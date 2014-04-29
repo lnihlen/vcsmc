@@ -1,0 +1,295 @@
+0. Rip frames out to individual images
+
+Use ffmpeg, -t 30 is to limit to 30 seconds of output, -r 1 can make 1 frame/sec,
+bmp is just random uncompressed format.
+
+ffmpeg -i sintel-1024-stereo.ogv -s 160x192 -pix_fmt abgr -f image2 frame-%7d.tiff
+
+
+1. Use ImageMagick to quantize the individual frames using the color reference image.
+
+convert frame-00297.tiff +dither -remap refcolors_ntsc.tiff remap-frame-00297.tiff
+
+it seems to be adding a color profile, which we might want to remove with +profile *
+
+can experiment with other dithering algorithms, e.g. -dither FloydSteinberg, or if the
+dithering is adding too much noise consider +dither to disable.
+
+Dithering makes individual images look good, but adds too much noise for a movie.
+
+TODO: paralellize. Currently hella slow.
+
+NOTE: to go back to a test mp4
+
+ffmpeg -pix_fmt abgr -s 160x192 -f image2 -i frame-%7d.tiff -r 24 original.mp4
+
+Kernel Designs:
+
+76 machine cycles per scanline. 228 color clocks consisting of 68 horizontal
+blank, 160 color.
+that means that 22 1/3 clock counts in hblank, 53 2/3 clock counts in color.
+use color clocks as timing in a scanline, since it goes from 0-227.
+
+an LDA immediate is 2 clocks. A STA zero-page is 3, absolute is 4. So minimum 5
+clocks to update something, possibly 6. Meaning 4-5 updates in hblank at most,
+10 during drawing. tight tight! looks like TIA is mostly in the zero-page.
+transfer between registers is quite fast, 1 clock. TXA and friends.
+for loading and storing x,a, and y are equal in speed.
+
+max 4 colors per line? not so! because you can change the colors at any time.
+it just costs you :).
+
+2-pass compiler. first pass is what needs to be set to what, and when, for line
+to render. minimize TIA state change, and include an entry set of conditions,
+calculate an exit set of conditions.
+second pass considers whole image timeframe, including vblank, and tries to make
+everything fit in, using 3 registers, the six or so zero-page RAM locations, and
+other memory locations as available.
+
+first pass, heuristic approach:
+
+identify best bg and pf candidates. both bg and pf are drawn in 4-pixel blocks.
+pf has weird symmetry opportunities - either being repeated or mirrored, so
+look for that. tie breakers are based on current TIA state - re-use BG color?
+re-use parts of PF bitfield? etc.
+
+players draw in 8 pixels, so slightly faster than 3 clock cycles.
+
+
+state block: basically everything in the TIA.
+***************
+
+Frame is one whole frame of animation. It takes an Image* as input (non-owning).
+Produces Image* at end, along with assembly language or even bytecode that
+generates that image.
+
+Frame consists of a series of Commands, which are fed into a Scheduler, which
+can reject them based on availability of resources.
+
+Command is something like "set background color register to $00." Commands have
+deadlines, absolute times by which they must be done. They might also have
+dependencies between each other, or be aware somehow of blackouts.
+
+Using the player sprite at time t. We've determined that turning on the player
+sprite with bitfield 0xaf and color 0xcc, horizontal offset at 0x01, player
+doubling disabled. Those are the preconditions and they have a deadline. Going
+back from that deadline, then, the question is what is the earliest time each
+of those could be met? There's also a strobe command to fire the player which
+has very tight timing constraints and must be issued on a certain cycle.
+
+Some talk about graceful degredation - best perhaps to handle it as just other
+sets of commands. They have different preconditions, the scheduler may be able
+to take advantage of prior state.
+
+Commands should try to generate their optimum strategy, but some commands don't
+have to - like "just strobe the player 1" - perhaps we can't schedule a command
+to change the bitfield in the player1 position at this time, but strobing it
+results in lower error than not..
+
+Start with just setting background color. Then add playfield options.
+
+======
+
+HARD SCHEDULING:
+
+76 machine cycles per scanline sort of limits the options. Additionally,
+some strategies really limit availability of other options.
+5 clocks per LDA/STA pair, 2 for the LDA Immediate mode, 3 for STA zero-page.
+22 clocks in hblank, so 4 load/store pairs, and 54 in scanout.
+
+Start of Scan Line:
+
+a) Strobe HMOVE or HCLR - 3 clocks.
+b) Update PF0           - 5 clocks.
+e) Update 1 color       - 5 clocks.
+c) Update GP0           - 5 clocks.
+d) Update GP1           - 5 clocks.
+
+There's about 25 things we chould change in this time, (25 choose 5) = 53510.
+
+BG color fitter - majority color on any given line. costs 5 clocks (unless BG unchanged).
+PF fitter - second majority color. set color before scanout costs 5 clocks (unless unchanged).
+  then another 5 clocks for PF0 during hblank, then another 5 for pf1, and other 5
+  for pf2, then pf0 again, then pf1, then pf2. So potentially 30 for bitfields and 5 for
+  color, 10 of it during hblank.
+
+
+================================================================================
+
+Constraints. How to represent what must be done and when. Some examples:
+
+a) playfield fitter wants to change PF1 to 0xef for this and the next scanline.
+this means there's a deadline for PF1 which is the color clock when the first pf1
+bit is scanned out to the screen. The range in which it could be set is anytime
+before that, up until the last blackout of pf1. The blackout on pf1 is then for
+the color clocks until pf1 has scanned out a second time. The PF color should not
+change during this time. Smaller state changes seem better, so consider only one
+ - like during this time of pf1 being scanned out, pf1 bitfield is off limits,
+  and it needs to be 0xef for this time.
+pf color seems dangerous to paint outside of hblank, as does bg color. so each
+line will first decide on pf and bg colors. - during scanout, bg color needs to
+be x, pf color needs to be y.
+
+anyway, constraint is like pf1 needs to be 0xef from t_0 to t_1, and also
+colupf needs to be 0xaa from t_0 to t_1 too. So that's two contraints, which
+can be modeled as two time ranges on those two registers.
+
+
+================================================================================
+
+what would a genome program look like?
+
+================================================================================
+
+What would a playfield-only kernel look like?
+
+PF0 in use from color clock 68 up until color clock 84
+PF1 in use from color clock 84 up until 116
+PF2 116 - 148
+PF0 148 - 164
+PF1 164 - 196
+PF2 196 - 228
+
+Action               | clocks | color | pixel |
+---------------------+--------+-------+-------+
+Set Background Color |   0    |   0   |   0   |
+Set Playfield Color  |   10   |   30  |   0   |
+Set PF0              |   15   |   45  |   0   |
+Set PF1              |   20   |   60  |   0   |
+Set PF2              |   25   |   75  |   7   |
+NOP                  |   30   |   90  |  22   |
+Set PF0              |   32   |   96  |  28   |
+NOP                  |   37   |  111  |  43   |
+Set PF1              |   39   |  117  |  49   |
+NOP                  |   44   |  132  |  64   |
+NOP                  |   46   |  138  |  70   |
+NOP                  |   48   |  144  |  76   |
+Set PF2              |   50   |  150  |  82   |
+sta WSYNC            |   65   |  165  |  97   |
+
+
+So for now, write a program that takes an input image, then:
+
+a) converts to atari colors
+b) then per-line:
+  c) computes histogram of colors, sorted by frequency
+  d) makes BG color most frequent
+  e) makes PF color second most frequent
+  f) analyzes each 4-pixel block. Compare error for BG color or PF color, pick
+      minimum error
+  g) constructs a time sequence of states for that line
+  h) directly fills a program buffer with opcodes for that line
+i) once finsihed with frame, should produce predicted output image and kernel
+    text file, with header and footer so it can be assembled.
+
+================================================================================
+
+Kernel scheduling: do the states drive the schedule or does the schedule drive
+the states?
+
+In the end we want to produce opcodes. But there needs to be a more semantic way
+to specify what is happening to the program. Like a domain-specific embedded
+language that is eventually run through an optimizing compiler, that either
+accepts or rejects the DSEL based on availability of resources.
+
+Two levels of optimization - high-level DSEL is trying to minimize pixel error.
+It can use any part of the TIA state machine at any time. Couple of different
+approaches here worth exploring such as hand-coded heuristics like playfield
+fitting, genetic algorithms, etc.
+
+Fitting emits DSEL, which is just per-line state information: (class ScanLine):
+colubk
+playfield:
+  80-bit bitfield, colupf
+players - list of n elements, each containing:
+  start_time - what pixel during scanout does this need to be triggered
+  color
+  bitmask
+  nusiz - can be used to repeat player or scale player
+
+Compilation then is a process of choosing the combination of state changes
+required to get TIA in to that state by the time each piece is needed that
+minimizes error for the picture. It's worth specifying entire state because it
+may be possible to fit quite a bit. During fitting we will experiment with
+throwing out different states that don't fit and examine resulting output
+picture for minimum error.
+
+--=<(* Fitting Heuristic A *)>=---
+
+Take histogram of line. For each color C in histogram, sorted by most frequent
+to least frequent:
+  set background color to C
+  playfield fitting
+  player fitting
+  if best error rate save as best fit
+
+playfield fitting:
+  for each 4-pixel block identify majority color if there is one. Break ties by
+  identifying minimum-error color.
+  histogram majority playfield colors. For now we adopt a single-color-per-line
+  playfied color strategy. playfield color is most frequent non-background
+  majority color. Then to determine bitfield we just compare error for 4 pixels
+  at bg color vs 4 pixels at fg color.
+
+player fitting:
+  Identify bit patterns of uncovered colors, that is colors that aren't
+  currently accurately covered by the BG or PF pattern. Maybe histogram each
+  bit pattern (of oncovered pixels), starting with each pixel position, and try
+  to identify commonality? This is an unsupervised learning clustering problem.
+  http://en.wikipedia.org/wiki/Hamming_distance as well as color distance.
+
+================================================================================
+
+How to fit the refcheck image?
+easy mode: 8 colors / line means 20 pixels / color. colubk/colupf thrashing:
+turn pf on for 5 bits, then off for 5 bits, etc. While playfield is drawing bump
+background color. While background is drawing bump playfield color.
+colors are just 1-8
+68 blank, 160 color
+
+Action               | clocks | color | pixel | comment                        |
+---------------------+--------+-------+-------+--------------------------------+
+lda color1           |    0   |    0  |    0  | set bg to color1               |
+sta colubk           |    2   |    6  |    0  |                                |
+lda color2           |    5   |   15  |    0  | set pf to color2               |
+sta colupf           |    7   |   21  |    0  |                                |
+lda color3           |   10   |   30  |    0  | wait for bg to paint           |
+nop                  |   13   |   39  |    0  |                                |
+nop                  |   15   |   45  |    0  |                                |
+nop                  |   17   |   51  |    0  |                                |
+nop                  |   19   |   57  |    0  |                                |
+nop                  |   21   |   63  |    0  | bg painting colu1 cc 68-88     |
+nop                  |   22   |   72  |    0  |                                |
+nop                  |   25   |   75  |    4  |                                |
+nop                  |   27   |   81  |   13  |                                |
+nop                  |   29   |   87  |   19  | pf painting colu2 cc 88-108    |
+sta colubk           |   31   |   93  |   25  |                                |
+lda color4           |   34   |  102  |   34  |                                |
+sta colupf           |   36   |  108  |   40  | bg painting colu3 cc 108-128   |
+lda color5           |   39   |  117  |   49  |                                |
+nop                  |   41   |  123  |   55  | fg painting colu4 cc 128-148   |
+sta colubk           |   43   |  129  |   61  |                                |
+lda color6           |   46   |  138  |   70  |                                |
+nop                  |   48   |  144  |   76  | bg painting colu5 cc 148-168   |
+sta colupf           |   50   |  150  |   82  |                                |
+lda color7           |   53   |  159  |   91  |                                |
+nop                  |   55   |  165  |   97  | fg painting colu6 cc 168-188   |
+sta colubk           |   57   |  171  |  103  |                                |
+lda color8           |   60   |  180  |  112  |                                |
+nop                  |   62   |  186  |  118  | bg painting colu7 cc 188-208   |
+sta colupf           |   64   |  192  |  125  |                                |
+sta WSYNC            |   67   |  201  |  134  |                                |
+
+hblank:
+  lda color1
+  sta colubk
+  lda color2
+  sta colupf
+scanout:
+  ; bg is drawing for 20 pixels
+  ; pf is drawing for 20 pixels
+  lda color2
+  sta colubk
+  nop   ; bk starts during
+  lda color
+
