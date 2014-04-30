@@ -137,10 +137,6 @@ can be modeled as two time ranges on those two registers.
 
 ================================================================================
 
-what would a genome program look like?
-
-================================================================================
-
 What would a playfield-only kernel look like?
 
 PF0 in use from color clock 68 up until color clock 84
@@ -293,3 +289,66 @@ scanout:
   nop   ; bk starts during
   lda color
 
+================================================================================
+
+what would a genome program look like?
+
+per-line genome is:
+  a) initial conditions - what state did the previous line leave things in?
+  b) up to 76 cycles of instructions. Can set X, Y, and A to constant values,
+     or can store one of those three registers into any of the "fair game"
+     zero-page TIA state registers such as COLUPF. Some strobes are also valid
+     such as RESP0 and even VBLANK but not WSYNC. Invalid state modifications,
+     like setting PF0 when it is being scanned out, or setting any color while
+     it is being drawn, are treated as no-ops by the scheduler, which therefore
+     modifies the clock count of that operation to 2 clocks. Do nothing is also
+     a choice of action.
+  c) an exit state.
+  d) a predicted output scanline
+  e) that ability to emit that line program in assembler
+
+program generation:
+  a) take image, break into ColuStrips
+  b) initial image state is everything is 0
+  c) for each ColuStrip:
+    d) histogram colu values
+    e) random seeding?
+    f) generate kGenerationSize random programs (ScanLines)
+      g) while cycle_count < 76 && error > kLineErrorTolerance:
+        h) make weighted probability choice to do a load or a store.
+        i) if load:
+          j) pick register with uniform probability
+          k) make weighted probability choice to pick colu or other
+          l) if colu pick histogram-weighted colu or if other just random byte
+        m) if store:
+          n) pick register with uniform probability
+          o) pick TIA address with uniform probability
+        p) output StateChange looks like (load/store, register, value/address)
+        q) supply StateChange to scheduler, along with current state.
+        r) Scheduler will determine if StateChange is invalid, in which case it
+           becomes a nop and takes 2 clocks. Otherwise it takes 3 or 4 clocks.
+        s) Scheduler returns new state and ScanLine, assuming this state change
+           was the last of the line.
+    t) Run standard GA on lines. Save best candidate code & output. Can save in
+       an image of stacked lines for each generation on each line. For scoring
+       the programs we want a weighted sum of error and length. If error is
+       below threshold we want to optimize for length more heavily perhaps.
+  u) Winning program is the program for that line. For testing generate a kernel
+     that paints a whole screen of that line, to ensure that our simulator is
+     simulating lines correctly. Add the winning program to the list of
+     ScanLines for the program and save output state as input for the next line.
+
+to think about later:
+  1) previous line packing. "what's the earliest I can set this?" ability to fit
+     in some state changes well before scanline starts.
+  2) bitfield random value seeding - are there other random values besides color
+     histogram that might help seed better programs?
+  3) redundant state changes become nops - did the porgram just set A and never
+     did anything with it? that first set becomes a nop, freeing up a cycle.
+  4) greedy generation algorithms - regenerate StateChange until we find one
+     that decreases error, or regenerate ones that fail to schedule, etc
+  5) output kernel could be upwards of 10K in size! Think about bankswitching
+     strategies. They may impact timing on certain lines. Ultimately it may make
+     the most sense in terms of timing to just let the program counter wrap and
+     always be loading in fresh code behind the PC, since we never jump or fork
+     or anything.

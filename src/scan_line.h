@@ -3,26 +3,34 @@
 
 #include <vector>
 
-#include "player.h"
+#include "colu_strip.h"
+#include "opcodes.h"
+#include "state.h"
 #include "types.h"
 
-// A ScanLine represents the output of the first pass of the compiler, fitting.
-// The goal of fitting is to approximate a single line of the input image with
-// the drawing primitives available on the VCS.
+namespace vcsmc {
+
+// A ScanLine represents a program that will attempt to render one ColuStrip.
+// It has a starting State, which is the state of the VCS on entry to the
+// ScanLine. It also has a target ColuStrip, which is the ColuStrip this
+// ScanLine is attempting to render with minimum error. It has a list of
+// (OpCode, new state) pairs representing the program changes to the TIA state
+// machine. It can evaluate this to produce a predicted output ColuStrip. It can
+// also output its program in assembly language (and possibly later bytecode).
+// It can answer questions about its size in bytecode bytes as well as its
+// length in Color Clocks or CPU cycles.
 class ScanLine {
  public:
+  ScanLine(const ColuStrip& target_strip);
+  ~ScanLine();
 
  private:
-  // 80-bit playfield, 4 pixels/bit.
-  uint8 playfield_[10];
-
-  // Background color/luminance.
-  uint8 colubk_;
-
-  // Playfield color/luminance.
-  uint8 colupf_;
-
-  std::vector<Player> players_;
+  ColuStrip target_strip_;
+  // Owning vector of OpCodes in time order.
+  std::vector<OpCode*> opcodes_;
+  std::vector<State> states_;
 };
+
+}  // namespace vcsmc
 
 #endif  // SRC_SCAN_LINE_H_
