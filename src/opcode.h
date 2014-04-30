@@ -26,77 +26,78 @@ class OpCode {
   virtual const uint32 bytes() const = 0;
 
   // Returns the assember version of this OpCode.
-  virtual const std::string& assembler() const = 0;
+  virtual const std::string assembler() const = 0;
 };
 
 class LoadImmediate : public OpCode {
  public:
-  LoadImmediate(uint8 value);
+  virtual State Transform(const State& state) const;
   virtual const uint32 cycles() const override;
   virtual const uint32 bytes() const override;
+  virtual const std::string assembler() const override;
 
  protected:
+  LoadImmediate(uint8 value, State::Register reg);
   uint8 value_;
+  State::Register register_;
+
+ private:
+  LoadImmediate() { /* Do not call me */ }
 };
 
 class LDA : public LoadImmediate {
  public:
-  LDA(uint8 value);
-  virtual State Transform(const State& state) const override;
-  virtual const std::string& assembler() const override;
+  LDA(uint8 value) : LoadImmediate(value, State::Register::A) {}
 };
 
 class LDX : public LoadImmediate {
  public:
-  LDX(uint8 value);
-  virtual State Transform(const State& state) const override;
-  virtual const std::string& assembler() const override;
+  LDX(uint8 value) : LoadImmediate(value, State::Register::X) {}
 };
 
 class LDY : public LoadImmediate {
  public:
-  LDY(uint8 value);
-  virtual State Transform(const State& state) const override;
-  virtual const std::string& assembler() const override;
+  LDY(uint8 value) : LoadImmediate(value, State::Register::Y) {}
 };
 
 class StoreZeroPage : public OpCode {
  public:
-  StoreZeroPage(uint8 address);
+  virtual State Transform(const State& state) const;
   virtual const uint32 cycles() const override;
   virtual const uint32 bytes() const override;
+  virtual const std::string assembler() const override;
+
  protected:
+  StoreZeroPage(uint8 address, State::Register reg);
   uint8 address_;
+  State::Register register_;
+
+ private:
+  StoreZeroPage() { /* Do not call me */ }
 };
 
 class STA : public StoreZeroPage {
  public:
-  STA(uint8 address);
-  virtual State Transform(const State& state) const override;
-  virtual const std::string& assembler() const override;
+  STA(uint8 address) : StoreZeroPage(address, State::Register::A) {}
 };
 
 class STX : public StoreZeroPage {
  public:
-  STX(uint8 address);
-  virtual State Transform(const State& state) const override;
-  virtual const std::string& assembler() const override;
+  STX(uint8 address) : StoreZeroPage(address, State::Register::X) {}
 };
 
 class STY : public StoreZeroPage {
  public:
-  STY(uint address);
-  virtual State Transform(const State& state) const override;
-  virtual const std::string& assembler() const override;
+  STY(uint address) : StoreZeroPage(address, State::Register::Y) {}
 };
 
 class NOP : public OpCode {
  public:
-  NOP();
+  NOP() {}
   virtual State Transform(const State& state) const override;
   virtual const uint32 cycles() const override;
   virtual const uint32 bytes() const override;
-  virtual const std::string& assembler() const override;
+  virtual const std::string assembler() const override;
 };
 
 }  // namespace op

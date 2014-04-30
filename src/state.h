@@ -1,7 +1,11 @@
 #ifndef SRC_STATE_H_
 #define SRC_STATE_H_
 
+#include <string>
+
 #include "constants.h"
+
+namespace vcsmc {
 
 // State represents a moment in time for the VCS. It is a complete (enough for
 // our purposes) representation of the VCS hardware. It can generate output
@@ -62,13 +66,29 @@ class State {
     count  = 0x2d
   };
 
+  enum Register : uint8 {
+    A,
+    Y,
+    X,
+    count = 3;
+  };
+
+  //====== Utility Methods
+
+  // Given a value like Register::A returns "a";
+  static std::string RegisterToString(const Register reg);
+  // Given a ZeroPage address returns either a human-readable name, if within
+  // the TIA realm, or a hexadecimal number for the address.
+  static std::string AddressToString(const uint8 address);
+  // Really only here because the other things are here. Given 0xfe will return
+  // the string "$fe".
+  static std::string ByteToHexString(const uint8 value);
+
  private:
   uint8 tia_[TIA::count];
-  uint8 ram_[kNumberOfBytesOfRAM];
-  uint8 a_;
-  uint8 x_;
-  uint8 y_;
+  uint8 registers_[Register::count];
 };
 
+}  // namespace vcsmc
 
 #endif  // SRC_STATE_H_

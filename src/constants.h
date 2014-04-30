@@ -16,11 +16,6 @@ const uint32 kColorClocksPerCPUCycle = 3;
 const uint32 kScanLineWidthCycles = kScanLineWidthClocks /
                                     kColorClocksPerCPUCycle;
 
-// The PIA provides 128 bytes of RAM starting at zero page address $80. The
-// stack is also used for this, it grows down from $ff. We reserve only 1 byte
-// for the stack.
-const uint32 kNumberOfBytesOfRAM = 127;
-
 }  // namespace vcsmc
 
 #endif  // SRC_CONSTANTS_H_
