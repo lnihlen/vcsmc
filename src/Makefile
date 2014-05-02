@@ -7,7 +7,7 @@ LIBS=-lm -lstdc++ -ltiff
 
 DEPS=constants.h image_file.h types.h
 OBJ=background_color_strategy.o color.o frame.o histogram.o image.o kernel.o   \
-    opcode.o picc.o scan_line.o state.o switches.o tiff_image_file.o
+    log.o opcode.o picc.o scan_line.o state.o switches.o tiff_image_file.o
 
 %.o: %.cc $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)

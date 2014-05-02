@@ -1,6 +1,7 @@
 #ifndef SRC_STATE_H_
 #define SRC_STATE_H_
 
+#include <memory>
 #include <string>
 
 #include "constants.h"

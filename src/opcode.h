@@ -1,6 +1,7 @@
 #ifndef SRC_OPCODE_H_
 #define SRC_OPCODE_H_
 
+#include <memory>
 #include <string>
 
 #include "constants.h"
@@ -17,7 +18,8 @@ class OpCode {
  public:
   // Given input State, apply this OpCode to it and return the resultant output
   // state.
-  virtual State Transform(const State& state) const = 0;
+  virtual std::unique_ptr<State> Transform(
+      const std::unique_ptr<State>& state) const = 0;
 
   // Returns the number of CPU cycles this opcode takes.
   virtual const uint32 cycles() const = 0;
@@ -31,7 +33,8 @@ class OpCode {
 
 class LoadImmediate : public OpCode {
  public:
-  virtual State Transform(const State& state) const;
+  virtual std::unique_ptr<State> Transform(
+      const std::unique_ptr<State>& state) const;
   virtual const uint32 cycles() const override;
   virtual const uint32 bytes() const override;
   virtual const std::string assembler() const override;
@@ -62,14 +65,15 @@ class LDY : public LoadImmediate {
 
 class StoreZeroPage : public OpCode {
  public:
-  virtual State Transform(const State& state) const;
+  virtual std::unique_ptr<State> Transform(
+      const std::unique_ptr<State>& state) const;
   virtual const uint32 cycles() const override;
   virtual const uint32 bytes() const override;
   virtual const std::string assembler() const override;
 
  protected:
-  StoreZeroPage(uint8 address, State::Register reg);
-  uint8 address_;
+  StoreZeroPage(State::TIA address, State::Register reg);
+  State::TIA address_;
   State::Register register_;
 
  private:
@@ -78,23 +82,24 @@ class StoreZeroPage : public OpCode {
 
 class STA : public StoreZeroPage {
  public:
-  STA(uint8 address) : StoreZeroPage(address, State::Register::A) {}
+  STA(State::TIA address) : StoreZeroPage(address, State::Register::A) {}
 };
 
 class STX : public StoreZeroPage {
  public:
-  STX(uint8 address) : StoreZeroPage(address, State::Register::X) {}
+  STX(State::TIA address) : StoreZeroPage(address, State::Register::X) {}
 };
 
 class STY : public StoreZeroPage {
  public:
-  STY(uint8 address) : StoreZeroPage(address, State::Register::Y) {}
+  STY(State::TIA address) : StoreZeroPage(address, State::Register::Y) {}
 };
 
 class NOP : public OpCode {
  public:
   NOP() {}
-  virtual State Transform(const State& state) const override;
+  virtual std::unique_ptr<State> Transform(
+      const std::unique_ptr<State>& state) const override;
   virtual const uint32 cycles() const override;
   virtual const uint32 bytes() const override;
   virtual const std::string assembler() const override;

@@ -6,6 +6,8 @@
 
 #include "types.h"
 
+namespace vcsmc {
+
 Image* TiffImageFile::Load() {
   TIFF* tiff = TIFFOpen(file_path_.c_str(), "r");
   if (!tiff) {
@@ -86,3 +88,5 @@ bool TiffImageFile::Save(Image* image) {
   delete[] scanline;
   return success;
 }
+
+}  // namespace vcsmc

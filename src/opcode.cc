@@ -8,17 +8,17 @@ LoadImmediate::LoadImmediate(uint8 value, State::Register reg)
     : value_(value),
       register_(reg) { }
 
-std::unique_ptr<State> LoadImmediate::Transform(const State& state) const {
-  State new_state(state);
-  new_state.SetRegister(register_, value_);
-  return new_state;
+std::unique_ptr<State> LoadImmediate::Transform(
+    const std::unique_ptr<State>& state) const {
+  return std::move(state->AdvanceTimeAndSetRegister(
+      cycles() * kColorClocksPerCPUCycle, register_, value_));
 }
 
 const uint32 LoadImmediate::cycles() const { return 2u; }
 
 const uint32 LoadImmediate::bytes() const { return 2u; }
 
-const std::string assembler() const {
+const std::string LoadImmediate::assembler() const {
   std::string asm_string("ld");
 
   // Add register string name to instruction.
@@ -30,9 +30,15 @@ const std::string assembler() const {
   return asm_string;
 }
 
-StoreZeroPage::StoreZeroPage(uint8 address, State::Register reg)
+StoreZeroPage::StoreZeroPage(State::TIA address, State::Register reg)
     : address_(address),
       register_(reg) { }
+
+std::unique_ptr<State> StoreZeroPage::Transform(
+    const std::unique_ptr<State>& state) const {
+  return std::move(state->AdvanceTimeAndCopyRegisterToTIA(
+      cycles() * kColorClocksPerCPUCycle, register_, address_));
+}
 
 const uint32 StoreZeroPage::cycles() const { return 3u; }
 
@@ -46,9 +52,9 @@ const std::string StoreZeroPage::assembler() const {
   return asm_string;
 }
 
-State NOP::Transform(const State& state) const {
-  State new_state(state);
-  return new_state;
+std::unique_ptr<State> NOP::Transform(
+    const std::unique_ptr<State>& state) const {
+  return std::move(state->AdvanceTime(cycles() * kColorClocksPerCPUCycle));
 }
 
 const uint32 NOP::cycles() const { return 2u; }

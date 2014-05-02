@@ -4,7 +4,8 @@
 
 namespace vcsmc {
 
-static Switches* Switches::instance_ = NULL;
+// static
+Switches* Switches::instance_ = NULL;
 
 Switches::Switches() {
   assert(!instance_);
@@ -29,18 +30,11 @@ bool Switches::Parse(int argc, char* argv[]) {
       // Check for follow-on argument of filename.
     } else {
       // No argument matched, return parsing failure.
-      return -1;
+      return false;
     }
   }
 
   return true;
-}
-
-
-// static
-void Switches::Teardown() {
-  delete instance_;
-  instance_ = NULL;
 }
 
 }  // namespace vcsmc

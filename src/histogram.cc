@@ -1,5 +1,7 @@
 #include "histogram.h"
 
+#include <algorithm>
+#include <cstring>
 #include <map>
 
 #include "constants.h"

@@ -16,7 +16,7 @@ std::string State::RegisterToString(const Register reg) {
 // static
 std::string State::AddressToString(const uint8 address) {
   // First see if within the TIA range or no:
-  if (address < TIA::count) {
+  if (address < TIA::TIA_COUNT) {
     switch (address) {
       case VSYNC:   return "VSYNC";
       case VBLANK:  return "VBLANK";
@@ -76,6 +76,5 @@ std::string State::ByteToHexString(const uint8 value) {
   std::snprintf(buf, 4, "$%01x", value);
   return std::string(buf);
 }
-
 
 }  // namespace vcsmc
