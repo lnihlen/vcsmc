@@ -2,6 +2,7 @@
 #define SRC_KERNEL_H_
 
 #include "frame.h"
+#include "scan_line.h"
 
 namespace vcsmc {
 
@@ -13,12 +14,16 @@ namespace vcsmc {
 class Kernel {
  public:
   // Takes ownership of target_frame.
-  Kernel(Frame* target_frame);
+  Kernel(std::unique_ptr<Frame> target_frame);
 
   void Fit();
 
+  // Save output.
+  void Save();
+
  private:
   std::unique_ptr<Frame> target_frame_;
+  std::vector<std::unique_ptr<ScanLine>> scan_lines_;
 };
 
 }  // namespace vcsmc

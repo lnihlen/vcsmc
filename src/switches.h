@@ -9,11 +9,13 @@ namespace vcsmc {
 // support defaults living all in one place.
 class Switches {
  public:
+  // Initializes the singleton pointer, or asserts if one already exists.
+  Switches();
+  // NULLs the singleton pointer.
+  ~Switches();
   // Parse command-arguments. Returns false on failure to parse. Also
   // initializes the Switches singleton for future queries.
   static bool Parse(int argc, char* argv[]);
-  // Call on program termination, deletes the singleton.
-  static void Teardown();
 
   static const std::string& input_file();
   static const std::string& output_file();

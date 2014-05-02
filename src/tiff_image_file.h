@@ -8,8 +8,8 @@ class TiffImageFile : public ImageFile {
   TiffImageFile(const std::string& file_path) : ImageFile(file_path) {}
 
   // ImageFile overrides
-  virtual Image* Load() override;
-  virtual bool Save(Image* image) override;
+  virtual std::unique_ptr<Image> Load() override;
+  virtual bool Save(const std::unique_ptr<Image>& image) override;
 };
 
 #endif  // SRC_BITMAP_IMAGE_FILE_H_

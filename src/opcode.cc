@@ -8,7 +8,7 @@ LoadImmediate::LoadImmediate(uint8 value, State::Register reg)
     : value_(value),
       register_(reg) { }
 
-State LoadImmediate::Transform(const State& state) const {
+std::unique_ptr<State> LoadImmediate::Transform(const State& state) const {
   State new_state(state);
   new_state.SetRegister(register_, value_);
   return new_state;

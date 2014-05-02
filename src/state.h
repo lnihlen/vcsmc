@@ -13,7 +13,6 @@ namespace vcsmc {
 // active.
 class State {
  public:
-
   // Defines the address and name of every register on the TIA. The ones marked
   // as (strobe) are write-only and writing to them will cause new changes in
   // state.
@@ -63,16 +62,35 @@ class State {
     HMOVE  = 0x2a,  // (strobe) apply horizontal motion
     HMCLR  = 0x2b,  // (strobe) clear horizontal motion registers
     CXCLR  = 0x2c,  // (strobe) clear collision latches
-    count  = 0x2d
+    TIA_COUNT  = 0x2d
   };
 
   enum Register : uint8 {
-    A,
-    Y,
-    X,
-    count = 3;
+    A = 0,
+    Y = 1,
+    X = 2,
+    REGISTER_COUNT = 3
   };
 
+  // Given this state at |color_clock_| = t, produce a new State which is an
+  // exact copy of this one but at color_clock_ = t + delta time.
+  std::unique_ptr<State> AdvanceTime(uint32 delta);
+
+  // Same as above, but the returned state also has new value stored in reg.
+  std::unique_ptr<State> AdvanceTimeAndSetRegister(uint32 delta,
+                                                   Register reg,
+                                                   uint8 value);
+
+  // Save as above, but the returned state also simulates the effect of copying
+  // the value in reg to the supplied tia address. Note that for some of the
+  // strobe values this can have substantial impact on other states within the
+  // new state. Also note that setting some states is invalid, like strobing
+  // HMOVE at times other than at the start of HBLANK, or in general setting
+  // values while they are in use, and if such a state is invalid this function
+  // will return nullptr.
+  std::unique_ptr<State> AdvanceTimeAndCopyRegisterToTIA(uint32 delta,
+                                                         Register reg,
+                                                         TIA address);
   //====== Utility Methods
 
   // Given a value like Register::A returns "a";
@@ -85,8 +103,10 @@ class State {
   static std::string ByteToHexString(const uint8 value);
 
  private:
-  uint8 tia_[TIA::count];
-  uint8 registers_[Register::count];
+  uint8 tia_[TIA_COUNT];
+  uint8 registers_[REGISTER_COUNT];
+  uint32 color_clock_;
+
 };
 
 }  // namespace vcsmc

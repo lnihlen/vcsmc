@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "colu_strip.h"
-#include "opcodes.h"
+#include "opcode.h"
 #include "state.h"
 #include "types.h"
 
@@ -27,8 +27,8 @@ class ScanLine {
  private:
   ColuStrip target_strip_;
   // Owning vector of OpCodes in time order.
-  std::vector<OpCode*> opcodes_;
-  std::vector<State> states_;
+  std::vector<std::unique_ptr<op::OpCode>> opcodes_;
+  std::vector<std::unique_ptr<State>> states_;
 };
 
 }  // namespace vcsmc

@@ -88,7 +88,7 @@ class STX : public StoreZeroPage {
 
 class STY : public StoreZeroPage {
  public:
-  STY(uint address) : StoreZeroPage(address, State::Register::Y) {}
+  STY(uint8 address) : StoreZeroPage(address, State::Register::Y) {}
 };
 
 class NOP : public OpCode {

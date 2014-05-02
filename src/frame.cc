@@ -5,53 +5,44 @@
 
 #include "color.h"
 
-Frame::Frame() {
-  colors_ = new uint8[kFrameSize];
-  memset(colors_, 0, kFrameSize);
+namespace vcsmc {
+
+Frame::Frame()
+    : colu_(new uint8[kFrameSizeBytes]) {
+  std::memset(colu_.get(), 0, kFrameSizeBytes);
 }
 
-Frame::Frame(Image* image) {
-  assert(image->width() == kFrameWidth);
-  assert(image->height() == kFrameHeight);
+Frame::Frame(const std::unique_ptr<Image>& image)
+    : colu_(new uint8[kFrameSizeBytes]) {
+  assert(image->width() == kFrameWidthPixels);
+  assert(image->height() == kFrameHeightPixels);
 
-  colors_ = new uint8[kFrameSize];
   uint32 offset = 0;
-  for (uint32 i = 0; i < kFrameWidth; ++i) {
-    for (uint32 j = 0; j < kFrameHeight; ++j) {
-      colors_[offset] = Color::ABGRToAtariColor(image->GetPixel(i, j));
+  for (uint32 i = 0; i < kFrameWidthPixels; ++i) {
+    for (uint32 j = 0; j < kFrameHeightPixels; ++j) {
+      colu_[offset] = Color::ABGRToAtariColor(image->GetPixel(i, j));
       ++offset;
     }
   }
 }
 
-Frame::Frame(const Frame& frame) {
-  colors_ = new uint8[kFrameSize];
-  *this = frame;
-}
-
-const Frame& Frame::operator=(const Frame& frame) {
-  memcpy(colors_, frame.colors_, kFrameSize);
-  return *this;
-}
-
-Frame::~Frame() {
-  delete[] colors_;
-}
-
 void Frame::SetColor(uint32 offset, uint8 color) {
-  assert(offset < kFrameSize);
-  colors_[offset] = color;
+  assert(offset < kFrameSizeBytes);
+  colu_[offset] = color;
 }
 
-Image* Frame::ToImage() {
-  Image* image = new Image(kFrameWidth, kFrameHeight);
+std::unique_ptr<Image> Frame::ToImage() {
+  std::unique_ptr<Image> image(new Image(kFrameWidthPixels,
+                                         kFrameHeightPixels));
   uint32 offset = 0;
-  for (uint32 i = 0; i < kFrameWidth; ++i) {
-    for (uint32 j = 0; j < kFrameHeight; ++j) {
-      uint32 abgr = Color::AtariColorToABGR(colors_[offset]);
+  for (uint32 i = 0; i < kFrameWidthPixels; ++i) {
+    for (uint32 j = 0; j < kFrameHeightPixels; ++j) {
+      uint32 abgr = Color::AtariColorToABGR(colu_[offset]);
       image->SetPixel(i, j, abgr);
     }
   }
 
-  return image;
+  return std::move(image);
 }
+
+}  // namespace vcsmc

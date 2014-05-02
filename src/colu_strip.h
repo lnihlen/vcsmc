@@ -14,7 +14,7 @@ class ColuStrip {
  public:
   // Given a pixel [0..width()) returns the stored colu value.
   const uint8 colu(const uint32 pixel) const { return colu_[pixel]; }
-  const uint32 width() const return { return kFrameWidthPixels; }
+  const uint32 width() const { return kFrameWidthPixels; }
 
  private:
   uint8 colu_[kFrameWidthPixels];

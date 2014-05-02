@@ -1,15 +1,26 @@
 #include "switches.h"
 
+#include <cassert>
+
 namespace vcsmc {
 
 static Switches* Switches::instance_ = NULL;
+
+Switches::Switches() {
+  assert(!instance_);
+  instance_ = this;
+}
+
+Switches::~Switches() {
+  assert(instance_);
+  instance_ = NULL;
+}
 
 // static
 bool Switches::Parse(int argc, char* argv[]) {
   if (argc < 2 || std::string(argv[0]) != "picc")
     return false;
 
-  instance_ = new Switches();
   instance_->input_file_ = std::string(argv[1]);
 
   for (int i = 2; i < argc, ++i) {
@@ -24,6 +35,7 @@ bool Switches::Parse(int argc, char* argv[]) {
 
   return true;
 }
+
 
 // static
 void Switches::Teardown() {

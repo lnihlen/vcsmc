@@ -13,9 +13,11 @@ namespace vcsmc {
 // that behavior.
 class Strategy {
  public:
-  // Attempts to fit the scanline.
-  virtual ScanLine Fit(ColuStrip* target_strip, State* entry_state) = 0;
-
+  // Attempts to fit the colustrip, returns a new ScanLine representing best
+  // fit.
+  virtual std::unique_ptr<ScanLine> Fit(
+      const std::unique_ptr<ColuStrip>& target_strip,
+      const std::unique_ptr<State>& entry_state) = 0;
 };
 
 }  // namespace vcsmc
