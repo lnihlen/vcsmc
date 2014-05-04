@@ -24,6 +24,7 @@ class Kernel {
  private:
   std::unique_ptr<Frame> target_frame_;
   std::vector<std::unique_ptr<ScanLine>> scan_lines_;
+  std::unique_ptr<Frame> output_frame_;
 };
 
 }  // namespace vcsmc

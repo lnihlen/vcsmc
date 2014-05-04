@@ -119,4 +119,12 @@ double Color::CartesianDistanceSquaredABGR(uint32_t a, uint32_t b) {
   return (d_b * d_b) + (d_g * d_g) + (d_r * d_r);
 }
 
+// static
+double Color::CartesianDistanceSquaredAtari(uint8 a, uint8 b) {
+  return CartesianDistanceSquaredABGR(AtariColorToABGR(a), AtariColorToABGR(b));
+}
+
+// http://www.ece.rochester.edu/~gsharma/ciede2000/ciede2000noteCRNA.pdf
+// CIEDE2000 color distance.
+
 }  // namespace vcsmc

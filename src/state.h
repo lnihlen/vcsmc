@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "colu_strip.h"
 #include "constants.h"
 
 namespace vcsmc {
@@ -14,6 +15,9 @@ namespace vcsmc {
 // active.
 class State {
  public:
+  // Constructs a default initial state, with all values set to zero.
+  State();
+
   // Defines the address and name of every register on the TIA. The ones marked
   // as (strobe) are write-only and writing to them will cause new changes in
   // state.
@@ -73,6 +77,14 @@ class State {
     REGISTER_COUNT = 3
   };
 
+  // Fill pixels into |colu_strip| from [color_clock, until)
+  void PaintInto(ColuStrip* colu_strip, uint32 until);
+
+  //====== State Creation Methods
+
+  // Produces an exact copy of this State.
+  std::unique_ptr<State> Clone() const;
+
   // Given this state at |color_clock_| = t, produce a new State which is an
   // exact copy of this one but at color_clock_ = t + delta time.
   std::unique_ptr<State> AdvanceTime(uint32 delta) const;
@@ -102,6 +114,12 @@ class State {
   // Really only here because the other things are here. Given 0xfe will return
   // the string "$fe".
   static std::string ByteToHexString(const uint8 value);
+
+  const uint32 color_clocks() const { return color_clock_; }
+  const uint8 x() const { return registers_[Register::X]; }
+  const uint8 y() const { return registers_[Register::Y]; }
+  const uint8 a() const { return registers_[Register::A]; }
+  const uint8 tia(TIA address) const { return tia_[address]; }
 
  private:
   State(const State& state);

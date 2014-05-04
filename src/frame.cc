@@ -4,6 +4,9 @@
 #include <cstring>
 
 #include "color.h"
+#include "colu_strip.h"
+#include "constants.h"
+#include "image.h"
 
 namespace vcsmc {
 
@@ -31,7 +34,12 @@ void Frame::SetColor(uint32 offset, uint8 color) {
   colu_[offset] = color;
 }
 
-std::unique_ptr<Image> Frame::ToImage() {
+void Frame::SetStrip(const std::unique_ptr<ColuStrip>& strip, uint32 row) {
+  uint32 offset = row * kFrameWidthPixels;
+  std::memcpy(colu_.get() + row, strip->colus(), kFrameWidthPixels);
+}
+
+std::unique_ptr<Image> Frame::ToImage() const {
   std::unique_ptr<Image> image(new Image(kFrameWidthPixels,
                                          kFrameHeightPixels));
   uint32 offset = 0;
@@ -42,7 +50,13 @@ std::unique_ptr<Image> Frame::ToImage() {
     }
   }
 
-  return std::move(image);
+  return image;
+}
+
+std::unique_ptr<ColuStrip> Frame::GetStrip(uint32 row) const {
+  assert(row < kFrameHeightPixels);
+  return std::unique_ptr<ColuStrip>(
+      new ColuStrip(colu_, row * kFrameWidthPixels));
 }
 
 }  // namespace vcsmc

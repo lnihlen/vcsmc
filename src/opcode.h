@@ -33,6 +33,7 @@ class OpCode {
 
 class LoadImmediate : public OpCode {
  public:
+  LoadImmediate(uint8 value, State::Register reg);
   virtual std::unique_ptr<State> Transform(
       const std::unique_ptr<State>& state) const;
   virtual const uint32 cycles() const override;
@@ -40,7 +41,6 @@ class LoadImmediate : public OpCode {
   virtual const std::string assembler() const override;
 
  protected:
-  LoadImmediate(uint8 value, State::Register reg);
   uint8 value_;
   State::Register register_;
 
@@ -65,6 +65,7 @@ class LDY : public LoadImmediate {
 
 class StoreZeroPage : public OpCode {
  public:
+  StoreZeroPage(State::TIA address, State::Register reg);
   virtual std::unique_ptr<State> Transform(
       const std::unique_ptr<State>& state) const;
   virtual const uint32 cycles() const override;
@@ -72,7 +73,6 @@ class StoreZeroPage : public OpCode {
   virtual const std::string assembler() const override;
 
  protected:
-  StoreZeroPage(State::TIA address, State::Register reg);
   State::TIA address_;
   State::Register register_;
 

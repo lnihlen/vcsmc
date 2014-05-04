@@ -10,7 +10,7 @@ class BackgroundColorStrategy : public Strategy {
  public:
   virtual std::unique_ptr<ScanLine> Fit(
       const std::unique_ptr<ColuStrip>& target_strip,
-      const std::unique_ptr<State>& state) override;
+      const std::unique_ptr<State>& entry_state) override;
 };
 
 }  // namespace vcsmc

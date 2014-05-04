@@ -352,3 +352,36 @@ to think about later:
      the most sense in terms of timing to just let the program counter wrap and
      always be loading in fresh code behind the PC, since we never jump or fork
      or anything.
+
+
+================================================================================
+
+** wishlist
+
+a) backfiller - as mentioned before, ability to move some state changes to
+before scanline starts could be really invaluable. These other state changes
+should be at a discount when it comes to calculating scanline cost. although
+register/state dependency analysis seems interesting, a naive approach to this
+feature might be to iterate through any available time slice in the past, try
+to insert proposed instruction, and note if any pixels change color on the
+output. Could have something like two methods "earliest time to load register"
+which could look also for times when any register had been set to the required
+value, if any, and "earliest time to load value," which would just look for
+spots on the schedule to load the given tia address with the value. The two
+parts of the function account well for different scenarios like strobing, where
+nobody cares about the values they just need to be written, and setting multiple
+addresses to same value, where once the register is loaded we can stuff away.
+
+b) perception-weighted error metrics - seem to me vital in increasing quality of
+fit, like CIEDE2000 for color distance. What about position in image weighting,
+or edge vs. interior weighting? All pixels are _not_ created equal.
+
+c) PNG lossless. Because TIFF.
+
+d) Using the CIEDE2000 metric, do k-Means clustering or other unsupervised
+learning algorithm to cluster colors in to n Atari colors. Then BG color strategy
+just enumerates all atari colors to find minimum error. Playfield strategy does
+same but enumerates all possible 2-color choices, 128 choose 2 = 128 * 127 =
+16257 a computationally tractable number of choices to evaluate. Beyond that
+we'll need to do heuristic clustering, 128 choose 3 = 2048256, which evaluating
+1000 combos a second is a 34s eval (so maybe doable).

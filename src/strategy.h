@@ -1,11 +1,13 @@
 #ifndef SRC_STRATEGY_H_
 #define SRC_STRATEGY_H_
 
-#include "colu_strip.h"
-#include "scan_line.h"
-#include "state.h"
+#include <memory>
 
 namespace vcsmc {
+
+class ColuStrip;
+class ScanLine;
+class State;
 
 // A Strategy defines an approach to generating ScanLines. It has a target line
 // of colors and attempts to generate a ScanLine with minimum error and length
@@ -14,7 +16,8 @@ namespace vcsmc {
 class Strategy {
  public:
   // Attempts to fit the colustrip, returns a new ScanLine representing best
-  // fit.
+  // fit. Entry state should be aligned to the color clock at the start of the
+  // ScanLine.
   virtual std::unique_ptr<ScanLine> Fit(
       const std::unique_ptr<ColuStrip>& target_strip,
       const std::unique_ptr<State>& entry_state) = 0;

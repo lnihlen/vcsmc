@@ -1,10 +1,31 @@
 #include "state.h"
 
+#include <cassert>
+
 namespace vcsmc {
 
-std::unique_ptr<State> State::AdvanceTime(uint32 delta) const {
+State::State()
+    : color_clock_(0) {
+  std::memset(tia_, 0, sizeof(tia_));
+  std::memset(registers_, 0, sizeof(registers_));
+}
+
+void State::PaintInto(ColuStrip* colu_strip, uint32 until) {
+  assert(color_clock_ < until);
+  uint32 starting_clock = std::max(color_clock_, kHBlankWidthClocks);
+  for (uint32 clock = starting_clock; clock < until; ++clock) {
+    colu_strip->SetColu(clock - kHBlankWidthClocks, tia_[TIA::COLUBK]);
+  }
+}
+
+std::unique_ptr<State> State::Clone() const {
   // Make a copy of ourselves.
   std::unique_ptr<State> state(new State(*this));
+  return state;
+}
+
+std::unique_ptr<State> State::AdvanceTime(uint32 delta) const {
+  std::unique_ptr<State> state(Clone());
   // Add to the color_clock_
   state->color_clock_ += delta;
   return state;
@@ -22,7 +43,7 @@ std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
   std::unique_ptr<State> state(AdvanceTime(delta));
   uint8 reg_value = state->registers_[reg];
   switch (address) {
-
+    // interesting code here... :)
 
     default:
       state->tia_[address] = reg_value;

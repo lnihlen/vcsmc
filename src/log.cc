@@ -2,8 +2,6 @@
 
 #include <cassert>
 
-#include "switches.h"
-
 namespace vcsmc {
 
 // static

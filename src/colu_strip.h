@@ -1,6 +1,8 @@
 #ifndef SRC_COLU_STRIP_H_
 #define SRC_COLU_STRIP_H_
 
+#include <memory>
+
 #include "constants.h"
 #include "types.h"
 
@@ -12,9 +14,21 @@ namespace vcsmc {
 // output.
 class ColuStrip {
  public:
+  ColuStrip();
+  // Builds a ColuStrip by making a copy of kFrameWidthPixels bytes from the
+  // provided pointer and offset.
+  ColuStrip(const std::unique_ptr<uint8[]>& colu, uint32 offset);
+
+  // Returns the error distance from the provided ColuStrip.
+  double DistanceFrom(const std::unique_ptr<ColuStrip>& colu_strip) const;
+
+  void SetColu(const uint32 pixel, const uint8 colu) { colu_[pixel] = colu; }
+
   // Given a pixel [0..width()) returns the stored colu value.
   const uint8 colu(const uint32 pixel) const { return colu_[pixel]; }
   const uint32 width() const { return kFrameWidthPixels; }
+
+  const uint8* colus() { return colu_; }
 
  private:
   uint8 colu_[kFrameWidthPixels];
