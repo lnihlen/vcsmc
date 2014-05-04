@@ -21,11 +21,8 @@ namespace vcsmc {
 // length in Color Clocks or CPU cycles.
 class ScanLine {
  public:
-  ScanLine(const ColuStrip& target_strip);
-  ~ScanLine();
 
  private:
-  ColuStrip target_strip_;
   // Owning vector of OpCodes in time order.
   std::vector<std::unique_ptr<op::OpCode>> opcodes_;
   std::vector<std::unique_ptr<State>> states_;

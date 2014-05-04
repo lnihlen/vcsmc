@@ -17,9 +17,16 @@ int main(int argc, char* argv[]) {
 
   // Parse command line.
   if (!vcsmc::Switches::Parse(argc, argv)) {
-    std::cerr << "picc usage:" << std::endl << std::endl
-              << "picc <input_file.tiff> [-o output_file]" << std::endl;
+    std::cerr << "picc usage:" << std::endl
+              << "picc <input_file.tiff> [options]" << std::endl
+              << "picc -h for help." << std::endl;
     return -1;
+  }
+
+  // Was this a request for the help string?
+  if (vcsmc::Switches::print_help()) {
+    Switches::PrintHelp();
+    return 0;
   }
 
   // Assumes switches have already been parsed, or sadness will occur.

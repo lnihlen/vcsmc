@@ -10,8 +10,8 @@ LoadImmediate::LoadImmediate(uint8 value, State::Register reg)
 
 std::unique_ptr<State> LoadImmediate::Transform(
     const std::unique_ptr<State>& state) const {
-  return std::move(state->AdvanceTimeAndSetRegister(
-      cycles() * kColorClocksPerCPUCycle, register_, value_));
+  return state->AdvanceTimeAndSetRegister(
+      cycles() * kColorClocksPerCPUCycle, register_, value_);
 }
 
 const uint32 LoadImmediate::cycles() const { return 2u; }
@@ -36,8 +36,8 @@ StoreZeroPage::StoreZeroPage(State::TIA address, State::Register reg)
 
 std::unique_ptr<State> StoreZeroPage::Transform(
     const std::unique_ptr<State>& state) const {
-  return std::move(state->AdvanceTimeAndCopyRegisterToTIA(
-      cycles() * kColorClocksPerCPUCycle, register_, address_));
+  return state->AdvanceTimeAndCopyRegisterToTIA(
+      cycles() * kColorClocksPerCPUCycle, register_, address_);
 }
 
 const uint32 StoreZeroPage::cycles() const { return 3u; }
@@ -54,7 +54,7 @@ const std::string StoreZeroPage::assembler() const {
 
 std::unique_ptr<State> NOP::Transform(
     const std::unique_ptr<State>& state) const {
-  return std::move(state->AdvanceTime(cycles() * kColorClocksPerCPUCycle));
+  return state->AdvanceTime(cycles() * kColorClocksPerCPUCycle);
 }
 
 const uint32 NOP::cycles() const { return 2u; }

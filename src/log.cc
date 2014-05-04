@@ -21,6 +21,7 @@ Log::~Log() {
 
 // static
 bool Log::Setup() {
+  return true;
 }
 
 }  // namespace vcsmc

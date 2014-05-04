@@ -75,12 +75,12 @@ class State {
 
   // Given this state at |color_clock_| = t, produce a new State which is an
   // exact copy of this one but at color_clock_ = t + delta time.
-  std::unique_ptr<State> AdvanceTime(uint32 delta);
+  std::unique_ptr<State> AdvanceTime(uint32 delta) const;
 
   // Same as above, but the returned state also has new value stored in reg.
   std::unique_ptr<State> AdvanceTimeAndSetRegister(uint32 delta,
                                                    Register reg,
-                                                   uint8 value);
+                                                   uint8 value) const;
 
   // Save as above, but the returned state also simulates the effect of copying
   // the value in reg to the supplied tia address. Note that for some of the
@@ -91,7 +91,7 @@ class State {
   // will return nullptr.
   std::unique_ptr<State> AdvanceTimeAndCopyRegisterToTIA(uint32 delta,
                                                          Register reg,
-                                                         TIA address);
+                                                         TIA address) const;
   //====== Utility Methods
 
   // Given a value like Register::A returns "a";
@@ -104,10 +104,10 @@ class State {
   static std::string ByteToHexString(const uint8 value);
 
  private:
+  State(const State& state);
   uint8 tia_[TIA_COUNT];
   uint8 registers_[REGISTER_COUNT];
   uint32 color_clock_;
-
 };
 
 }  // namespace vcsmc

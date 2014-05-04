@@ -2,6 +2,35 @@
 
 namespace vcsmc {
 
+std::unique_ptr<State> State::AdvanceTime(uint32 delta) const {
+  // Make a copy of ourselves.
+  std::unique_ptr<State> state(new State(*this));
+  // Add to the color_clock_
+  state->color_clock_ += delta;
+  return state;
+}
+
+std::unique_ptr<State> State::AdvanceTimeAndSetRegister(
+    uint32 delta, Register reg, uint8 value) const {
+  std::unique_ptr<State> state(AdvanceTime(delta));
+  state->registers_[reg] = value;
+  return state;
+}
+
+std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
+    uint32 delta, Register reg, TIA address) const {
+  std::unique_ptr<State> state(AdvanceTime(delta));
+  uint8 reg_value = state->registers_[reg];
+  switch (address) {
+
+
+    default:
+      state->tia_[address] = reg_value;
+      break;
+  }
+  return state;
+}
+
 // static
 std::string State::RegisterToString(const Register reg) {
   if (reg == Register::A) {
@@ -75,6 +104,12 @@ std::string State::ByteToHexString(const uint8 value) {
   char buf[4];
   std::snprintf(buf, 4, "$%01x", value);
   return std::string(buf);
+}
+
+State::State(const State& state) {
+  std::memcpy(tia_, state.tia_, sizeof(tia_));
+  std::memcpy(registers_, state.registers_, sizeof(registers_));
+  color_clock_ = state.color_clock_;
 }
 
 }  // namespace vcsmc

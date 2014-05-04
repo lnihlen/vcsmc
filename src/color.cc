@@ -1,10 +1,10 @@
 #include "color.h"
 
-#include <iostream>
 #include <unordered_map>
 
+namespace vcsmc {
+
 // Values cribbed from http://www.qotile.net/minidig/docs/tia_color.html
-#if defined(NTSC)
 // Index is atari_color / 2, 0xAABBGGRR
 static const uint32_t kAtariNTSCColorTable[128] = {
   0xff000000, 0xff404040, 0xff6c6c6c, 0xff909090,
@@ -100,15 +100,8 @@ uint8 Color::ABGRToAtariColor(uint32 abgr) {
     }
   }
 
-  std::cerr << "No exact NTSC Atari color match for color: " << std::hex << bgr
-            << ", using naive color match: " << kAtariNTSCColorTable[best_match_index]
-            << std::dec << std::endl;
-
   return best_match_index * 2;
 }
-#else
-#error Need to implement non-NTSC colors
-#endif  // defined(NTSC)
 
 // static
 double Color::CartesianDistanceSquaredABGR(uint32_t a, uint32_t b) {
@@ -125,3 +118,5 @@ double Color::CartesianDistanceSquaredABGR(uint32_t a, uint32_t b) {
 
   return (d_b * d_b) + (d_g * d_g) + (d_r * d_r);
 }
+
+}  // namespace vcsmc

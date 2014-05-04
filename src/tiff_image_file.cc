@@ -1,40 +1,33 @@
 #include "tiff_image_file.h"
 
 #include <cstring>
-#include <iostream>
 #include <tiffio.h>
 
 #include "types.h"
 
 namespace vcsmc {
 
-Image* TiffImageFile::Load() {
+std::unique_ptr<Image> TiffImageFile::Load() {
   TIFF* tiff = TIFFOpen(file_path_.c_str(), "r");
-  if (!tiff) {
-    std::cerr << "Error opening TIFF file: " << file_path_ << std::endl;
-    return NULL;
-  }
+  if (!tiff)
+    return nullptr;
 
   uint32 width, height;
   uint32* pixels;
   TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
   TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
 
-  Image* image = new Image(width, height);
+  std::unique_ptr<Image> image(new Image(width, height));
 
-  if (!TIFFReadRGBAImage(tiff, width, height, image->pixels_writeable(), 0)) {
-    // File read error.
-    std::cerr << "Error reading TIFF file: " << file_path_ << std::endl;
-    delete image;
-    image = NULL;
-  }
+  if (!TIFFReadRGBAImage(tiff, width, height, image->pixels_writeable(), 0))
+    return nullptr;
 
   TIFFClose(tiff);
 
   return image;
 }
 
-bool TiffImageFile::Save(Image* image) {
+bool TiffImageFile::Save(const std::unique_ptr<Image>& image) {
   // Open file for writing.
   TIFF* tiff = TIFFOpen(file_path_.c_str(), "w");
   if (!tiff) return false;

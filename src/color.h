@@ -3,6 +3,8 @@
 
 #include "types.h"
 
+namespace vcsmc {
+
 // Utilities for converting to/from Atari 2600 Color Codes and ABGR color words
 class Color {
  public:
@@ -14,5 +16,7 @@ class Color {
   // space. Alpha is ignored.
   static double CartesianDistanceSquaredABGR(uint32 a, uint32 b);
 };
+
+}  // namespace vcsmc
 
 #endif  // SRC_COLOR_H_
