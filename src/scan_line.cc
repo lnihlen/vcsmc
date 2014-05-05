@@ -6,8 +6,8 @@
 
 namespace vcsmc {
 
-ScanLine::ScanLine(const std::unique_ptr<State>& entry_state) {
-  states_.push_back(std::move(entry_state->Clone()));
+ScanLine::ScanLine(State* entry_state) {
+  states_.push_back(entry_state->Clone());
 }
 
 std::unique_ptr<ColuStrip> ScanLine::Simulate() {
@@ -24,7 +24,7 @@ std::unique_ptr<ColuStrip> ScanLine::Simulate() {
 
 void ScanLine::AddOperation(std::unique_ptr<op::OpCode> opcode) {
   // Generate new state as a result of this opcode transforming last state.
-  states_.push_back(opcode->Transform(*states_.rbegin()));
+  states_.push_back(std::move(opcode->Transform(final_state())));
   opcodes_.push_back(std::move(opcode));
 }
 

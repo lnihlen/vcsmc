@@ -27,7 +27,7 @@ std::unique_ptr<Image> TiffImageFile::Load() {
   return image;
 }
 
-bool TiffImageFile::Save(const std::unique_ptr<Image>& image) {
+bool TiffImageFile::Save(Image* image) {
   // Open file for writing.
   TIFF* tiff = TIFFOpen(file_path_.c_str(), "w");
   if (!tiff) return false;

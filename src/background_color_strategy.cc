@@ -9,17 +9,19 @@
 namespace vcsmc {
 
 std::unique_ptr<ScanLine> BackgroundColorStrategy::Fit(
-    const std::unique_ptr<ColuStrip>& target_strip,
-    const std::unique_ptr<State>& entry_state) {
+    ColuStrip* target_strip, State* entry_state) {
   // Histogram the colors in the target_strip.
   Histogram histo(target_strip);
+
   // Choose most frequent color.
   uint8 colubk = histo.colu(0);
+
   // Now figure out most efficient means to pack it in to a new ScanLine.
   std::unique_ptr<ScanLine> scan_line(new ScanLine(entry_state));
+
   // Is bg color currently what we need?
   if (entry_state->tia(State::TIA::COLUBK) != colubk) {
-    //** To me it seems this kind of thinking may best fit bcak in ScanLine.
+    //** To me it seems this kind of thinking may best fit back in ScanLine.
     // Find if a register already has this value
     if (entry_state->a() == colubk) {
       scan_line->AddOperation(std::unique_ptr<op::OpCode>(

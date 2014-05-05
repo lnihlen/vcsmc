@@ -15,7 +15,7 @@ Frame::Frame()
   std::memset(colu_.get(), 0, kFrameSizeBytes);
 }
 
-Frame::Frame(const std::unique_ptr<Image>& image)
+Frame::Frame(Image* image)
     : colu_(new uint8[kFrameSizeBytes]) {
   assert(image->width() == kFrameWidthPixels);
   assert(image->height() == kFrameHeightPixels);
@@ -34,7 +34,7 @@ void Frame::SetColor(uint32 offset, uint8 color) {
   colu_[offset] = color;
 }
 
-void Frame::SetStrip(const std::unique_ptr<ColuStrip>& strip, uint32 row) {
+void Frame::SetStrip(ColuStrip* strip, uint32 row) {
   uint32 offset = row * kFrameWidthPixels;
   std::memcpy(colu_.get() + row, strip->colus(), kFrameWidthPixels);
 }
@@ -56,7 +56,6 @@ std::unique_ptr<Image> Frame::ToImage() const {
 std::unique_ptr<ColuStrip> Frame::GetStrip(uint32 row) const {
   assert(row < kFrameHeightPixels);
   return std::unique_ptr<ColuStrip>(
-      new ColuStrip(colu_, row * kFrameWidthPixels));
+      new ColuStrip(colu_.get(), row * kFrameWidthPixels));
 }
-
 }  // namespace vcsmc

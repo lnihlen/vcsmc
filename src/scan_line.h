@@ -1,6 +1,7 @@
 #ifndef SRC_SCAN_LINE_H_
 #define SRC_SCAN_LINE_H_
 
+#include <memory>
 #include <vector>
 
 #include "types.h"
@@ -25,13 +26,13 @@ namespace op {
 class ScanLine {
  public:
   // Makes a copy of |entry_state|.
-  ScanLine(const std::unique_ptr<State>& entry_state);
+  ScanLine(State* entry_state);
   // Advance from initial state through final and produce predicted output color
   // strip.
   std::unique_ptr<ColuStrip> Simulate();
 
-  const std::unique_ptr<State>& final_state() const {
-    return *(states_.rbegin());
+  State* final_state() const {
+    return (*(states_.rbegin())).get();
   }
 
   // Takes ownership of |opcode|, adds resultant state to |states_|.

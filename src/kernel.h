@@ -1,10 +1,16 @@
 #ifndef SRC_KERNEL_H_
 #define SRC_KERNEL_H_
 
-#include "frame.h"
-#include "scan_line.h"
+#include <memory>
+#include <vector>
+
+#include "types.h"
 
 namespace vcsmc {
+
+class Frame;
+class ScanLine;
+class State;
 
 // A Kernel, while somewhat an abuse of the term, represents a program to render
 // an entire Frame of imagery. It owns a |target_frame_| from which it extracts
@@ -22,6 +28,9 @@ class Kernel {
   void Save();
 
  private:
+  // utility method
+  std::unique_ptr<State> EntryStateForLine(uint32 line);
+
   std::unique_ptr<Frame> target_frame_;
   std::vector<std::unique_ptr<ScanLine>> scan_lines_;
   std::unique_ptr<Frame> output_frame_;

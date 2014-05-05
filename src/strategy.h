@@ -19,8 +19,7 @@ class Strategy {
   // fit. Entry state should be aligned to the color clock at the start of the
   // ScanLine.
   virtual std::unique_ptr<ScanLine> Fit(
-      const std::unique_ptr<ColuStrip>& target_strip,
-      const std::unique_ptr<State>& entry_state) = 0;
+      ColuStrip* target_strip, State* entry_state) = 0;
 };
 
 }  // namespace vcsmc

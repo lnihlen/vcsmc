@@ -7,7 +7,7 @@
 
 namespace vcsmc {
 
-// Defines a field of uint32 ARGB colors, has a width and height, etc.
+// Defines a field of uint32 ABGR colors, has a width and height, etc.
 class Image {
  public:
   // Constructs an Image that owns a pixel array.

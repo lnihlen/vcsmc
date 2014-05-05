@@ -15,7 +15,7 @@ class ImageFile {
   ImageFile(const std::string& file_path) : file_path_(file_path) {}
 
   virtual std::unique_ptr<Image> Load() = 0;
-  virtual bool Save(const std::unique_ptr<Image>& image) = 0;
+  virtual bool Save(Image* image) = 0;
 
  protected:
   std::string file_path_;

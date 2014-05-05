@@ -17,13 +17,13 @@ class Frame {
   Frame();
 
   // Build a Frame from an Image.
-  Frame(const std::unique_ptr<Image>& image);
+  Frame(Image* image);
 
   // Offset is (y * kFrameWidth) + x < kFrameSize;
   void SetColor(uint32 offset, uint8 color);
 
   // Set an entire strip at a time.
-  void SetStrip(const std::unique_ptr<ColuStrip>& strip, uint32 row);
+  void SetStrip(ColuStrip* strip, uint32 row);
 
   // Make a new Image from these frame colors and return.
   std::unique_ptr<Image> ToImage() const;

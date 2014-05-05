@@ -8,9 +8,8 @@
 
 namespace vcsmc {
 
-std::unique_ptr<ScanLine> DoNothingStrategy::Fit(
-    const std::unique_ptr<ColuStrip>& target_strip,
-    const std::unique_ptr<State>& entry_state) {
+std::unique_ptr<ScanLine> DoNothingStrategy::Fit(ColuStrip* target_strip,
+                                                 State* entry_state) {
   // Start scanline on a color-clock scanline boundary.
   assert((entry_state->color_clocks() % kScanLineWidthClocks) == 0);
   // Doing nothing means the state will be the same at exit that it was at

@@ -5,7 +5,7 @@
 namespace vcsmc {
 
 // static
-Log* Log::instance_ = NULL;
+Log* Log::instance_ = nullptr;
 
 Log::Log() {
   assert(!instance_);
@@ -14,7 +14,7 @@ Log::Log() {
 
 Log::~Log() {
   assert(instance_);
-  instance_ = NULL;
+  instance_ = nullptr;
 }
 
 // static

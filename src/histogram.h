@@ -13,7 +13,7 @@ namespace vcsmc {
 class Histogram {
  public:
   // Compute from a single strip of color.
-  Histogram(const std::unique_ptr<ColuStrip>& colu_strip);
+  Histogram(ColuStrip* colu_strip);
 
   const uint32 unique_colors() const { return colu_counts_.size(); }
   // Returns the ith most frequent color, for i in [0, unique_colors())
@@ -24,7 +24,7 @@ class Histogram {
  private:
   // Sorted vector of ordered pairs of (count, colu value). Only elements with
   // non-zero counts are retained.
-  std::vector<std::pair<uint32, uint8> > colu_counts_;
+  std::vector<std::pair<uint32, uint8>> colu_counts_;
 };
 
 }  // namespace vcsmc

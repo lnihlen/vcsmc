@@ -18,8 +18,7 @@ class OpCode {
  public:
   // Given input State, apply this OpCode to it and return the resultant output
   // state.
-  virtual std::unique_ptr<State> Transform(
-      const std::unique_ptr<State>& state) const = 0;
+  virtual std::unique_ptr<State> Transform(State* state) const = 0;
 
   // Returns the number of CPU cycles this opcode takes.
   virtual const uint32 cycles() const = 0;
@@ -34,8 +33,7 @@ class OpCode {
 class LoadImmediate : public OpCode {
  public:
   LoadImmediate(uint8 value, State::Register reg);
-  virtual std::unique_ptr<State> Transform(
-      const std::unique_ptr<State>& state) const;
+  virtual std::unique_ptr<State> Transform(State* state) const override;
   virtual const uint32 cycles() const override;
   virtual const uint32 bytes() const override;
   virtual const std::string assembler() const override;
@@ -66,8 +64,7 @@ class LDY : public LoadImmediate {
 class StoreZeroPage : public OpCode {
  public:
   StoreZeroPage(State::TIA address, State::Register reg);
-  virtual std::unique_ptr<State> Transform(
-      const std::unique_ptr<State>& state) const;
+  virtual std::unique_ptr<State> Transform(State* state) const override;
   virtual const uint32 cycles() const override;
   virtual const uint32 bytes() const override;
   virtual const std::string assembler() const override;
@@ -98,8 +95,7 @@ class STY : public StoreZeroPage {
 class NOP : public OpCode {
  public:
   NOP() {}
-  virtual std::unique_ptr<State> Transform(
-      const std::unique_ptr<State>& state) const override;
+  virtual std::unique_ptr<State> Transform(State* state) const override;
   virtual const uint32 cycles() const override;
   virtual const uint32 bytes() const override;
   virtual const std::string assembler() const override;

@@ -8,7 +8,7 @@
 
 namespace vcsmc {
 
-Histogram::Histogram(const std::unique_ptr<ColuStrip>& colu_strip) {
+Histogram::Histogram(ColuStrip* colu_strip) {
   // Build histo from all possible values of 1-byte colu.
   uint32 histo[256];
   std::memset(histo, 0, sizeof(histo));
@@ -19,7 +19,7 @@ Histogram::Histogram(const std::unique_ptr<ColuStrip>& colu_strip) {
   // Seed vector with indicies and non-zero counts.
   for (uint32 i = 0; i < 256; ++i) {
     if (histo[i]) {
-      colu_counts_.push_back(std::make_pair(histo[i], static_cast<uint8>(i)));
+      colu_counts_.emplace_back(histo[i], static_cast<uint8>(i));
     }
   }
 

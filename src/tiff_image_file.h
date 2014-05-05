@@ -11,7 +11,7 @@ class TiffImageFile : public ImageFile {
 
   // ImageFile overrides
   virtual std::unique_ptr<Image> Load() override;
-  virtual bool Save(const std::unique_ptr<Image>& image) override;
+  virtual bool Save(Image* image) override;
 };
 
 }  // namespace vcsmc

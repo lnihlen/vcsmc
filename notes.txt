@@ -385,3 +385,13 @@ same but enumerates all possible 2-color choices, 128 choose 2 = 128 * 127 =
 16257 a computationally tractable number of choices to evaluate. Beyond that
 we'll need to do heuristic clustering, 128 choose 3 = 2048256, which evaluating
 1000 combos a second is a 34s eval (so maybe doable).
+
+================================================================================
+
+http://media.xiph.org/sintel/sintel-4k-png16/
+
+Sintel images are 4096px x 1744px. (close to 2.39:1)  Assuming square pixels at
+160x192 we would need to crop almost 2/3 of the horizontal image out, or down
+to 1453x1744. If we can do 240 lines on an Atari, which it seems like we can
+(max is 262 without interlacing), then we could go to 320x240, which is 4:3,
+and just use 2 horizontal pixels for each of the 160 output pixels.

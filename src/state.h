@@ -17,6 +17,7 @@ class State {
  public:
   // Constructs a default initial state, with all values set to zero.
   State();
+  ~State();
 
   // Defines the address and name of every register on the TIA. The ones marked
   // as (strobe) are write-only and writing to them will cause new changes in

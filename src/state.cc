@@ -1,6 +1,8 @@
 #include "state.h"
 
 #include <cassert>
+#include <cstring>
+#include <iostream>
 
 namespace vcsmc {
 
@@ -10,10 +12,16 @@ State::State()
   std::memset(registers_, 0, sizeof(registers_));
 }
 
+State::~State() {
+  std::cout << "state dtor: " << color_clock_ << std::endl;
+}
+
 void State::PaintInto(ColuStrip* colu_strip, uint32 until) {
   assert(color_clock_ < until);
-  uint32 starting_clock = std::max(color_clock_, kHBlankWidthClocks);
-  for (uint32 clock = starting_clock; clock < until; ++clock) {
+  uint32 local_cc = color_clock_ % kScanLineWidthClocks;
+  uint32 local_until = color_clock_ % kScanLineWidthClocks;
+  uint32 starting_clock = std::max(local_cc, kHBlankWidthClocks);
+  for (uint32 clock = starting_clock; clock < local_until; ++clock) {
     colu_strip->SetColu(clock - kHBlankWidthClocks, tia_[TIA::COLUBK]);
   }
 }

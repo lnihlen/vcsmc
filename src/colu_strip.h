@@ -17,10 +17,10 @@ class ColuStrip {
   ColuStrip();
   // Builds a ColuStrip by making a copy of kFrameWidthPixels bytes from the
   // provided pointer and offset.
-  ColuStrip(const std::unique_ptr<uint8[]>& colu, uint32 offset);
+  ColuStrip(uint8* colu, uint32 offset);
 
   // Returns the error distance from the provided ColuStrip.
-  double DistanceFrom(const std::unique_ptr<ColuStrip>& colu_strip) const;
+  double DistanceFrom(ColuStrip* colu_strip) const;
 
   void SetColu(const uint32 pixel, const uint8 colu) { colu_[pixel] = colu; }
 

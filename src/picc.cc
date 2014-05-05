@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Build Frame from Image.
-  std::unique_ptr<vcsmc::Frame> frame(new vcsmc::Frame(image));
+  std::unique_ptr<vcsmc::Frame> frame(new vcsmc::Frame(image.get()));
 
   // Kernel takes ownership of frame.
   vcsmc::Kernel kernel(std::move(frame));
