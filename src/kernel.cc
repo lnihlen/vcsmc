@@ -55,6 +55,16 @@ void Kernel::Fit() {
         target_strip.get());
 
     //========== Pick minimum error result.
+    std::cout << "bg_color_error: " << bg_color_error
+              << " do_nothing_error: " << do_nothing_error
+              << std::endl;
+    std::cout << "bg_color:" << std::endl << bg_color_scan_line->Assemble() << std::hex
+              << "a: " << static_cast<int>(bg_color_scan_line->final_state()->a())
+              << " x: " << static_cast<int>(bg_color_scan_line->final_state()->x())
+              << " y: " << static_cast<int>(bg_color_scan_line->final_state()->y())
+              << " COLUBK: "
+              << static_cast<int>(bg_color_scan_line->final_state()->tia(State::TIA::COLUBK))
+              << std::endl;
 
     if (bg_color_error < do_nothing_error) {
       output_frame_->SetStrip(bg_color_colu_strip.get(), i);
@@ -70,7 +80,7 @@ void Kernel::Save() {
   // Write out assembler.
   std::ofstream of("kernel.asm");
   for (uint32 i = 0; i < kFrameHeightPixels; ++i) {
-    of << "; -- scan line: " << i << std::endl << std::endl;
+    of << std::endl << "; -- scan line: " << i << std::endl;
     of << scan_lines_[i]->Assemble();
   }
 

@@ -1,5 +1,7 @@
 #include "scan_line.h"
 
+#include <iostream>
+
 #include "colu_strip.h"
 #include "opcode.h"
 #include "state.h"
@@ -26,6 +28,7 @@ void ScanLine::AddOperation(std::unique_ptr<op::OpCode> opcode) {
   // Generate new state as a result of this opcode transforming last state.
   states_.push_back(opcode->Transform(final_state()));
   opcodes_.push_back(std::move(opcode));
+  std::cout << "states: " << states_.size() << " opcodes: " << opcodes_.size() << std::endl;
 }
 
 const std::string ScanLine::Assemble() const {

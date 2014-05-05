@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <iostream>
 
 namespace vcsmc {
 
@@ -14,11 +15,24 @@ State::State()
 void State::PaintInto(ColuStrip* colu_strip, uint32 until) {
   assert(color_clock_ < until);
   uint32 local_cc = color_clock_ % kScanLineWidthClocks;
-  uint32 local_until = color_clock_ % kScanLineWidthClocks;
+  uint32 local_until = until - color_clock_ + (color_clock_ %
+                                               kScanLineWidthClocks);
   uint32 starting_clock = std::max(local_cc, kHBlankWidthClocks);
+  uint32 painted = 0;
   for (uint32 clock = starting_clock; clock < local_until; ++clock) {
     colu_strip->SetColu(clock - kHBlankWidthClocks, tia_[TIA::COLUBK]);
+    ++painted;
   }
+  std::cout << "painted " << painted << " pixels."
+            << " local_cc " << local_cc << " local_until " << local_until
+            << " starting_clock " << starting_clock
+            << " color_clock_ " << color_clock_ 
+            << " colubk: " << static_cast<int>(tia_[TIA::COLUBK]) << std::endl;
+/*
+painted 0 pixels. local_cc 0 local_until 6 starting_clock 44 color_clock_ a854
+painted 0 pixels. local_cc 6 local_until 3 starting_clock 44 color_clock_ a85a
+painted 82 pixels. local_cc f local_until c6 starting_clock 44 color_clock_ a863
+ */
 }
 
 std::unique_ptr<State> State::Clone() const {
@@ -131,8 +145,8 @@ std::string State::ByteToHexString(const uint8 value) {
 }
 
 State::State(const State& state) {
-  std::memcpy(tia_, state.tia_, sizeof(tia_));
-  std::memcpy(registers_, state.registers_, sizeof(registers_));
+  std::memcpy(tia_, state.tia_, TIA_COUNT);
+  std::memcpy(registers_, state.registers_, REGISTER_COUNT);
   color_clock_ = state.color_clock_;
 }
 

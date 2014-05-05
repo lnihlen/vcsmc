@@ -28,7 +28,7 @@ class ColuStrip {
   const uint8 colu(const uint32 pixel) const { return colu_[pixel]; }
   const uint32 width() const { return kFrameWidthPixels; }
 
-  const uint8* colus() { return colu_; }
+  const uint8* colus() const { return colu_; }
 
  private:
   uint8 colu_[kFrameWidthPixels];
