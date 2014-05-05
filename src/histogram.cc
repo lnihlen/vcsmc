@@ -25,6 +25,8 @@ Histogram::Histogram(ColuStrip* colu_strip) {
 
   // Sorting pairs sorts by first and then second.
   std::sort(colu_counts_.begin(), colu_counts_.end());
+  // Reverse sort order so the highest counts are first.
+  std::reverse(colu_counts_.begin(), colu_counts_.end());
 }
 
 }  // namespace vcsmc

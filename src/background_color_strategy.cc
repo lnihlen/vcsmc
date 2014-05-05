@@ -1,5 +1,7 @@
 #include "background_color_strategy.h"
 
+#include <cassert>
+
 #include "colu_strip.h"
 #include "histogram.h"
 #include "opcode.h"
@@ -43,6 +45,8 @@ std::unique_ptr<ScanLine> BackgroundColorStrategy::Fit(
           new op::StoreZeroPage(State::TIA::COLUBK, reg)));
     }
   }
+
+  assert(scan_line->final_state()->tia(State::TIA::COLUBK) == colubk);
   return scan_line;
 }
 

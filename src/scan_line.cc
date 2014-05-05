@@ -24,7 +24,7 @@ std::unique_ptr<ColuStrip> ScanLine::Simulate() {
 
 void ScanLine::AddOperation(std::unique_ptr<op::OpCode> opcode) {
   // Generate new state as a result of this opcode transforming last state.
-  states_.push_back(std::move(opcode->Transform(final_state())));
+  states_.push_back(opcode->Transform(final_state()));
   opcodes_.push_back(std::move(opcode));
 }
 

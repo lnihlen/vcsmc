@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <cstring>
-#include <iostream>
 
 namespace vcsmc {
 
@@ -10,10 +9,6 @@ State::State()
     : color_clock_(0) {
   std::memset(tia_, 0, sizeof(tia_));
   std::memset(registers_, 0, sizeof(registers_));
-}
-
-State::~State() {
-  std::cout << "state dtor: " << color_clock_ << std::endl;
 }
 
 void State::PaintInto(ColuStrip* colu_strip, uint32 until) {

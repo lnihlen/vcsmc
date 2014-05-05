@@ -8,6 +8,7 @@
 #include "kernel.h"
 #include "log.h"
 #include "opcode.h"
+#include "scan_line.h"
 #include "state.h"
 #include "tiff_image_file.h"
 

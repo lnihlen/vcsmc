@@ -22,7 +22,7 @@ class ColuStrip {
   // Returns the error distance from the provided ColuStrip.
   double DistanceFrom(ColuStrip* colu_strip) const;
 
-  void SetColu(const uint32 pixel, const uint8 colu) { colu_[pixel] = colu; }
+  void SetColu(const uint32 pixel, const uint8 colu);
 
   // Given a pixel [0..width()) returns the stored colu value.
   const uint8 colu(const uint32 pixel) const { return colu_[pixel]; }
