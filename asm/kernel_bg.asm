@@ -25,6 +25,13 @@ StartOfFrame
   ; 37 scanlines of vertical blank
   lda #$00
   sta VSYNC
+
+; RESET STATE
+  lda #$00
+  ldx #$00
+  ldy #$00
+  sta COLUBK
+
   sta WSYNC   ; 1
   sta WSYNC   ; 2
   sta WSYNC   ; 3
@@ -62,11 +69,16 @@ StartOfFrame
   sta WSYNC   ; 35
   sta WSYNC   ; 36
   sta WSYNC   ; 37
+  sta WSYNC   ; 38
+  sta WSYNC   ; 39
+  sta WSYNC   ; 40
+  sta WSYNC   ; 41
+  sta WSYNC   ; 42
 
 ;-------  begin machine-generated code
 
 ; -- scan line: 0
-  lda #$e0
+  lda #$f0
   sta COLUBK
   sta WSYNC
 
@@ -119,6 +131,8 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 17
+  ldy #$e0
+  sty COLUBK
   sta WSYNC
 
 ; -- scan line: 18
@@ -137,8 +151,6 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 23
-  ldx #$e4
-  stx COLUBK
   sta WSYNC
 
 ; -- scan line: 24
@@ -160,8 +172,6 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 30
-  lda #$e2
-  sta COLUBK
   sta WSYNC
 
 ; -- scan line: 31
@@ -249,12 +259,9 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 59
-  stx COLUBK
   sta WSYNC
 
 ; -- scan line: 60
-  lda #$f8
-  sta COLUBK
   sta WSYNC
 
 ; -- scan line: 61
@@ -267,6 +274,7 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 64
+  stx COLUBK
   sta WSYNC
 
 ; -- scan line: 65
@@ -276,8 +284,6 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 67
-  ldy #$f6
-  sty COLUBK
   sta WSYNC
 
 ; -- scan line: 68
@@ -335,16 +341,13 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 86
-  ldx #$f4
-  stx COLUBK
   sta WSYNC
 
 ; -- scan line: 87
+  sty COLUBK
   sta WSYNC
 
 ; -- scan line: 88
-  ldy #$e6
-  sty COLUBK
   sta WSYNC
 
 ; -- scan line: 89
@@ -360,7 +363,6 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 93
-  stx COLUBK
   sta WSYNC
 
 ; -- scan line: 94
@@ -418,18 +420,16 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 112
+  stx COLUBK
   sta WSYNC
 
 ; -- scan line: 113
   sta WSYNC
 
 ; -- scan line: 114
-  lda #$fa
-  sta COLUBK
   sta WSYNC
 
 ; -- scan line: 115
-  stx COLUBK
   sta WSYNC
 
 ; -- scan line: 116
@@ -439,6 +439,7 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 118
+  sty COLUBK
   sta WSYNC
 
 ; -- scan line: 119
@@ -460,8 +461,6 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 125
-  ldx #$f6
-  stx COLUBK
   sta WSYNC
 
 ; -- scan line: 126
@@ -474,6 +473,7 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 129
+  stx COLUBK
   sta WSYNC
 
 ; -- scan line: 130
@@ -489,6 +489,7 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 134
+  sty COLUBK
   sta WSYNC
 
 ; -- scan line: 135
@@ -501,11 +502,10 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 138
+  stx COLUBK
   sta WSYNC
 
 ; -- scan line: 139
-  ldy #$f4
-  sty COLUBK
   sta WSYNC
 
 ; -- scan line: 140
@@ -557,8 +557,6 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 156
-  lda #$2
-  sta COLUBK
   sta WSYNC
 
 ; -- scan line: 157
@@ -580,8 +578,6 @@ StartOfFrame
   sta WSYNC
 
 ; -- scan line: 163
-  ldy #$e0
-  sty COLUBK
   sta WSYNC
 
 ; -- scan line: 164
@@ -631,49 +627,12 @@ StartOfFrame
 
 ; -- scan line: 179
   sta WSYNC
-
-; -- scan line: 180
-  sta WSYNC
-
-; -- scan line: 181
-  sta WSYNC
-
-; -- scan line: 182
-  sta WSYNC
-
-; -- scan line: 183
-  sta WSYNC
-
-; -- scan line: 184
-  sta WSYNC
-
-; -- scan line: 185
-  sta WSYNC
-
-; -- scan line: 186
-  sta WSYNC
-
-; -- scan line: 187
-  sta WSYNC
-
-; -- scan line: 188
-  sta WSYNC
-
-; -- scan line: 189
-  sta WSYNC
-
-; -- scan line: 190
-  sta WSYNC
-
-; -- scan line: 191
-  sta WSYNC
-
 ;-------  end machine-generated code
+
 
   lda #%01000010
   sta VBLANK                     ; end of screen - enter blanking
 
-  ; 30 scanlines of overscan
   sta WSYNC   ; 1
   sta WSYNC   ; 2
   sta WSYNC   ; 3
@@ -704,6 +663,13 @@ StartOfFrame
   sta WSYNC   ; 28
   sta WSYNC   ; 29
   sta WSYNC   ; 30
+  sta WSYNC   ; 31
+  sta WSYNC   ; 32
+  sta WSYNC   ; 33
+  sta WSYNC   ; 34
+  sta WSYNC   ; 35
+  sta WSYNC   ; 36
+
   jmp StartOfFrame
 
   ORG $fffa

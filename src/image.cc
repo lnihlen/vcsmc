@@ -1,6 +1,7 @@
 #include "image.h"
 
 #include <cassert>
+#include <cstring>
 
 #include "pixel_strip.h"
 
@@ -20,6 +21,14 @@ std::unique_ptr<PixelStrip> Image::GetPixelStrip(uint32 row) {
   assert(row < height_);
   return std::unique_ptr<PixelStrip>(
       new PixelStrip(pixels_.get() + (row * width_), width_));
+}
+
+void Image::SetStrip(uint32 row, PixelStrip* strip) {
+  assert(row < height_);
+  assert(strip->width() == width_);
+  std::memcpy(pixels_.get() + (row * width_),
+              strip->pixels(),
+              width_ * sizeof(uint32));
 }
 
 }  // namespace vcsmc

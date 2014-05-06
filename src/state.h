@@ -4,10 +4,11 @@
 #include <memory>
 #include <string>
 
-#include "colu_strip.h"
 #include "constants.h"
 
 namespace vcsmc {
+
+class PixelStrip;
 
 // State represents a moment in time for the VCS. It is a complete (enough for
 // our purposes) representation of the VCS hardware. It can generate output
@@ -72,13 +73,13 @@ class State {
 
   enum Register : uint8 {
     A = 0,
-    Y = 1,
-    X = 2,
+    X = 1,
+    Y = 2,
     REGISTER_COUNT = 3
   };
 
-  // Fill pixels into |colu_strip| from [color_clock, until)
-  void PaintInto(ColuStrip* colu_strip, uint32 until);
+  // Fill pixels into |pixel_strip| from [color_clock, until)
+  void PaintInto(PixelStrip* pixel_strip, uint32 until);
 
   //====== State Creation Methods
 
@@ -116,9 +117,9 @@ class State {
   static std::string ByteToHexString(const uint8 value);
 
   const uint32 color_clocks() const { return color_clock_; }
+  const uint8 a() const { return registers_[Register::A]; }
   const uint8 x() const { return registers_[Register::X]; }
   const uint8 y() const { return registers_[Register::Y]; }
-  const uint8 a() const { return registers_[Register::A]; }
   const uint8 tia(TIA address) const { return tia_[address]; }
 
  private:

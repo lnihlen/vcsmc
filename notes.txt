@@ -419,3 +419,27 @@ e) Histogram now histos uint32s!.
 f) BGColorStrategy now exhaustively computes minimum error color based on histo.
 
 g) If we need to paint a frame at all we just double horizontal dimension.
+
+================================================================================
+
+Sintel Trailer at 480p - letterboxed 854x480 images. actual image is 854x364ish,
+2.34:1, centered. sintel_trailer_2k_0334.png. 58 pixel border on top and bottom.
+
+convert 480/sintel_trailer_2k_0334.png -crop 854x364+0+58 +repage cropped.tiff
+
+Now we want to scale it down to 240 pixels tall, 563x240, so then crop 121.5
+pixels off of each side :), or:
+
+convert cropped.tiff -resize 563x240 resized.tiff
+convert resized.tiff -crop 320x240+121+0 +repage final.tiff
+
+Hrm, 240 lines seems a bit aggressive for Stella. Idea - we could try to emulate
+video at 16:9, 320x180 rendered at 160x180, so after cropping scale to 422x180:
+
+convert cropped.tiff -resize 422x180 resized.tiff
+
+then crop to 320x180 by taking 51 off each side:
+
+convert resized.tiff -crop 320x180+51+0 +repage final.tiff
+
+

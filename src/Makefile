@@ -6,9 +6,9 @@ LDFLAGS=-L/opt/local/lib
 LIBS=-lm -lstdc++ -ltiff
 
 DEPS=constants.h image_file.h strategy.h types.h
-OBJ=background_color_strategy.o color.o colu_strip.o do_nothing_strategy.o     \
-    frame.o histogram.o image.o kernel.o log.o opcode.o picc.o pixel_strip.o   \
-    scan_line.o state.o tiff_image_file.o
+OBJ=background_color_strategy.o color.o do_nothing_strategy.o histogram.o      \
+    image.o kernel.o log.o opcode.o picc.o pixel_strip.o scan_line.o state.o   \
+    tiff_image_file.o
 
 %.o: %.cc $(DEPS)
 	$(CC) -c -g -o $@ $< $(CFLAGS)

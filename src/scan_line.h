@@ -8,7 +8,7 @@
 
 namespace vcsmc {
 
-class ColuStrip;
+class PixelStrip;
 class State;
 namespace op {
   class OpCode;
@@ -29,7 +29,7 @@ class ScanLine {
   ScanLine(State* entry_state);
   // Advance from initial state through final and produce predicted output color
   // strip.
-  std::unique_ptr<ColuStrip> Simulate();
+  std::unique_ptr<PixelStrip> Simulate();
 
   State* final_state() const {
     return (*(states_.rbegin())).get();

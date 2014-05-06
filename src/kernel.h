@@ -8,7 +8,6 @@
 
 namespace vcsmc {
 
-class Frame;
 class Image;
 class ScanLine;
 class State;
@@ -34,7 +33,7 @@ class Kernel {
 
   std::unique_ptr<Image> target_image_;
   std::vector<std::unique_ptr<ScanLine>> scan_lines_;
-  std::unique_ptr<Frame> output_frame_;
+  std::unique_ptr<Image> output_image_;
 };
 
 }  // namespace vcsmc

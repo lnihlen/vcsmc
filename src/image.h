@@ -21,6 +21,8 @@ class Image {
 
   // Builds a copy of our |row| of pixels and returns.
   std::unique_ptr<PixelStrip> GetPixelStrip(uint32 row);
+  // Copies contents of |strip| into our own buffer at row.
+  void SetStrip(uint32 row, PixelStrip* strip);
 
   const uint32 width() const { return width_; }
   const uint32 height() const { return height_; }

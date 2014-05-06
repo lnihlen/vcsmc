@@ -3,7 +3,6 @@
 #include <iostream>
 #include <string>
 
-#include "frame.h"
 #include "image.h"
 #include "kernel.h"
 #include "log.h"

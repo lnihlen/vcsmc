@@ -2,8 +2,8 @@
 
 #include <iostream>
 
-#include "colu_strip.h"
 #include "opcode.h"
+#include "pixel_strip.h"
 #include "state.h"
 
 namespace vcsmc {
@@ -12,23 +12,23 @@ ScanLine::ScanLine(State* entry_state) {
   states_.push_back(entry_state->Clone());
 }
 
-std::unique_ptr<ColuStrip> ScanLine::Simulate() {
-  std::unique_ptr<ColuStrip> colu_strip(new ColuStrip());
+std::unique_ptr<PixelStrip> ScanLine::Simulate() {
+  std::unique_ptr<PixelStrip> pixel_strip(
+      new PixelStrip(kFrameWidthPixels * 2));
   for (uint32 i = 0; i < states_.size(); ++i) {
     uint32 until = states_[0]->color_clocks() + kScanLineWidthClocks;
     if (i + 1 < states_.size()) {
       until = states_[i + 1]->color_clocks();
     }
-    states_[i]->PaintInto(colu_strip.get(), until);
+    states_[i]->PaintInto(pixel_strip.get(), until);
   }
-  return colu_strip;
+  return pixel_strip;
 }
 
 void ScanLine::AddOperation(std::unique_ptr<op::OpCode> opcode) {
   // Generate new state as a result of this opcode transforming last state.
   states_.push_back(opcode->Transform(final_state()));
   opcodes_.push_back(std::move(opcode));
-  std::cout << "states: " << states_.size() << " opcodes: " << opcodes_.size() << std::endl;
 }
 
 const std::string ScanLine::Assemble() const {

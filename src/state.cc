@@ -4,6 +4,9 @@
 #include <cstring>
 #include <iostream>
 
+#include "color.h"
+#include "pixel_strip.h"
+
 namespace vcsmc {
 
 State::State()
@@ -12,27 +15,19 @@ State::State()
   std::memset(registers_, 0, sizeof(registers_));
 }
 
-void State::PaintInto(ColuStrip* colu_strip, uint32 until) {
+void State::PaintInto(PixelStrip* pixel_strip, uint32 until) {
+  assert(pixel_strip->width() == kFrameWidthPixels * 2);
   assert(color_clock_ < until);
   uint32 local_cc = color_clock_ % kScanLineWidthClocks;
   uint32 local_until = until - color_clock_ + (color_clock_ %
                                                kScanLineWidthClocks);
   uint32 starting_clock = std::max(local_cc, kHBlankWidthClocks);
-  uint32 painted = 0;
+  uint32 starting_pixel = (starting_clock - kHBlankWidthClocks) * 2;
   for (uint32 clock = starting_clock; clock < local_until; ++clock) {
-    colu_strip->SetColu(clock - kHBlankWidthClocks, tia_[TIA::COLUBK]);
-    ++painted;
+    uint32 colubk = Color::AtariColorToABGR(tia_[TIA::COLUBK]);
+    pixel_strip->SetPixel(starting_pixel++, colubk);
+    pixel_strip->SetPixel(starting_pixel++, colubk);
   }
-  std::cout << "painted " << painted << " pixels."
-            << " local_cc " << local_cc << " local_until " << local_until
-            << " starting_clock " << starting_clock
-            << " color_clock_ " << color_clock_ 
-            << " colubk: " << static_cast<int>(tia_[TIA::COLUBK]) << std::endl;
-/*
-painted 0 pixels. local_cc 0 local_until 6 starting_clock 44 color_clock_ a854
-painted 0 pixels. local_cc 6 local_until 3 starting_clock 44 color_clock_ a85a
-painted 82 pixels. local_cc f local_until c6 starting_clock 44 color_clock_ a863
- */
 }
 
 std::unique_ptr<State> State::Clone() const {
