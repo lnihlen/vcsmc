@@ -1,5 +1,9 @@
 #include "image.h"
 
+#include <cassert>
+
+#include "pixel_strip.h"
+
 namespace vcsmc {
 
 Image::Image(uint32 width, uint32 height)
@@ -12,8 +16,10 @@ void Image::SetPixel(uint32 x, uint32 y, uint32 abgr) {
   *(pixels_.get() + ((y * width_) + x)) = abgr;
 }
 
-uint32 Image::GetPixel(uint32 x, uint32 y) {
-  return pixels_[(y * width_) + x];
+std::unique_ptr<PixelStrip> Image::GetPixelStrip(uint32 row) {
+  assert(row < height_);
+  return std::unique_ptr<PixelStrip>(
+      new PixelStrip(pixels_.get() + (row * width_), width_));
 }
 
 }  // namespace vcsmc

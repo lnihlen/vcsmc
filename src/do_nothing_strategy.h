@@ -7,7 +7,7 @@ namespace vcsmc {
 
 class DoNothingStrategy : public Strategy {
  public:
-  virtual std::unique_ptr<ScanLine> Fit(ColuStrip* target_strip,
+  virtual std::unique_ptr<ScanLine> Fit(PixelStrip* target_strip,
                                         State* entry_state) override;
 };
 

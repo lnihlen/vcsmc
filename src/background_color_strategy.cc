@@ -11,12 +11,12 @@
 namespace vcsmc {
 
 std::unique_ptr<ScanLine> BackgroundColorStrategy::Fit(
-    ColuStrip* target_strip, State* entry_state) {
+    PixelStrip* target_strip, State* entry_state) {
   // Histogram the colors in the target_strip.
   Histogram histo(target_strip);
 
-  // Choose most frequent color.
-  uint8 colubk = histo.colu(0);
+  // Choose best-fit single color.
+  uint8 colubk = 0;
 
   // Now figure out most efficient means to pack it in to a new ScanLine.
   std::unique_ptr<ScanLine> scan_line(new ScanLine(entry_state));

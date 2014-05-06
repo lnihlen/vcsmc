@@ -28,9 +28,6 @@ class Frame {
   // Make a new Image from these frame colors and return.
   std::unique_ptr<Image> ToImage() const;
 
-  // Make a new ColuStrip from a supplied row number.
-  std::unique_ptr<ColuStrip> GetStrip(uint32 row) const;
-
  private:
   std::unique_ptr<uint8[]> colu_;
 };

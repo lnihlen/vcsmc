@@ -9,6 +9,7 @@
 namespace vcsmc {
 
 class Frame;
+class Image;
 class ScanLine;
 class State;
 
@@ -19,8 +20,8 @@ class State;
 // coherent whole that can be assembled in to 6502 bytecode for running.
 class Kernel {
  public:
-  // Takes ownership of target_frame.
-  Kernel(std::unique_ptr<Frame> target_frame);
+  // Takes ownership of target_image.
+  Kernel(std::unique_ptr<Image> target_image);
 
   void Fit();
 
@@ -31,7 +32,7 @@ class Kernel {
   // utility method
   std::unique_ptr<State> EntryStateForLine(uint32 line);
 
-  std::unique_ptr<Frame> target_frame_;
+  std::unique_ptr<Image> target_image_;
   std::vector<std::unique_ptr<ScanLine>> scan_lines_;
   std::unique_ptr<Frame> output_frame_;
 };

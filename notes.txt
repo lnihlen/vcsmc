@@ -395,3 +395,27 @@ Sintel images are 4096px x 1744px. (close to 2.39:1)  Assuming square pixels at
 to 1453x1744. If we can do 240 lines on an Atari, which it seems like we can
 (max is 262 without interlacing), then we could go to 320x240, which is 4:3,
 and just use 2 horizontal pixels for each of the 160 output pixels.
+
+================================================================================
+
+Upcoming changes:
+
+a) stop quantizing to Atari colors on the input side. The question is then is it
+useful to deprecate Frame? I think Frame is useful as an output vehicle, it is
+handy to be able to just paint with bytes and not have to worry about their
+representation outside of the Atari scope.
+
+b) Kernel now accepts an Image not a Frame, and is trying to fit an Image. For
+now we require the input image is 320x240.
+
+c) PixelRow - is like ColuStrip but a row from an image. Can be arbitrary width.
+
+d) Wouldn't be hard to change PaintInto() and Simulate() to work on Images and
+PixelRows instead of Frames and ColuStrips - but this is the output side, so
+let's just stick to Atari Colors.
+
+e) Histogram now histos uint32s!.
+
+f) BGColorStrategy now exhaustively computes minimum error color based on histo.
+
+g) If we need to paint a frame at all we just double horizontal dimension.

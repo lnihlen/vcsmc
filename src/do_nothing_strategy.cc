@@ -2,13 +2,13 @@
 
 #include <cassert>
 
-#include "opcode.h"
+#include "opcode.h"  // doing nothing requires knowledge of many things.
 #include "scan_line.h"
 #include "state.h"
 
 namespace vcsmc {
 
-std::unique_ptr<ScanLine> DoNothingStrategy::Fit(ColuStrip* target_strip,
+std::unique_ptr<ScanLine> DoNothingStrategy::Fit(PixelStrip* target_strip,
                                                  State* entry_state) {
   // Start scanline on a color-clock scanline boundary.
   assert((entry_state->color_clocks() % kScanLineWidthClocks) == 0);

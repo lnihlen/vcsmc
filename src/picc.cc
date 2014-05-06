@@ -36,11 +36,8 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  // Build Frame from Image.
-  std::unique_ptr<vcsmc::Frame> frame(new vcsmc::Frame(image.get()));
-
   // Kernel takes ownership of frame.
-  vcsmc::Kernel kernel(std::move(frame));
+  vcsmc::Kernel kernel(std::move(image));
 
   std::cout << "fitting " << input_file << std::endl;
   // Fit the frame.

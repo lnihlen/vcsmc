@@ -16,8 +16,8 @@
 
 namespace vcsmc {
 
-Kernel::Kernel(std::unique_ptr<Frame> target_frame)
-    : target_frame_(std::move(target_frame)),
+Kernel::Kernel(std::unique_ptr<Image> target_image)
+    : target_image_(std::move(target_image)),
       output_frame_(new Frame()) {
 }
 
@@ -26,7 +26,7 @@ void Kernel::Fit() {
 
   for (uint32 i = 0; i < kFrameHeightPixels; ++i) {
     std::unique_ptr<State> entry_state = EntryStateForLine(i);
-    std::unique_ptr<ColuStrip> target_strip = target_frame_->GetStrip(i);
+    std::unique_ptr<PixelStrip> target_strip = target_image_->GetPixelStrip(i);
 
     //========== Do Nothing!
 

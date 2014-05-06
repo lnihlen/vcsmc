@@ -7,6 +7,8 @@
 
 namespace vcsmc {
 
+class PixelStrip;
+
 // Defines a field of uint32 ABGR colors, has a width and height, etc.
 class Image {
  public:
@@ -17,14 +19,20 @@ class Image {
   void SetPixel(uint32 x, uint32 y, uint32 abgr);
   uint32 GetPixel(uint32 x, uint32 y);
 
-  uint32 width() { return width_; }
-  uint32 height() { return height_; }
-  const uint32* pixels() { return pixels_.get(); }
+  // Builds a copy of our |row| of pixels and returns.
+  std::unique_ptr<PixelStrip> GetPixelStrip(uint32 row);
+
+  const uint32 width() const { return width_; }
+  const uint32 height() const { return height_; }
+  const uint32* pixels() const { return pixels_.get(); }
   uint32* pixels_writeable() { return pixels_.get(); }
+  const uint32 pixel(uint32 x, uint32 y) const {
+    return pixels_[(y * width_) + x];
+  }
 
  protected:
-  uint32 width_;
-  uint32 height_;
+  const uint32 width_;
+  const uint32 height_;
   std::unique_ptr<uint32[]> pixels_;
 
  private:

@@ -54,9 +54,4 @@ std::unique_ptr<Image> Frame::ToImage() const {
   return image;
 }
 
-std::unique_ptr<ColuStrip> Frame::GetStrip(uint32 row) const {
-  assert(row < kFrameHeightPixels);
-  return std::unique_ptr<ColuStrip>(
-      new ColuStrip(colu_.get(), row * kFrameWidthPixels));
-}
 }  // namespace vcsmc
