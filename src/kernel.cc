@@ -27,6 +27,7 @@ void Kernel::Fit() {
   for (uint32 i = 0; i < kFrameHeightPixels; ++i) {
     std::unique_ptr<State> entry_state = EntryStateForLine(i);
     std::unique_ptr<PixelStrip> target_strip = target_image_->GetPixelStrip(i);
+    target_strip->BuildHistogram();
 
     //========== Do Nothing!
 

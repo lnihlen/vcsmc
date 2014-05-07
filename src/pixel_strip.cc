@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "color.h"
+#include "histogram"
 
 namespace vcsmc {
 
@@ -31,6 +32,10 @@ double PixelStrip::DistanceFrom(const PixelStrip* strip) const {
     accum += Color::CartesianDistanceSquaredABGR(pixels_[i], strip->pixels_[i]);
   }
   return accum;
+}
+
+void PixelStrip::BuildHistogram() {
+  histo_.reset(new Histogram(this));
 }
 
 }  // namespace vcsmc
