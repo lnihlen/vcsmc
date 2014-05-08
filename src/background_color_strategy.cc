@@ -16,15 +16,7 @@ std::unique_ptr<ScanLine> BackgroundColorStrategy::Fit(
   assert(histo);
 
   // Choose best-fit single color.
-  uint8 colubk = 0;
-  double best_color_score = histo.DistanceFrom(Color::AtariColorToABGR(0));
-  for (uint32 i = 2; i < 256; i += 2) {
-    double color_score = histo.DistanceFrom(Color::AtariColorToABGR(i));
-    if (color_score < best_color_score) {
-      colubk = i;
-      best_color_score = color_score;
-    }
-  }
+  uint8 colubk = histo->colu(0);
 
   // Now figure out most efficient means to pack it in to a new ScanLine.
   std::unique_ptr<ScanLine> scan_line(new ScanLine(entry_state));

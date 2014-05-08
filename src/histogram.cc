@@ -9,7 +9,7 @@
 
 namespace vcsmc {
 
-Histogram::Histogram(PixelStrip* pixel_strip) {
+void Histogram::Compute(PixelStrip* pixel_strip) {
   std::unordered_map<uint32, uint32> color_map;
 
   for (uint32 i = 0; i < pixel_strip->width(); ++i) {
@@ -32,6 +32,16 @@ Histogram::Histogram(PixelStrip* pixel_strip) {
   std::sort(color_counts_.begin(), color_counts_.end());
   // Reverse sort order so the highest counts are first.
   std::reverse(color_counts_.begin(), color_counts_.end());
+
+  // Now evaluate all Atari colors for error distance from this histo
+  colu_errors_.reserve(128);
+  for (uint32 i = 0; i < 256; i += 2) {
+    double error = DistanceFrom(Color::AtariColorToABGR(i));
+    colu_errors_.emplace_back(error, static_cast<uint8>(i));
+  }
+
+  // Sort by error distance.
+  std::sort(colu_errors_.begin(), colu_errors_.end());
 }
 
 double Histogram::DistanceFrom(uint32 color) {
