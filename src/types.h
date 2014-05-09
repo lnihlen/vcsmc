@@ -3,6 +3,7 @@
 
 #include <cstdint>
 
+typedef std::uint64_t uint64;
 typedef std::uint32_t uint32;
 typedef std::uint8_t uint8;
 
