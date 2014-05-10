@@ -124,6 +124,8 @@ class State {
 
  private:
   State(const State& state);
+  // Clock in this case is the lcoal_clock, that is [0..228)
+  const bool PlayfieldPaints(uint32 clock);
   uint8 tia_[TIA_COUNT];
   uint8 registers_[REGISTER_COUNT];
   uint32 color_clock_;

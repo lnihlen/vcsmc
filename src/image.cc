@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstring>
 
+#include "histogram.h"
 #include "pixel_strip.h"
 
 namespace vcsmc {

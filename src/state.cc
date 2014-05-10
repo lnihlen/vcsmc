@@ -24,9 +24,15 @@ void State::PaintInto(PixelStrip* pixel_strip, uint32 until) {
   uint32 starting_clock = std::max(local_cc, kHBlankWidthClocks);
   uint32 starting_pixel = (starting_clock - kHBlankWidthClocks) * 2;
   for (uint32 clock = starting_clock; clock < local_until; ++clock) {
-    uint32 colubk = Color::AtariColorToABGR(tia_[TIA::COLUBK]);
-    pixel_strip->SetPixel(starting_pixel++, colubk);
-    pixel_strip->SetPixel(starting_pixel++, colubk);
+    uint8 colu = tia_[TIA::COLUBK];
+    if (PlayfieldPaints(clock)) {
+      colu = tia_[TIA::COLUPF];
+    }
+
+    uint32 color = Color::AtariColorToABGR(colu);
+    // We paint two pixels for every color clock.
+    pixel_strip->SetPixel(starting_pixel++, color);
+    pixel_strip->SetPixel(starting_pixel++, color);
   }
 }
 
@@ -143,6 +149,33 @@ State::State(const State& state) {
   std::memcpy(tia_, state.tia_, TIA_COUNT);
   std::memcpy(registers_, state.registers_, REGISTER_COUNT);
   color_clock_ = state.color_clock_;
+}
+
+const bool State::PlayfieldPaints(uint32 clock) {
+  assert(clock >= 68);
+
+  // Usage schedule for playfield registers, in color clocks:
+  // PF0 68 up until 84
+  // PF1 84 - 116
+  // PF2 116 - 148
+  // PF0 148 - 164
+  // PF1 164 - 196
+  // PF2 196 - 228
+
+  if (clock < 84 || (clock >= 148 && clock < 164)) {
+    // PF0 D4 through D7 left to right.
+    int pfbit = (clock - (clock < 84 ? 68 : 148)) >> 2;
+    return tia_[TIA::PF0] & (0x10 << pfbit);
+  } else if (clock < 116 || (clock >= 164 && clock < 196)) {
+    // PF1 D7 through D0 left to right.
+    int pfbit = (clock - (clock < 116 ? 84 : 164)) >> 2;
+    return tia_[TIA::PF1] & (0x80 >> pfbit);
+  } else {
+    // PF2 D0 through D7 left to right.
+    assert(clock < 148 || (clock >= 196 && clock < 228));
+    int pfbit = (clock - (clock < 148 ? 116 : 196)) >> 2;
+    return tia_[TIA::PF2] & (0x01 << pfbit);
+  }
 }
 
 }  // namespace vcsmc

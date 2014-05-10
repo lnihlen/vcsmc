@@ -62,4 +62,32 @@ const std::string NOP::assembler() const { return std::string("nop"); }
 
 }  // namespace op
 
+std::unique_ptr<op::OpCode> makeLDA(uint8 value) {
+  return std::unique_ptr<op::OpCode>(new op::LDA(value));
+}
+
+std::unique_ptr<op::OpCode> makeLDX(uint8 value) {
+  return std::unique_ptr<op::OpCode>(new op::LDX(value));
+}
+
+std::unique_ptr<op::OpCode> makeLDY(uint8 value) {
+  return std::unique_ptr<op::OpCode>(new op::LDY(value));
+}
+
+std::unique_ptr<op::OpCode> makeSTA(State::TIA address) {
+  return std::unique_ptr<op::OpCode>(new op::STA(address));
+}
+
+std::unique_ptr<op::OpCode> makeSTX(State::TIA address) {
+  return std::unique_ptr<op::OpCode>(new op::STX(address));
+}
+
+std::unique_ptr<op::OpCode> makeSTY(State::TIA address) {
+  return std::unique_ptr<op::OpCode>(new op::STY(address));
+}
+
+std::unique_ptr<op::OpCode> makeNOP() {
+  return std::unique_ptr<op::OpCode>(new op::NOP);
+}
+
 }  // namespace vcsmc

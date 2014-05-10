@@ -103,6 +103,16 @@ class NOP : public OpCode {
 
 }  // namespace op
 
+// Factory methods in vcsmc namespace
+
+std::unique_ptr<op::OpCode> makeLDA(uint8 value);
+std::unique_ptr<op::OpCode> makeLDX(uint8 value);
+std::unique_ptr<op::OpCode> makeLDY(uint8 value);
+std::unique_ptr<op::OpCode> makeSTA(State::TIA address);
+std::unique_ptr<op::OpCode> makeSTX(State::TIA address);
+std::unique_ptr<op::OpCode> makeSTY(State::TIA address);
+std::unique_ptr<op::OpCode> makeNOP();
+
 }  // namespace vcsmc
 
 #endif  // SRC_OPCODE_H_

@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "histogram.h"
 #include "opcode.h"
 #include "pixel_strip.h"
 #include "state.h"

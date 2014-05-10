@@ -7,9 +7,11 @@
 #include "background_color_strategy.h"
 #include "constants.h"
 #include "do_nothing_strategy.h"
+#include "histogram.h"
 #include "image.h"
 #include "opcode.h"
 #include "pixel_strip.h"
+#include "playfield_strategy.h"
 #include "scan_line.h"
 #include "state.h"
 #include "tiff_image_file.h"
@@ -49,15 +51,27 @@ void Kernel::Fit() {
 
     BackgroundColorStrategy bg_color;
     std::unique_ptr<ScanLine> bg_color_scan_line = bg_color.Fit(
-      target_strip.get(), entry_state.get());
+        target_strip.get(), entry_state.get());
     std::unique_ptr<PixelStrip> bg_color_strip =
-      bg_color_scan_line->Simulate();
+        bg_color_scan_line->Simulate();
     double bg_color_error = bg_color_strip->DistanceFrom(
         target_strip.get());
 
+    //========== Playfield Fitting.
+
+    PlayfieldStrategy pf_strategy;
+    std::unique_ptr<ScanLine> pf_scan_line = pf_strategy.Fit(
+        target_strip.get(), entry_state.get());
+    std::unique_ptr<PixelStrip> pf_color_strip = pf_scan_line->Simulate();
+    double pf_error = pf_color_strip->DistanceFrom(target_strip.get());
+
     //========== Pick minimum error result.
 
-    if (bg_color_error < do_nothing_error) {
+    // Yes I know we need to sort.
+    if (pf_error < bg_color_error) {
+      output_image_->SetStrip(i, pf_color_strip.get());
+      scan_lines_.push_back(std::move(pf_scan_line));
+    } else if (bg_color_error < do_nothing_error) {
       output_image_->SetStrip(i, bg_color_strip.get());
       scan_lines_.push_back(std::move(bg_color_scan_line));
     } else {

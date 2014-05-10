@@ -37,7 +37,7 @@ class Histogram {
   // non-zero counts are retained.
   ColorCounts color_counts_;
 
-  typedef std::vector<std::pair<double, uint8> ColuErrors;
+  typedef std::vector<std::pair<double, uint8>> ColuErrors;
   ColuErrors colu_errors_;
 };
 

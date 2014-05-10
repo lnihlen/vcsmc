@@ -3,10 +3,12 @@
 #include <iostream>
 #include <string>
 
+#include "color.h"        // just temp testing of pf_image
 #include "image.h"
 #include "kernel.h"
 #include "log.h"
 #include "opcode.h"
+#include "pixel_strip.h"  // just temp testing of pf_image
 #include "scan_line.h"
 #include "state.h"
 #include "tiff_image_file.h"
@@ -26,6 +28,15 @@ int main(int argc, char* argv[]) {
 
   // Assumes switches have already been parsed, or sadness will occur.
   vcsmc::Log::Setup();
+
+/*
+  // make test image for pf fitting
+  std::unique_ptr<vcsmc::Image> test_image(new vcsmc::Image(320, 180));
+  std::unique_ptr<vcsmc::PixelStrip> test_strip(new vcsmc::PixelStrip(320));
+  for (uint i = 0; i < 320; ++i) {
+    test_strip->SetPixel(i, Color::
+  }
+*/
 
   // Load input image file.
   vcsmc::TiffImageFile image_file(input_file);
