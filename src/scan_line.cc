@@ -9,7 +9,9 @@
 
 namespace vcsmc {
 
-ScanLine::ScanLine(State* entry_state) {
+ScanLine::ScanLine(State* entry_state)
+    : total_cycles_(0),
+      total_bytes_(0) {
   states_.push_back(entry_state->Clone());
 }
 
@@ -27,6 +29,8 @@ std::unique_ptr<PixelStrip> ScanLine::Simulate() {
 }
 
 void ScanLine::AddOperation(std::unique_ptr<op::OpCode> opcode) {
+  total_cycles_ += opcode->cycles();
+  total_bytes_ += opcode->bytes();
   // Generate new state as a result of this opcode transforming last state.
   states_.push_back(opcode->Transform(final_state()));
   opcodes_.push_back(std::move(opcode));

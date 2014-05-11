@@ -19,7 +19,8 @@
 namespace vcsmc {
 
 Kernel::Kernel(std::unique_ptr<Image> target_image)
-    : target_image_(std::move(target_image)),
+    : total_bytes_(0),
+      target_image_(std::move(target_image)),
       output_image_(new Image(kFrameWidthPixels * 2, kFrameHeightPixels)) {
 }
 
@@ -40,12 +41,6 @@ void Kernel::Fit() {
         do_nothing_scan_line->Simulate();
     double do_nothing_error = do_nothing_strip->DistanceFrom(
         target_strip.get());
-
-    if (do_nothing_error == 0) {
-      output_image_->SetStrip(i, do_nothing_strip.get());
-      scan_lines_.push_back(std::move(do_nothing_scan_line));
-      continue;
-    }
 
     //========== Set background color only.
 
@@ -70,12 +65,15 @@ void Kernel::Fit() {
     // Yes I know we need to sort.
     if (pf_error < bg_color_error) {
       output_image_->SetStrip(i, pf_color_strip.get());
+      total_bytes_ += pf_scan_line->bytes();
       scan_lines_.push_back(std::move(pf_scan_line));
     } else if (bg_color_error < do_nothing_error) {
       output_image_->SetStrip(i, bg_color_strip.get());
+      total_bytes_ += bg_color_scan_line->bytes();
       scan_lines_.push_back(std::move(bg_color_scan_line));
     } else {
       output_image_->SetStrip(i, do_nothing_strip.get());
+      total_bytes_ += do_nothing_scan_line->bytes();
       scan_lines_.push_back(std::move(do_nothing_scan_line));
     }
   }

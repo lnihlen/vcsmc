@@ -442,4 +442,19 @@ then crop to 320x180 by taking 51 off each side:
 
 convert resized.tiff -crop 320x180+51+0 +repage final.tiff
 
+================================================================================
+
+OK playfield fitting is going (ish) next steps are:
+
+a) Error maps input and output. These are grayscale images mapped to floats
+which on input represent a multiplier on pixel error and on output represent a
+per-pixel error distance.
+
+b) scheduler? how to fit in new stuff 
+
+b) OpenCL CIEDE2000 error distance.
+
+c) Per-file logging and per-file output
+
+d) multi-threading per-file.
 

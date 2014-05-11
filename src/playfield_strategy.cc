@@ -115,9 +115,9 @@ std::unique_ptr<ScanLine> PlayfieldStrategy::Fit(
   // lda #pf2     |       129       |
   // nop          |       135       |
   // nop          |       141       |
-  // nop          |       147       | // arithmetic is wrong here.
-  // sta PF2      |       159       |
-  // sta WSYNC    |       168       |
+  // nop          |       147       |
+  // sta PF2      |       153       |
+  // sta WSYNC    |       162       |
   std::unique_ptr<ScanLine> scan_line(new ScanLine(entry_state));
   scan_line->AddOperation(makeLDA(colubk));
   scan_line->AddOperation(makeSTA(State::TIA::COLUBK));

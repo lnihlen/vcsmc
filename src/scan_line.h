@@ -41,7 +41,13 @@ class ScanLine {
   // Returns the assembly language output of our opcodes.
   const std::string Assemble() const;
 
+  const uint32 cycles() const { return total_cycles_; }
+  const uint32 bytes() const { return total_bytes_; }
+
  private:
+  uint32 total_cycles_;
+  uint32 total_bytes_;
+
   // |states_| and |opcodes_| are expected to be interleaved, with states
   // bookending opcodes, as in:
   // state_0 | opcode_0 | state_1 | opcode_1 | .... | opcode_n-1 | state_n
@@ -51,10 +57,6 @@ class ScanLine {
   // state of the system.
   std::vector<std::unique_ptr<State>> states_;
   std::vector<std::unique_ptr<op::OpCode>> opcodes_;
-
-  // going to need to start tracking these most likely
-  // uint32 total_cycles_;
-  // uint32 total_size_;
 };
 
 }  // namespace vcsmc

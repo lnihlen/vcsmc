@@ -4,6 +4,7 @@
 #include <string>
 
 #include "color.h"        // just temp testing of pf_image
+#include "histogram.h"    // ditto
 #include "image.h"
 #include "kernel.h"
 #include "log.h"
@@ -29,14 +30,18 @@ int main(int argc, char* argv[]) {
   // Assumes switches have already been parsed, or sadness will occur.
   vcsmc::Log::Setup();
 
-/*
-  // make test image for pf fitting
+  // make test image for pf fitting, 0x00, 0x0e
   std::unique_ptr<vcsmc::Image> test_image(new vcsmc::Image(320, 180));
   std::unique_ptr<vcsmc::PixelStrip> test_strip(new vcsmc::PixelStrip(320));
-  for (uint i = 0; i < 320; ++i) {
-    test_strip->SetPixel(i, Color::
+  for (uint32 i = 0; i < 320; ++i) {
+    uint8 colu = (i >> 3) % 2 ? 0x0e : 0x00;
+    test_strip->SetPixel(i, vcsmc::Color::AtariColorToABGR(colu));
   }
-*/
+  for (uint32 i = 0; i < 180; ++i) {
+    test_image->SetStrip(i, test_strip.get());
+  }
+  vcsmc::TiffImageFile test_file("test_pf.tiff");
+  test_file.Save(test_image.get());
 
   // Load input image file.
   vcsmc::TiffImageFile image_file(input_file);
@@ -50,10 +55,13 @@ int main(int argc, char* argv[]) {
   vcsmc::Kernel kernel(std::move(image));
 
   std::cout << "fitting " << input_file << std::endl;
+
   // Fit the frame.
   kernel.Fit();
 
-  std::cout << "saving fit for " << input_file << std::endl;
+  std::cout << "saving fit for " << input_file << ", "
+            << kernel.bytes() << " bytes." << std::endl;
+
   // Write the output.
   kernel.Save();
 
