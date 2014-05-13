@@ -450,11 +450,20 @@ a) Error maps input and output. These are grayscale images mapped to floats
 which on input represent a multiplier on pixel error and on output represent a
 per-pixel error distance.
 
-b) scheduler? how to fit in new stuff 
+b) scheduler? how to fit in new stuff
 
 b) OpenCL CIEDE2000 error distance.
 
 c) Per-file logging and per-file output
 
 d) multi-threading per-file.
+
+================================================================================
+
+threading architecture
+
+each kernel gets its own thread. OpenCL also has its own thread, but that one
+has an event it blocks on so it must be terminated manually.
+
+use std::promise and std::future to communicate with OpenCL thread.
 

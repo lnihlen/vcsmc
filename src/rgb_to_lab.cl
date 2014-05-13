@@ -5,10 +5,10 @@
 // a global argument.
 
 __kernel void rgb_to_lab(__global __read_only image2d input_image,
-                         __global int row,
+                         __global __read_only int row,
                          __global __write_only float4* lab_out) {
   // First convert to CIE tristimus values XYZ. Matrix values cribbed from
-  // http://www.cs.rit.edu/~ncs/color/t_convert.html
+  // http://www.cs.rit.edu/~ncs/color/t_convert.html.
   // [ X ]   [  0.412453  0.357580  0.180423 ]   [ R ]
   // [ Y ] = [  0.212671  0.715160  0.072169 ] * [ G ]
   // [ Z ]   [  0.019334  0.119193  0.950227 ]   [ B ]

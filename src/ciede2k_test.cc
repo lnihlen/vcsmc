@@ -96,8 +96,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Does not have to be blocking, but currently is.
-//  result = clBuildProgram(program, 0, NULL, "-Werror", NULL, NULL);
-  result = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
+  result = clBuildProgram(program, 0, NULL, "-Werror", NULL, NULL);
   if (result != CL_SUCCESS) {
     size_t len;
     char buffer[4096];
