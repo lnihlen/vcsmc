@@ -465,5 +465,32 @@ threading architecture
 each kernel gets its own thread. OpenCL also has its own thread, but that one
 has an event it blocks on so it must be terminated manually.
 
+** Actually the "OpenCL has its own thread idea" kinda sucks.
+
 use std::promise and std::future to communicate with OpenCL thread.
+
+cl_events are associated with every command enqueue. cl_events can't be
+associated with program builds but oh well. Command enqueues are to execute
+kernels and to copy data in and out of the device.
+
+// Note: each kernel fitting thread should get its own command queue
+// Somewhere in kernel thread we kick off a pallette compute based on a pixel
+// strip.
+std::future<std::unique_ptr<Pallette>> pallette = pixel_strip->BuildPallette(
+    2, cl_command_queue_);
+
+
+// Within PixelStrip::BuildPallette(size_t number_of_colors, CLCommandQueue queue):
+// perhaps we've done this bit already, or perhaps we have an cl_image
+// reference so PixelStrip already knows image and row data about itself
+CLInputBuffer pixels_cl(<pointer to pixel data>, <size of pixel data>);
+pixels_cl.CopyToDevice(queue);
+
+// pick the number of colors at random,
+// there's some kind of global array of these (maybe Color:: has them?)
+// in LAB space already.
+
+
+
+
 
