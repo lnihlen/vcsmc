@@ -473,6 +473,9 @@ cl_events are associated with every command enqueue. cl_events can't be
 associated with program builds but oh well. Command enqueues are to execute
 kernels and to copy data in and out of the device.
 
+within Kernel::Fit():
+scoped_ptr<CLCommandQueue> queue_ = CLDeviceContext::MakeCommandQueue();
+
 // Note: each kernel fitting thread should get its own command queue
 // Somewhere in kernel thread we kick off a pallette compute based on a pixel
 // strip.
@@ -484,13 +487,30 @@ std::future<std::unique_ptr<Pallette>> pallette = pixel_strip->BuildPallette(
 // perhaps we've done this bit already, or perhaps we have an cl_image
 // reference so PixelStrip already knows image and row data about itself
 CLInputBuffer pixels_cl(<pointer to pixel data>, <size of pixel data>);
-pixels_cl.CopyToDevice(queue);
+pixels_cl.EnqueueCopy(queue);
 
 // pick the number of colors at random,
 // there's some kind of global array of these (maybe Color:: has them?)
 // in LAB space already.
+CLOutputBuffer distances_cl(size_t)
 
+std::unique_ptr<CLKernel> kernel = CLDeviceContext::MakeKernel("k_means");
+kernel->SetArgument(uint32 index, size_t size, const void* arg);
+""
+""
 
+kernel->Enqueue(queue);
 
+std::future<std::unique_ptr<float[]>> future_distance = 
+    distances_cl->EnqueueCopy(queue);
+
+// .. enqueue all other work ..
+
+// if you want, or can trust FIFO order of above enqueues and just wait on
+// future_distance.
+kernel->Wait();
+
+// or whatever is correct syntax for this.
+std::unique_ptr<float[]> distances = future_distance.get();
 
 
