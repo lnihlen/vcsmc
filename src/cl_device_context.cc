@@ -1,44 +1,133 @@
 #include "cl_device_context.h"
 
+#include <cassert>
 #include <OpenCL/OpenCL.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include "cl_buffer_impl.h"
+#include "cl_command_queue_impl.h"
+#include "cl_kernel_impl.h"
 
 namespace vcsmc {
 
+CLDeviceContext* CLDeviceContext::instance_ = NULL;
 
-// CLCommandQueue -------------------------------------------------------------
+struct CLDeviceContext::Impl {
+  cl_device_id device_id;
+  cl_context context;
 
-struct CLCommandQueueImpl {
-  cl_command_queue command_queue;
-
-  ~CLCommandQueueImpl() {
-    clReleaseCommandQueue(command_queue);
-  }
+  // Our cache of previously loaded and compiled programs.
+  cl_program programs[Kernels::kKernelsCount];
 };
 
-void CLCommandQueue::Finish() {
-  clFinish(impl_->command_queue);
+// static
+bool CLDeviceContext::Setup() {
+  instance_ = new CLDeviceContext();
+  return instance_->DoSetup();
 }
 
+// static
+void CLDeviceContext::Teardown() {
+  delete instance_;
+  instance_ = NULL;
+}
 
-// CLKernel -------------------------------------------------------------------
+// static
+std::unique_ptr<CLCommandQueue> CLDeviceContext::MakeCommandQueue() {
+  return instance_->DoMakeCommandQueue();
+}
 
-struct CLKernelImpl {
-  cl_kernel kernel;
-  cl_event event;
+// static
+std::unique_ptr<CLKernel> CLDeviceContext::MakeKernel(Kernels kernel) {
+  return instance_->DoMakeKernel(kernel);
+}
 
-  ~CLKernelImpl {
-    clReleaseEvent(event);
-    clReleaseKernel(kernel);
+// static
+std::unique_ptr<CLBuffer> CLDeviceContext::MakeBuffer(size_t size) {
+  return instance_->DoMakeBuffer(size);
+}
+
+CLDeviceContext::CLDeviceContext() : impl_(new Impl) {
+}
+
+CLDeviceContext::~CLDeviceContext() {
+  for (size_t i = 0; i < Kernels::kKernelsCount; ++i) {
+    clReleaseProgram(impl_->programs[i]);
   }
-};
-
-bool CLKernel::SetArgument(uint32 index, size_t size, const uint8* arg) {
-  int result = clSetKernelArg(impl_->kernel, index, size, arg);
-  return (result == CL_SUCCESS);
+  clReleaseContext(impl_->context);
 }
 
-bool CLKernel::Enqueue(CLCommandQueue* queue) {
+bool CLDeviceContext::DoSetup() {
+  int result = clGetDeviceIDs(
+      NULL, CL_DEVICE_TYPE_GPU, 1, &impl_->device_id, NULL);
+  if (result != CL_SUCCESS)
+    return false;
 
+  impl_->context = clCreateContext(
+      0, 1, &impl_->device_id, NULL, NULL, &result);
+  if (!impl_->context)
+    return false;
+
+  // Load all program by hand, during the setup function. This allows easy error
+  // reporting and program termination if there are problems, saves me having to
+  // design additional async thread-safe program compilation, and spares me from
+  // having to protect program_map with a lock. And for a project likely to have
+  // only a dozen or so cl programs at most should be just fine.
+  if (!LoadAndBuildProgram(kCiede2k))
+    return false;
+  if (!LoadAndBuildProgram(kRGBToLab))
+    return false;
+
+  return true;
+}
+
+bool CLDeviceContext::LoadAndBuildProgram(Kernels kernel) {
+  std::string filename = std::string("cl/") + KernelName(kernel) + ".cl";
+  return false;
+}
+
+const char* CLDeviceContext::KernelName(Kernels kernel) {
+  switch (kernel) {
+    case kCiede2k:
+      return "ciede2k";
+    case kRGBToLab:
+      return "rgb_to_lab";
+    default:
+      assert(false);
+      return "";
+  }
+  assert(false);
+  return "";
+}
+
+std::unique_ptr<CLCommandQueue> CLDeviceContext::DoMakeCommandQueue() {
+  std::unique_ptr<CLCommandQueueImpl> cimpl(new CLCommandQueueImpl);
+  if (!cimpl->Setup(impl_->context, impl_->device_id))
+    return std::unique_ptr<CLCommandQueue>();
+
+  return std::unique_ptr<CLCommandQueue>(cimpl.release());
+}
+
+std::unique_ptr<CLKernel> CLDeviceContext::DoMakeKernel(Kernels kernel) {
+  std::unique_ptr<CLKernelImpl> kimpl(new CLKernelImpl);
+  if (!kimpl->Setup(impl_->programs[kernel],
+                    KernelName(kernel),
+                    impl_->context,
+                    impl_->device_id))
+    return std::unique_ptr<CLKernel>();
+
+  return std::unique_ptr<CLKernel>(kimpl.release());
+}
+
+std::unique_ptr<CLBuffer> CLDeviceContext::DoMakeBuffer(size_t size) {
+  std::unique_ptr<CLBufferImpl> bimpl(new CLBufferImpl);
+  if (!bimpl->Setup(size, impl_->context))
+    return std::unique_ptr<CLBuffer>();
+
+  return std::unique_ptr<CLBuffer>(bimpl.release());
 }
 
 }  // namespace vcsmc
