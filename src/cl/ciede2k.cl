@@ -73,7 +73,7 @@ __kernel void ciede2k(__global __read_only float4* lab_1_row,
   }
 
   float T = 1.0f - (0.17f * cos((h_mean - 30.0f) * (M_PI_F / 180.0f))) +
-                   (0.24f * cos(2.0 * h_mean * (M_PI_F / 180.0f))) +
+                   (0.24f * cos(2.0f * h_mean * (M_PI_F / 180.0f))) +
                    (0.32f * cos(((3.0f * h_mean) + 6.0f) * (M_PI_F / 180.0f))) -
                    (0.20f * cos(((4.0f * h_mean) - 63.0f) * (M_PI_F / 180.0f)));
 

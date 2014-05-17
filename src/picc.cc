@@ -3,13 +3,14 @@
 #include <iostream>
 #include <string>
 
-#include "color.h"        // just temp testing of pf_image
-#include "histogram.h"    // ditto
+#include "cl_device_context.h"
+//#include "color.h"        // just temp testing of pf_image
+//#include "histogram.h"    // ditto
 #include "image.h"
 #include "kernel.h"
 #include "log.h"
 #include "opcode.h"
-#include "pixel_strip.h"  // just temp testing of pf_image
+//#include "pixel_strip.h"  // just temp testing of pf_image
 #include "scan_line.h"
 #include "state.h"
 #include "tiff_image_file.h"
@@ -29,7 +30,12 @@ int main(int argc, char* argv[]) {
 
   // Assumes switches have already been parsed, or sadness will occur.
   vcsmc::Log::Setup();
+  if (!vcsmc::CLDeviceContext::Setup()) {
+    std::cerr << "OpenCL setup failed, exiting." << std::endl;
+    return -1;
+  }
 
+/*
   // make test image for pf fitting, 0x00, 0x0e
   std::unique_ptr<vcsmc::Image> test_image(new vcsmc::Image(320, 180));
   std::unique_ptr<vcsmc::PixelStrip> test_strip(new vcsmc::PixelStrip(320));
@@ -42,6 +48,7 @@ int main(int argc, char* argv[]) {
   }
   vcsmc::TiffImageFile test_file("test_pf.tiff");
   test_file.Save(test_image.get());
+*/
 
   // Load input image file.
   vcsmc::TiffImageFile image_file(input_file);
@@ -65,5 +72,6 @@ int main(int argc, char* argv[]) {
   // Write the output.
   kernel.Save();
 
+  vcsmc::CLDeviceContext::Teardown();
   return 0;
 }

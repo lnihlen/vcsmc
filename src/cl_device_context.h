@@ -14,6 +14,7 @@ class CLBuffer;
 // Singleton class to represent single ownership of a global OpenCL device.
 // Constructs all other CL objects.
 class CLDeviceContext {
+ public:
   // Initialize singleton instance, returns false on failure.
   static bool Setup();
   static void Teardown();

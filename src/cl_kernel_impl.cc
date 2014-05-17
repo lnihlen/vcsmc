@@ -8,7 +8,6 @@ CLKernelImpl::CLKernelImpl() : work_group_size_(0) {
 }
 
 CLKernelImpl::~CLKernelImpl() {
-  if (event_) clReleaseEvent(event_);
   if (kernel_) clReleaseKernel(kernel_);
 }
 

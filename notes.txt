@@ -513,4 +513,21 @@ kernel->Wait();
 // or whatever is correct syntax for this.
 std::unique_ptr<float[]> distances = future_distance.get();
 
+===============================================================================
 
+the new (new (new)) plan:
+
+a) install python colormath
+b) take offical Atari RGB colors out of stella source code
+c) write python script to take those official colors and generate the color
+  tables in vcsmc, including an RGB color table as well as a Lab color table
+  at D65.
+d) python script also generates test data to test Lab CL shader against
+  its calculated values
+e) write testbed for lab CL shader that loads refcheck_image and validates
+  values returned within epsilon.
+f) back to work on k-means clustering algorithm:
+  1) enqueue runs of lab shader on each row of input image
+  2) then can discard input image and just keep rows
+  3) those rows become the input for a given k-means run
+g) profit! :)

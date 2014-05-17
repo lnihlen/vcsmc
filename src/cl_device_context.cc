@@ -1,6 +1,8 @@
 #include "cl_device_context.h"
 
 #include <cassert>
+#include <iostream>
+#include <memory>
 #include <OpenCL/OpenCL.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -86,7 +88,47 @@ bool CLDeviceContext::DoSetup() {
 
 bool CLDeviceContext::LoadAndBuildProgram(Kernels kernel) {
   std::string filename = std::string("cl/") + KernelName(kernel) + ".cl";
-  return false;
+  int program_fd = open(filename.c_str(), O_RDONLY);
+  if (program_fd < 0)
+    return false;
+
+  // figure out size to pre-allocate buffer of correct size
+  struct stat program_stat;
+  if (fstat(program_fd, &program_stat)) {
+    close(program_fd);
+    return false;
+  }
+
+  std::unique_ptr<char[]> program_bytes(new char[program_stat.st_size]);
+  int read_size = read(program_fd, program_bytes.get(), program_stat.st_size);
+  close(program_fd);
+  if (read_size != program_stat.st_size)
+    return false;
+
+  const char* source_ptr = program_bytes.get();
+  int result = 0;
+  cl_program program = clCreateProgramWithSource(
+      impl_->context, 1, &source_ptr, NULL, &result);
+  if (!program || result != CL_SUCCESS)
+    return false;
+
+  result = clBuildProgram(program, 0, NULL, "-Werror", NULL, NULL);
+  if (result != CL_SUCCESS) {
+    std::unique_ptr<char[]> log_char(new char[16384]);
+    size_t log_length;
+    clGetProgramBuildInfo(program,
+                          impl_->device_id,
+                          CL_PROGRAM_BUILD_LOG,
+                          16384,
+                          log_char.get(),
+                          &log_length);
+    // this should really go in the logs but dump to stdio for now.
+    std::cerr << "** failed to build " << KernelName(kernel) << std::endl
+              << log_char.get();
+    return false;
+  }
+
+  return true;
 }
 
 const char* CLDeviceContext::KernelName(Kernels kernel) {
