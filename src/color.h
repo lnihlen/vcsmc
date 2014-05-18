@@ -9,11 +9,8 @@ namespace vcsmc {
 class Color {
  public:
   static uint32 AtariColorToABGR(uint8 atari_color);
-  static uint8 ABGRToAtariColor(uint32 abgr);
-  // Difference between two colors as calculated by Cartesian distance in ABGR
-  // space. Alpha is ignored.
-  static double CartesianDistanceSquaredABGR(uint32 a, uint32 b);
-  static double CartesianDistanceSquaredAtari(uint8 a, uint8 b);
+  // Returns a pointer to 4 floats L, a, b, 1.0
+  static const float* AtariColorToLab(uint8 atari_color);
 
  private:
 };
