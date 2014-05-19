@@ -3,7 +3,6 @@
 #include <cassert>
 #include <cstring>
 
-#include "histogram.h"
 #include "pixel_strip.h"
 
 namespace vcsmc {
@@ -21,7 +20,7 @@ void Image::SetPixel(uint32 x, uint32 y, uint32 abgr) {
 std::unique_ptr<PixelStrip> Image::GetPixelStrip(uint32 row) {
   assert(row < height_);
   return std::unique_ptr<PixelStrip>(
-      new PixelStrip(pixels_.get() + (row * width_), width_));
+      new PixelStrip(pixels_.get() + (row * width_), width_, row));
 }
 
 void Image::SetStrip(uint32 row, PixelStrip* strip) {

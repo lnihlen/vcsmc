@@ -4,49 +4,41 @@
 // We typically process one row at a time of the image, so row is provided as
 // a global argument.
 
-__kernel void rgb_to_lab(__global __read_only image2d input_image,
-                         __global __read_only int row,
-                         __global __write_only float4* lab_out) {
-  // First convert to CIE tristimus values XYZ. Matrix values cribbed from
-  // http://www.cs.rit.edu/~ncs/color/t_convert.html.
-  // [ X ]   [  0.412453  0.357580  0.180423 ]   [ R ]
-  // [ Y ] = [  0.212671  0.715160  0.072169 ] * [ G ]
-  // [ Z ]   [  0.019334  0.119193  0.950227 ]   [ B ]
+// Notes, values, and algorithm from:
+// http://www.brucelindbloom.com/index.html?Eqn_RGB_XYZ_Matrix.html
 
-  // Column is assumed to be stored in the 0th global id.
+__kernel void rgb_to_lab(__read_only image2d_t input_image,
+                         __read_only int image_row,
+                         __global __write_only float4* lab_out) {
   int col = get_global_id(0);
-  float4 rgba = read_imagef(input_image, (float2)(col, row));
+  float4 rgba = read_imagef(input_image, (int2)(col, image_row));
+
+  float4 v_below = rgba / 12.92f;
+  float4 v_above = pow((rgba + 0.055f) / 1.055f, 2.4f);
+  int4 below = islessequal(rgba, 0.04045f);
+  int4 above = isgreater(rgba, 0.04045f);
+  float4 rgba_norm = (v_below * below) + (v_above * above);
 
   // Multiply matrix cols first and then add.
-  float4 col_0 = (float4)(rgba.xxx, 0.0) * (0.412453, 0.212671, 0.019334, 0.0);
-  float4 col_1 = (float4)(rgba.yyy, 0.0) * (0.357580, 0.715160, 0.119193, 0.0);
-  float4 col_2 = (float4)(rgba.zzz, 0.0) * (0.180423, 0.072169, 0.950227, 0.0);
-  float4 xyz = col_0 + col_1 + col2;
+  float4 col_0 = (float4)(rgba_norm.xxx, 0.0f) *
+      (float4)(0.4124564f, 0.3575761f, 0.1804375f, 0.0f);
+  float4 col_1 = (float4)(rgba_norm.yyy, 0.0f) *
+      (float4)(0.2126729f, 0.7151522f, 0.0721750f, 0.0f);
+  float4 col_2 = (float4)(rgba_norm.zzz, 0.0f) *
+      (float4)(0.0193339f, 0.1191920f, 0.9503041f, 0.0f);
+  float4 xyz = col_0 + col_1 + col_2;
 
-  // X=95.047, Y=100.00, Z=108.883
-  // Using D65 reference white, normalize. Terms are (X/Xn, Y/Yn, Z/Zn, 1)
-  float4 xyzn = XYZ / (float4)(0.95047, 1.0000, 1.08883, 1.000);
+  // Xr=0.3127, Yr=0.3290, Zr=0.3583 using D65 reference white.
+  float4 xyzn = xyz / (float4)(0.3127f, 0.3290f, 0.3583f, 1.0f);
 
-  // L* = 116 * (Y/Yn)1/3 - 16    for Y/Yn > 0.008856
-  // L* = 903.3 * Y/Yn             otherwise
-  float l_star = xyzn.y > 0.08856 ? (116.0 * pow(xyzn.y, 1.0 / 3.0)) - 16.0 :
-                                    903.3 * xyzn.y;
-
-  // a* and b* both rely on f(t), which has different formulae depending on t.
-  // we compute both values of f on Xn, Yn, and Zn.
-  // where f(t) = t^1/3      for t > 0.008856
-  //            f(t) = 7.787 * t + 16/116    otherwise
-  float4 f_t_above = pow(xyzn, 1.0 / 3.0);
-  float4 f_t_below = (7.787 * xyzn) + (16.0 / 116.0);
-  int4 above = is_greater(xyzn, 0.008856);
-  int4 below = isequal(above, 0);
-  float4 f_xyzn = (f_t_above * above) + (f_t_below * below);
-
-  // a* = 500 * ( f(X/Xn) - f(Y/Yn) )
-  float a_star = 500.0 * (f_xyzn.x - f_xyzn.y);
-
-  // b* = 200 * ( f(Y/Yn) - f(Z/Zn) )
-  float b_star = 200.0 * (f_xyzn.y - f_xyzn.z);
-
-  lab_out[col] = (float4)(l_star, a_star, b_star, rgba.w);
+  float4 f_below = (((24389.0f/27.0f) * xyzn) + 16.0f) / 116.0f;
+  float4 f_above = pow(xyzn, 1.0f / 3.0f);
+  below = islessequal(xyzn, 216.0f / 24389.0f);
+  above = isgreater(xyzn, 216.0f / 24389.0f);
+  float4 f = (f_below * below) + (f_above * above);
+  float4 Lab = (float4)((116.0f * f.y) - 16.0f,
+                        500.0f * (f.x - f.y),
+                        200.0f * (f.y - f.z),
+                        rgba.w);
+  lab_out[col] = Lab;
 }

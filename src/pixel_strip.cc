@@ -4,21 +4,20 @@
 #include <cstring>
 
 #include "color.h"
-#include "histogram.h"
 
 namespace vcsmc {
 
-PixelStrip::PixelStrip(const uint32 width)
+PixelStrip::PixelStrip(const uint32 width, uint32 row_id)
     : width_(width),
-      pixels_(new uint32[width]),
-      histo_(new Histogram) {
+      row_id_(row_id),
+      pixels_(new uint32[width]) {
   std::memset(pixels_.get(), 0, width * sizeof(uint32));
 }
 
-PixelStrip::PixelStrip(const uint32* pixels, const uint32 width)
+PixelStrip::PixelStrip(const uint32* pixels, const uint32 width, uint32 row_id)
     : width_(width),
-      pixels_(new uint32[width]),
-      histo_(new Histogram) {
+      row_id_(row_id),
+      pixels_(new uint32[width]) {
   std::memcpy(pixels_.get(), pixels, width * sizeof(uint32));
 }
 
@@ -34,11 +33,6 @@ double PixelStrip::DistanceFrom(const PixelStrip* strip) const {
     accum += Color::CartesianDistanceSquaredABGR(pixels_[i], strip->pixels_[i]);
   }
   return accum;
-}
-
-void PixelStrip::BuildHistogram() {
-  assert(histo_);
-  histo_->Compute(this);
 }
 
 }  // namespace vcsmc

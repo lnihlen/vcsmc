@@ -6,20 +6,17 @@
 #include <fstream>
 #include <memory>
 #include <OpenCL/opencl.h>
+#include <stdio.h>
 #include <string>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <vector>
 
-#include "color_table.cc"
+#include "types.h"
+#include "auto/color_table.cc"
 
 int main(int argc, char* argv[]) {
-  // read in program source to a vector of string
-  std::string source;
-  std::ifstream source_file("cl/rgb_to_lab.cl");
-  std::string source_line;
-  while (std::getline(source_file, source_line)) {
-    source += source_line + "\n";
-  }
-
   cl_device_id device_id;
   int result = clGetDeviceIDs(NULL, CL_DEVICE_TYPE_GPU, 1, &device_id, NULL);
   if (result != CL_SUCCESS) {
@@ -40,7 +37,24 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  const char* source_ptr = source.c_str();
+  int program_fd = open("cl/rgb_to_lab.cl", O_RDONLY);
+    // figure out size to pre-allocate buffer of correct size
+  struct stat program_stat;
+  if (fstat(program_fd, &program_stat)) {
+    close(program_fd);
+    return -1;
+  }
+
+  std::unique_ptr<char[]> program_bytes(new char[program_stat.st_size + 1]);
+  int read_size = read(program_fd, program_bytes.get(), program_stat.st_size);
+  close(program_fd);
+  if (read_size != program_stat.st_size)
+    return -1;
+
+  // NULL-terminate code!
+  program_bytes[program_stat.st_size] = '\0';
+
+  const char* source_ptr = program_bytes.get();
   cl_program program = clCreateProgramWithSource(
       context, 1, &source_ptr, NULL, &result);
   if (!program) {
@@ -51,60 +65,71 @@ int main(int argc, char* argv[]) {
   // Does not have to be blocking, but currently is.
   result = clBuildProgram(program, 0, NULL, "-Werror", NULL, NULL);
   if (result != CL_SUCCESS) {
-    size_t len;
-    char buffer[4096];
+    std::unique_ptr<char[]> log_char(new char[16384]);
+    size_t log_length;
     std::cerr << "failed to build program: " << result << std::endl;
-    clGetProgramBuildInfo(
-        program, device_id, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
-    std::cerr << buffer << std::endl;
+    clGetProgramBuildInfo(program,
+                          device_id,
+                          CL_PROGRAM_BUILD_LOG,
+                          16384,
+                          log_char.get(),
+                          &log_length);
+    std::cerr << log_char.get() << std::endl;
     return -1;
   }
 
-  cl_kernel kernel = clCreateKernel(program, "ciede2k", &result);
+  cl_kernel kernel = clCreateKernel(program, "rgb_to_lab", &result);
   if (!kernel || result != CL_SUCCESS) {
     std::cerr << "failed to create compute kernel: " << result << std::endl;
     return -1;
   }
 
-  size_t input_byte_size = sizeof(float) * 4 * data_lines;
-  cl_mem lab1_cl = clCreateBuffer(
-      context, CL_MEM_READ_ONLY, input_byte_size, NULL, NULL);
-  cl_mem lab2_cl = clCreateBuffer(
-      context, CL_MEM_READ_ONLY, input_byte_size, NULL, NULL);
-  if (!lab1_cl || !lab2_cl) {
-    std::cerr << "failed to create input buffers." << std::endl;
+  // Create single-row image from Atari ABGR color table, as it is a packed
+  // little-endian ABGR (CL_RGBA) color row.
+  cl_image_format image_format;
+  image_format.image_channel_order = CL_RGBA;
+  image_format.image_channel_data_type = CL_UNORM_INT8;
+  cl_image_desc image_desc;
+  image_desc.image_type = CL_MEM_OBJECT_IMAGE2D;
+  image_desc.image_width = 128;
+  image_desc.image_height = 1;
+  image_desc.image_depth = 1;  // unused
+  image_desc.image_array_size = 1;  // unused
+  image_desc.image_row_pitch = 128 * 4;  // row size in bytes or zero
+  image_desc.num_mip_levels = 0;  // must be 0
+  image_desc.num_samples = 0;  // must be 0
+  image_desc.buffer = NULL;  // must be NULL unless buffer type
+  cl_mem image = clCreateImage(context,
+                               CL_MEM_READ_ONLY,
+                               &image_format,
+                               &image_desc,
+                               NULL,
+                               &result);
+  if (!image || result != CL_SUCCESS) {
+    std::cerr << "failed to create image: " << result << std::endl;
     return -1;
   }
 
-  result = clEnqueueWriteBuffer(command_queue,
-                                lab1_cl,
-                                CL_TRUE,
-                                0,
-                                input_byte_size,
-                                lab1_packed.get(),
-                                0,
-                                NULL,
-                                NULL);
+  size_t origin[3] = {0, 0, 0};
+  size_t region[3] = {128, 1, 1};
+  result = clEnqueueWriteImage(command_queue,
+                               image,
+                               false,  // reconsider blocking in picc
+                               origin,
+                               region,
+                               128 * 4,
+                               1,
+                               kAtariNTSCABGRColorTable,
+                               0,
+                               NULL,
+                               NULL);
+
   if (result != CL_SUCCESS) {
-    std::cerr << "failed to write lab1_cl" << std::endl;
+    std::cerr << "failed to write cl_image" << std::endl;
     return -1;
   }
 
-  result = clEnqueueWriteBuffer(command_queue,
-                                lab2_cl,
-                                CL_TRUE,
-                                0,
-                                input_byte_size,
-                                lab2_packed.get(),
-                                0,
-                                NULL,
-                                NULL);
-  if (result != CL_SUCCESS) {
-    std::cerr << "failed to write lab2_cl" << std::endl;
-    return -1;
-  }
-
-  size_t output_data_size = sizeof(float) * data_lines;
+  size_t output_data_size = sizeof(float) * 4 * 128;
   cl_mem output_cl = clCreateBuffer(
       context, CL_MEM_WRITE_ONLY, output_data_size, NULL, NULL);
   if (!output_cl) {
@@ -112,8 +137,9 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  result = clSetKernelArg(kernel, 0, sizeof(cl_mem), &lab1_cl);
-  result |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &lab2_cl);
+  int row = 0;
+  result = clSetKernelArg(kernel, 0, sizeof(cl_mem), &image);
+  result |= clSetKernelArg(kernel, 1, sizeof(int), &row);
   result |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &output_cl);
   if (result != CL_SUCCESS) {
     std::cerr << "failed to set kernel argument" << std::endl;
@@ -135,7 +161,7 @@ int main(int argc, char* argv[]) {
 
   // lazy scheduling for now, we assume work group size is greater than
   // the size of our input set
-  if (wg_size < data_lines) {
+  if (wg_size < 128) {
     std::cerr << "work group size: " << wg_size << " too small." << std::endl;
     return -1;
   }
@@ -159,7 +185,7 @@ int main(int argc, char* argv[]) {
   clFinish(command_queue);
 
   // Read back results for verification.
-  std::unique_ptr<float[]> results_packed(new float[data_lines]);
+  std::unique_ptr<float[]> results_packed(new float[128 * 4]);
   result = clEnqueueReadBuffer(command_queue,
                                output_cl,
                                CL_TRUE,
@@ -175,18 +201,17 @@ int main(int argc, char* argv[]) {
   }
 
   // Compare results.
-  for (size_t i = 0; i < data_lines; ++i) {
-    float diff = fabs((results_packed[i] / expected_results[i]) - 1.0);
+  for (size_t i = 0; i < 128 * 4; ++i) {
+    float diff = fabs((results_packed[i] / kAtariNTSCLabColorTable[i]) - 1.0);
     if (diff > 0.0001) {
-      std::cerr << "mismatched results on line " << i + 1
-                << " expected: " << expected_results[i]
+      std::cerr << "mismatched results in element " << i
+                << " expected: " << kAtariNTSCLabColorTable[i]
                 << " got: " << results_packed[i]
                 << std::endl;
     }
   }
 
-  clReleaseMemObject(lab1_cl);
-  clReleaseMemObject(lab2_cl);
+  clReleaseMemObject(image);
   clReleaseMemObject(output_cl);
   clReleaseProgram(program);
   clReleaseKernel(kernel);

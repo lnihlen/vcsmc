@@ -5,6 +5,7 @@
 
 namespace vcsmc {
 
+class CLCommandQueue;
 class PixelStrip;
 
 // Associated with a PixelStrip, a Pallette represents a mapping from ABGR color
@@ -15,7 +16,7 @@ class Pallette {
   // that brute-force running times increase exponentially with |num_colus|.
   Pallette(uint32 num_colus);
 
-  void Compute(PixelStrip* pixel_strip);
+  void Compute(PixelStrip* pixel_strip, CLCommandQueue* queue);
 
  private:
 

@@ -11,10 +11,10 @@ OBJ=background_color_strategy.o                                                \
     cl_buffer_impl.o                                                           \
     cl_command_queue_impl.o                                                    \
     cl_device_context.o                                                        \
+    cl_image_impl.o                                                            \
     cl_kernel_impl.o                                                           \
     color.o                                                                    \
     do_nothing_strategy.o                                                      \
-    histogram.o                                                                \
     image.o                                                                    \
     kernel.o                                                                   \
     log.o                                                                      \
@@ -30,9 +30,12 @@ OBJ=background_color_strategy.o                                                \
 picc: $(OBJ) picc.o
 	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-ciede2k_test: $(OBJ) ciede2k_test.o
+ciede2k_test: ciede2k_test.o
+	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+rgb_to_lab_test: rgb_to_lab_test.o
 	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 clean:
-	rm -f *.o picc ciede2k_test
+	rm -f *.o picc ciede2k_test rgb_to_lab_test
 

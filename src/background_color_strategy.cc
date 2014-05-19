@@ -3,7 +3,6 @@
 #include <cassert>
 
 #include "color.h"
-#include "histogram.h"
 #include "opcode.h"
 #include "pixel_strip.h"
 #include "scan_line.h"

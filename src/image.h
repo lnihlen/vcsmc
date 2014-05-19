@@ -7,6 +7,7 @@
 
 namespace vcsmc {
 
+class CLImage;
 class PixelStrip;
 
 // Defines a field of uint32 ABGR colors, has a width and height, etc.
@@ -36,6 +37,7 @@ class Image {
   const uint32 width_;
   const uint32 height_;
   std::unique_ptr<uint32[]> pixels_;
+  std::unique_ptr<CLImage> cl_image_;
 
  private:
   // Private default ctor means "don't call me."

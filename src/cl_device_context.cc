@@ -11,7 +11,9 @@
 
 #include "cl_buffer_impl.h"
 #include "cl_command_queue_impl.h"
+#include "cl_image_impl.h"
 #include "cl_kernel_impl.h"
+#include "image.h"
 
 namespace vcsmc {
 
@@ -38,18 +40,23 @@ void CLDeviceContext::Teardown() {
 }
 
 // static
+std::unique_ptr<CLBuffer> CLDeviceContext::MakeBuffer(size_t size) {
+  return instance_->DoMakeBuffer(size);
+}
+
+// static
 std::unique_ptr<CLCommandQueue> CLDeviceContext::MakeCommandQueue() {
   return instance_->DoMakeCommandQueue();
 }
 
 // static
-std::unique_ptr<CLKernel> CLDeviceContext::MakeKernel(Kernels kernel) {
-  return instance_->DoMakeKernel(kernel);
+std::unique_ptr<CLImage> CLDeviceContext::MakeImage(const Image* image) {
+  return instance_->DoMakeImage(image);
 }
 
 // static
-std::unique_ptr<CLBuffer> CLDeviceContext::MakeBuffer(size_t size) {
-  return instance_->DoMakeBuffer(size);
+std::unique_ptr<CLKernel> CLDeviceContext::MakeKernel(Kernels kernel) {
+  return instance_->DoMakeKernel(kernel);
 }
 
 CLDeviceContext::CLDeviceContext() : impl_(new Impl) {
@@ -99,11 +106,12 @@ bool CLDeviceContext::LoadAndBuildProgram(Kernels kernel) {
     return false;
   }
 
-  std::unique_ptr<char[]> program_bytes(new char[program_stat.st_size]);
+  std::unique_ptr<char[]> program_bytes(new char[program_stat.st_size + 1]);
   int read_size = read(program_fd, program_bytes.get(), program_stat.st_size);
   close(program_fd);
   if (read_size != program_stat.st_size)
     return false;
+  program_bytes[program_stat.st_size] = '\0';
 
   const char* source_ptr = program_bytes.get();
   int result = 0;
@@ -145,12 +153,28 @@ const char* CLDeviceContext::KernelName(Kernels kernel) {
   return "";
 }
 
+std::unique_ptr<CLBuffer> CLDeviceContext::DoMakeBuffer(size_t size) {
+  std::unique_ptr<CLBufferImpl> bimpl(new CLBufferImpl);
+  if (!bimpl->Setup(size, impl_->context))
+    return std::unique_ptr<CLBuffer>();
+
+  return std::unique_ptr<CLBuffer>(bimpl.release());
+}
+
 std::unique_ptr<CLCommandQueue> CLDeviceContext::DoMakeCommandQueue() {
   std::unique_ptr<CLCommandQueueImpl> cimpl(new CLCommandQueueImpl);
   if (!cimpl->Setup(impl_->context, impl_->device_id))
     return std::unique_ptr<CLCommandQueue>();
 
   return std::unique_ptr<CLCommandQueue>(cimpl.release());
+}
+
+std::unique_ptr<CLImage> CLDeviceContext::DoMakeImage(const Image* image) {
+  std::unique_ptr<CLImageImpl> iimpl(new CLImageImpl(image));
+  if (!iimpl->Setup(impl_->context))
+    return std::unique_ptr<CLImage>();
+
+  return std::unique_ptr<CLImage>(iimpl.release());
 }
 
 std::unique_ptr<CLKernel> CLDeviceContext::DoMakeKernel(Kernels kernel) {
@@ -162,14 +186,6 @@ std::unique_ptr<CLKernel> CLDeviceContext::DoMakeKernel(Kernels kernel) {
     return std::unique_ptr<CLKernel>();
 
   return std::unique_ptr<CLKernel>(kimpl.release());
-}
-
-std::unique_ptr<CLBuffer> CLDeviceContext::DoMakeBuffer(size_t size) {
-  std::unique_ptr<CLBufferImpl> bimpl(new CLBufferImpl);
-  if (!bimpl->Setup(size, impl_->context))
-    return std::unique_ptr<CLBuffer>();
-
-  return std::unique_ptr<CLBuffer>(bimpl.release());
 }
 
 }  // namespace vcsmc
