@@ -14,6 +14,7 @@
 #include "cl_image_impl.h"
 #include "cl_kernel_impl.h"
 #include "image.h"
+#include "pixel_strip.h"
 
 namespace vcsmc {
 
@@ -52,6 +53,12 @@ std::unique_ptr<CLCommandQueue> CLDeviceContext::MakeCommandQueue() {
 // static
 std::unique_ptr<CLImage> CLDeviceContext::MakeImage(const Image* image) {
   return instance_->DoMakeImage(image);
+}
+
+// static
+std::unique_ptr<CLImage> CLDeviceContext::MakeImageFromStrip(
+    const PixelStrip* strip) {
+  return instance_->DoMakeImageFromStrip(strip);
 }
 
 // static
@@ -171,6 +178,15 @@ std::unique_ptr<CLCommandQueue> CLDeviceContext::DoMakeCommandQueue() {
 
 std::unique_ptr<CLImage> CLDeviceContext::DoMakeImage(const Image* image) {
   std::unique_ptr<CLImageImpl> iimpl(new CLImageImpl(image));
+  if (!iimpl->Setup(impl_->context))
+    return std::unique_ptr<CLImage>();
+
+  return std::unique_ptr<CLImage>(iimpl.release());
+}
+
+std::unique_ptr<CLImage> CLDeviceContext::DoMakeImageFromStrip(
+    const PixelStrip* strip) {
+  std::unique_ptr<CLImageImpl> iimpl(new CLImageImpl(strip));
   if (!iimpl->Setup(impl_->context))
     return std::unique_ptr<CLImage>();
 

@@ -46,7 +46,7 @@ bool CLBufferImpl::EnqueueCopyToDevice(
 
 std::future<std::unique_ptr<uint8>> CLBufferImpl::EnqueueCopyFromDevice(
     CLCommandQueue* queue) {
-
+  assert(false); // implement me!
   return promise_.get_future();
 }
 

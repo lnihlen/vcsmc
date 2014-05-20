@@ -20,6 +20,8 @@ class CLBufferImpl : public CLBuffer {
   virtual std::future<std::unique_ptr<uint8>> EnqueueCopyFromDevice(
       CLCommandQueue* queue) override;
 
+  const cl_mem get() const { return cl_mem; }
+
  private:
   size_t size_;
   cl_event event_;

@@ -3,6 +3,9 @@
 #include <cassert>
 #include <cstring>
 
+#include "cl_command_queue.h"
+#include "cl_device_context.h"
+#include "cl_image.h"
 #include "pixel_strip.h"
 
 namespace vcsmc {
@@ -13,6 +16,13 @@ Image::Image(uint32 width, uint32 height)
       pixels_(new uint32[width * height]) {
 }
 
+bool Image::CopyToDevice(CLCommandQueue* queue) {
+  cl_image_.reset(CLDeviceContext::MakeImage(this));
+  if (!cl_image_)
+    return false;
+  return cl_image_->EnqueueCopyToDevice(queue);
+}
+
 void Image::SetPixel(uint32 x, uint32 y, uint32 abgr) {
   *(pixels_.get() + ((y * width_) + x)) = abgr;
 }
@@ -20,7 +30,7 @@ void Image::SetPixel(uint32 x, uint32 y, uint32 abgr) {
 std::unique_ptr<PixelStrip> Image::GetPixelStrip(uint32 row) {
   assert(row < height_);
   return std::unique_ptr<PixelStrip>(
-      new PixelStrip(pixels_.get() + (row * width_), width_, row));
+    new PixelStrip(this, row));
 }
 
 void Image::SetStrip(uint32 row, PixelStrip* strip) {

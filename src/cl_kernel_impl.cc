@@ -1,6 +1,8 @@
 #include "cl_kernel_impl.h"
 
+#include "cl_buffer_impl.h"
 #include "cl_command_queue_impl.h"
+#include "cl_image_image.h"
 
 namespace vcsmc {
 
@@ -37,9 +39,23 @@ size_t CLKernelImpl::WorkGroupSize() {
   return work_group_size_;
 }
 
-bool CLKernelImpl::SetArgument(uint32 index, size_t size, const uint8* arg) {
+bool CLKernelImpl::SetByteArgument(
+    uint32 index, size_t size, const uint8* arg) {
   int result = clSetKernelArg(kernel_, index, size, arg);
-  return (result == CL_SUCCESS);
+  return result == CL_SUCCESS;
+}
+
+bool CLKernelImpl::SetBufferArgument(uint32 index, const CLBuffer* buffer) {
+  CLBuffferImpl* buffer_impl = static_cast<CLBufferImpl*>(buffer);
+  int result = clSetKernelArg(
+      kernel_, index, sizeof(cl_mem), buffer_impl->get());
+  return result == CL_SUCCESS;
+}
+
+bool CLKernelImpl::SetImageArugment(uint32 index, const CLImage* image) {
+  CLImageImpl* image_impl = static_cast<CLImageImpl*>(image);
+  int result = clSetKernelArg(
+      kernel_, index, sizeof(cl_mem), image_impl->get());
 }
 
 bool CLKernelImpl::Enqueue(CLCommandQueue* queue) {

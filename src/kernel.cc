@@ -7,11 +7,11 @@
 #include "background_color_strategy.h"
 #include "constants.h"
 #include "do_nothing_strategy.h"
-#include "histogram.h"
 #include "image.h"
 #include "opcode.h"
 #include "pixel_strip.h"
 #include "playfield_strategy.h"
+#include "random.h"
 #include "scan_line.h"
 #include "state.h"
 #include "tiff_image_file.h"
@@ -25,14 +25,21 @@ Kernel::Kernel(std::unique_ptr<Image> target_image)
 }
 
 void Kernel::Fit() {
-  scan_lines_.reserve(kFrameHeightPixels);
+  Random random;
 
+  std::unique_ptr<CLCommandQueue> queue(CLDeviceContext::MakeCommandQueue());
+  if (!queue)
+    return;
+
+  if (!target_image_->CopyToDevice(queue))
+    return;
+
+  scan_lines_.reserve(kFrameHeightPixels);
   for (uint32 i = 0; i < kFrameHeightPixels; ++i) {
     std::unique_ptr<State> entry_state = EntryStateForLine(i);
     std::unique_ptr<PixelStrip> target_strip = target_image_->GetPixelStrip(i);
-
-    // deprecate and replace with converting to lab and building pallettes.
-    target_strip->BuildHistogram();
+    if (!target_strip->MakeLabStrip(queue.get()))
+      return;
 
     //========== Do Nothing!
 

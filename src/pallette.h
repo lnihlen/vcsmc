@@ -7,6 +7,7 @@ namespace vcsmc {
 
 class CLCommandQueue;
 class PixelStrip;
+class Random;
 
 // Associated with a PixelStrip, a Pallette represents a mapping from ABGR color
 // values to a fixed number of Atari colors.
@@ -16,10 +17,9 @@ class Pallette {
   // that brute-force running times increase exponentially with |num_colus|.
   Pallette(uint32 num_colus);
 
-  void Compute(PixelStrip* pixel_strip, CLCommandQueue* queue);
+  void Compute(PixelStrip* pixel_strip, CLCommandQueue* queue, Random* random);
 
  private:
-
   const uint32 num_colus_;
 };
 

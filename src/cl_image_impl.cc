@@ -4,12 +4,22 @@
 
 #include "cl_command_queue_impl.h"
 #include "image.h"
+#include "pixel_strip.h"
 
 namespace vcsmc {
 
 CLImageImpl::CLImageImpl(const Image* image)
     : mem_(0),
-      image_(image) {
+      width_(image->width()),
+      height_(image->height()),
+      pixels_(image->pixels()) {
+}
+
+CLImageImpl::CLImageImpl(const PixelStrip* strip)
+    : mem_(0),
+      width_(strip->width()),
+      height_(1),
+      pixels_(strip->pixels()) {
 }
 
 CLImageImpl::~CLImageImpl() {
@@ -23,8 +33,8 @@ bool CLImageImpl::Setup(cl_context context) {
 
   cl_image_desc image_desc;
   image_desc.image_type = CL_MEM_OBJECT_IMAGE2D;
-  image_desc.image_width = image_->width();
-  image_desc.image_height = image_->height();
+  image_desc.image_width = width_;
+  image_desc.image_height = height_;
   image_desc.image_depth = 1;
   image_desc.image_array_size = 1;
   image_desc.image_row_pitch = 0;
@@ -46,15 +56,15 @@ bool CLImageImpl::Setup(cl_context context) {
 bool CLImageImpl::EnqueueCopyToDevice(CLCommandQueue* queue) {
   CLCommandQueueImpl* command_queue = static_cast<CLCommandQueueImpl*>(queue);
   size_t origin[3] = { 0, 0, 0 };
-  size_t region[3] = { image_->width(), image_->height(), 1 };
+  size_t region[3] = { width_, height_, 1 };
   int result = clEnqueueWriteImage(command_queue->get(),
                                    mem_,
                                    true,
                                    origin,
                                    region,
-                                   image_->width() * 4,
+                                   width_ * 4,
                                    1,
-                                   image_->pixels(),
+                                   pixels_,
                                    0,
                                    NULL,
                                    NULL);

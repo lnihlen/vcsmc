@@ -4,13 +4,10 @@
 #include <string>
 
 #include "cl_device_context.h"
-//#include "color.h"        // just temp testing of pf_image
-//#include "histogram.h"    // ditto
 #include "image.h"
 #include "kernel.h"
 #include "log.h"
 #include "opcode.h"
-//#include "pixel_strip.h"  // just temp testing of pf_image
 #include "scan_line.h"
 #include "state.h"
 #include "tiff_image_file.h"
@@ -35,20 +32,11 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-/*
-  // make test image for pf fitting, 0x00, 0x0e
-  std::unique_ptr<vcsmc::Image> test_image(new vcsmc::Image(320, 180));
-  std::unique_ptr<vcsmc::PixelStrip> test_strip(new vcsmc::PixelStrip(320));
-  for (uint32 i = 0; i < 320; ++i) {
-    uint8 colu = (i >> 3) % 2 ? 0x0e : 0x00;
-    test_strip->SetPixel(i, vcsmc::Color::AtariColorToABGR(colu));
+  // Setup Color array on device
+  if (!vcsmc::Color::Setup()) {
+    std::cerr << "Error setting up Color Lab cache, exiting." << std::endl;
+    return -1;
   }
-  for (uint32 i = 0; i < 180; ++i) {
-    test_image->SetStrip(i, test_strip.get());
-  }
-  vcsmc::TiffImageFile test_file("test_pf.tiff");
-  test_file.Save(test_image.get());
-*/
 
   // Load input image file.
   vcsmc::TiffImageFile image_file(input_file);

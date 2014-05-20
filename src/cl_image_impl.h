@@ -8,20 +8,26 @@
 namespace vcsmc {
 
 class Image;
+class PixelStrip;
 
 class CLImageImpl : public CLImage {
  public:
   CLImageImpl(const Image* image);
+  CLImageImpl(const PixelStrip* strip);
   ~CLImageImpl();
 
   bool Setup(cl_context context);
 
   virtual bool EnqueueCopyToDevice(CLCommandQueue* queue) override;
 
+  const cl_mem get() const { return mem_; }
+
  private:
   cl_mem mem_;
-  // non-owning pointer
-  const Image* image_;
+  uint32 width_;
+  uint32 height_;
+  // non-owning pointer!
+  const uint32* pixels_;
 };
 
 }  // namespace vcsmc

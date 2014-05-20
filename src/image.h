@@ -7,6 +7,7 @@
 
 namespace vcsmc {
 
+class CLCommandQueue;
 class CLImage;
 class PixelStrip;
 
@@ -15,6 +16,7 @@ class Image {
  public:
   // Constructs an Image that owns a pixel array.
   Image(uint32 width, uint32 height);
+  bool CopyToDevice(CLCommandQueue* queue);
 
   // 0-based coords.
   void SetPixel(uint32 x, uint32 y, uint32 abgr);
@@ -32,6 +34,7 @@ class Image {
   const uint32 pixel(uint32 x, uint32 y) const {
     return pixels_[(y * width_) + x];
   }
+  const CLImage* cl_image() const { return cl_image_; }
 
  protected:
   const uint32 width_;
