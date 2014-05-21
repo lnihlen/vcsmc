@@ -17,6 +17,7 @@ const uint32 kScanLineWidthClocks = kFrameWidthPixels + kHBlankWidthClocks;
 const uint32 kColorClocksPerCPUCycle = 3;
 const uint32 kScanLineWidthCycles = kScanLineWidthClocks /
                                     kColorClocksPerCPUCycle;
+const uint32 kNTSCColors = 128;
 
 }  // namespace vcsmc
 

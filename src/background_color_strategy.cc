@@ -4,6 +4,7 @@
 
 #include "color.h"
 #include "opcode.h"
+#include "pallette.h"
 #include "pixel_strip.h"
 #include "scan_line.h"
 #include "state.h"
@@ -12,11 +13,10 @@ namespace vcsmc {
 
 std::unique_ptr<ScanLine> BackgroundColorStrategy::Fit(
     PixelStrip* target_strip, State* entry_state) {
-  const Histogram* histo = target_strip->histo();
-  assert(histo);
+  const Pallette* pallette = target_strip->pallette(0);
 
   // Choose best-fit single color.
-  uint8 colubk = histo->colu(0);
+  uint8 colubk = pallette->colu(0);
 
   // Now figure out most efficient means to pack it in to a new ScanLine.
   std::unique_ptr<ScanLine> scan_line(new ScanLine(entry_state));

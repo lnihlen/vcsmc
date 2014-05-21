@@ -37,9 +37,13 @@ void Kernel::Fit() {
   scan_lines_.reserve(kFrameHeightPixels);
   for (uint32 i = 0; i < kFrameHeightPixels; ++i) {
     std::unique_ptr<State> entry_state = EntryStateForLine(i);
+
     std::unique_ptr<PixelStrip> target_strip = target_image_->GetPixelStrip(i);
+
     if (!target_strip->MakeLabStrip(queue.get()))
       return;
+
+    target_strip->BuildPallettes(queue, 8, &random);
 
     //========== Do Nothing!
 

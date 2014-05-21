@@ -17,16 +17,15 @@ class CLBufferImpl : public CLBuffer {
   // CLBuffer
   virtual bool EnqueueCopyToDevice(
       CLCommandQueue* queue, const uint8* bytes) override;
-  virtual std::future<std::unique_ptr<uint8>> EnqueueCopyFromDevice(
-      CLCommandQueue* queue) override;
+  virtual bool EnqueueCopyFromDevice(
+      CLCommandQueue* queue, uint8* bytes) override;
 
-  const cl_mem get() const { return cl_mem; }
+  const cl_mem get() const { return mem_; }
 
  private:
   size_t size_;
   cl_event event_;
   cl_mem mem_;
-  std::promise<std::unique_ptr<uint8>> promise_;
 };
 
 }  // namespace vcsmc

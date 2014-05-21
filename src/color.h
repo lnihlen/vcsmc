@@ -28,7 +28,7 @@ class Color {
  private:
   static Color* instance_;
   bool CopyColorBuffers();
-  vector<std::unique_ptr<CLBuffer>> atari_color_buffers_;
+  std::vector<std::unique_ptr<CLBuffer>> atari_color_buffers_;
 };
 
 }  // namespace vcsmc

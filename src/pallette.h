@@ -1,6 +1,9 @@
 #ifndef SRC_PALLETTE_H_
 #define SRC_PALLETTE_H_
 
+#include <memory>
+#include <vector>
+
 #include "types.h"
 
 namespace vcsmc {
@@ -19,8 +22,38 @@ class Pallette {
 
   void Compute(PixelStrip* pixel_strip, CLCommandQueue* queue, Random* random);
 
+  // Atari colu value for the ith class in [0, num_colus).
+  const uint8 colu(uint32 i) const { return colus_[i] * 2; }
+  // Number of colors in this pallette.
+  const uint32 num_colus() const { return num_colus_; }
+  // Total error in this pallette approximation.
+  const float error() const { return error_; }
+  // The minimum error class for the ith pixel in [0, pixel_strip->width())
+  const uint8 colu_class(uint32 i) const { return classes_[i]; }
+
  private:
+  void BuildErrorDistances(
+      PixelStrip* pixel_strip,
+      CLCommandQueue* queue,
+      std::vector<std::unique_ptr<float[]>>* error_distances_out);
+  // Given a precomputed array of error distances of each pixel to each Atari
+  // color and a vector of current colu indicies that are the classes, populates
+  // classes with the index in colus that is the minimum error class for each
+  // pixel. Returns the total error for this classfication.
+  float Classify(const std::vector<std::unique_ptr<float[]>>& error_distances,
+                 uint32 width);
+  // For each of the classes of colors, find minimum error color to approximate
+  // those pixels. Build array of kNTSCColors floats of total error for each K
+  // color. For each pixel in strip add error distance to the kth color total
+  // error in each color. Then find min error color and use it as new color.
+  void Color(const std::vector<std::unique_ptr<float[]>>& error_distances,
+             uint32 width,
+             std::vector<std::unique_ptr<float[]>>* colu_errors);
+
   const uint32 num_colus_;
+  float error_;
+  std::vector<uint8> colus_;
+  std::vector<uint8> classes_;
 };
 
 }  // namespace vcsmc

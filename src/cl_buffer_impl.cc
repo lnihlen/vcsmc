@@ -38,16 +38,23 @@ bool CLBufferImpl::EnqueueCopyToDevice(
                                     0,
                                     NULL,
                                     NULL);
-  if (result != CL_SUCCESS)
-    return false;
-
   return result == CL_SUCCESS;
 }
 
-std::future<std::unique_ptr<uint8>> CLBufferImpl::EnqueueCopyFromDevice(
-    CLCommandQueue* queue) {
-  assert(false); // implement me!
-  return promise_.get_future();
+bool CLBufferImpl::EnqueueCopyFromDevice(
+    CLCommandQueue* queue, uint8 * bytes) {
+  CLCommandQueueImpl* queue_impl = static_cast<CLCommandQueueImpl*>(queue);
+  assert(queue_impl);
+  int result = clEnqueueReadBuffer(queue_impl->get(),
+                                   mem_,
+                                   CL_TRUE,
+                                   0,
+                                   size_,
+                                   bytes,
+                                   0,
+                                   NULL,
+                                   NULL);
+  return result == CL_SUCCESS;
 }
 
 }  // namespace vcsmc

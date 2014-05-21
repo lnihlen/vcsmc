@@ -8,6 +8,7 @@
 #include "cl_device_context.h"
 #include "cl_image.h"
 #include "color.h"
+#include "pallette.h"
 
 namespace vcsmc {
 
@@ -69,6 +70,20 @@ bool PixelStrip::MakeLabStrip(CLCommandQueue* queue) {
 
   // Enqueue the conversion kernel.
   return kernel->Enqueue(queue);
+}
+
+void PixelStrip::BuildPallettes(
+    CLCommandQueue* queue, const uint32 max_colus, Random* random) {
+  for (uint32 i = 0; i < max_colus; ++i) {
+    std::unique_ptr<Pallette> pallete(new Pallete(i));
+    pallete->Compute(this, queue, random);
+    palletes_.push_back(std::move(pallete));
+  }
+
+  // BAD ASSUMPTION but yes here we are confidently destroying resources because
+  // we know that Pallete::Compute has a call to Finish() within it..
+  strip_image_.reset();
+  kernel_.reset();
 }
 
 void PixelStrip::SetPixel(uint32 pixel, uint32 color) {
