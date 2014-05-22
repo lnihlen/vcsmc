@@ -4,8 +4,11 @@
 #include <cstring>
 
 #include "cl_command_queue.h"
+#include "cl_buffer.h"
 #include "cl_device_context.h"
 #include "cl_image.h"
+#include "cl_kernel.h"
+#include "pallette.h"
 #include "pixel_strip.h"
 
 namespace vcsmc {
@@ -17,7 +20,7 @@ Image::Image(uint32 width, uint32 height)
 }
 
 bool Image::CopyToDevice(CLCommandQueue* queue) {
-  cl_image_.reset(CLDeviceContext::MakeImage(this));
+  cl_image_ = CLDeviceContext::MakeImage(this);
   if (!cl_image_)
     return false;
   return cl_image_->EnqueueCopyToDevice(queue);

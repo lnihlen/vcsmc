@@ -2,9 +2,9 @@
 
 #include <iostream>
 
+#include "colu_strip.h"
 #include "histogram.h"
 #include "opcode.h"
-#include "pixel_strip.h"
 #include "state.h"
 
 namespace vcsmc {
@@ -15,17 +15,16 @@ ScanLine::ScanLine(State* entry_state)
   states_.push_back(entry_state->Clone());
 }
 
-std::unique_ptr<PixelStrip> ScanLine::Simulate() {
-  std::unique_ptr<PixelStrip> pixel_strip(
-      new PixelStrip(kFrameWidthPixels * 2));
+std::unique_ptr<ColuStrip> ScanLine::Simulate() {
+  std::unique_ptr<ColuStrip> colu_strip(new ColuStrip);
   for (uint32 i = 0; i < states_.size(); ++i) {
     uint32 until = states_[0]->color_clocks() + kScanLineWidthClocks;
     if (i + 1 < states_.size()) {
       until = states_[i + 1]->color_clocks();
     }
-    states_[i]->PaintInto(pixel_strip.get(), until);
+    states_[i]->PaintInto(colu_strip.get(), until);
   }
-  return pixel_strip;
+  return colu_strip;
 }
 
 void ScanLine::AddOperation(std::unique_ptr<op::OpCode> opcode) {

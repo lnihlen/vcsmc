@@ -10,23 +10,17 @@ CLBufferImpl::CLBufferImpl() : size_(0) {
 }
 
 CLBufferImpl::~CLBufferImpl() {
-  if (event_) clReleaseEvent(event_);
   if (mem_) clReleaseMemObject(mem_);
 }
 
 bool CLBufferImpl::Setup(size_t size, cl_context context) {
   size_ = size;
   mem_ = clCreateBuffer(context, CL_MEM_READ_WRITE, size, NULL, NULL);
-  if (!mem_)
-    return false;
-
-  int result = 0;
-  event_ = clCreateUserEvent(context, &result);
-  return (result == CL_SUCCESS && event_);
+  return mem_;
 }
 
 bool CLBufferImpl::EnqueueCopyToDevice(
-    CLCommandQueue* queue, const uint8* bytes) {
+    CLCommandQueue* queue, const void* bytes) {
   CLCommandQueueImpl* queue_impl = static_cast<CLCommandQueueImpl*>(queue);
   assert(queue_impl);
   int result = clEnqueueWriteBuffer(queue_impl->get(),
@@ -42,7 +36,7 @@ bool CLBufferImpl::EnqueueCopyToDevice(
 }
 
 bool CLBufferImpl::EnqueueCopyFromDevice(
-    CLCommandQueue* queue, uint8 * bytes) {
+    CLCommandQueue* queue, void* bytes) {
   CLCommandQueueImpl* queue_impl = static_cast<CLCommandQueueImpl*>(queue);
   assert(queue_impl);
   int result = clEnqueueReadBuffer(queue_impl->get(),

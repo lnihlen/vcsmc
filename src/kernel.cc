@@ -5,10 +5,12 @@
 #include <iostream>
 
 #include "background_color_strategy.h"
+#include "cl_device_context.h"
 #include "constants.h"
 #include "do_nothing_strategy.h"
 #include "image.h"
 #include "opcode.h"
+#include "pallette.h"
 #include "pixel_strip.h"
 #include "playfield_strategy.h"
 #include "random.h"
@@ -31,7 +33,7 @@ void Kernel::Fit() {
   if (!queue)
     return;
 
-  if (!target_image_->CopyToDevice(queue))
+  if (!target_image_->CopyToDevice(queue.get()))
     return;
 
   scan_lines_.reserve(kFrameHeightPixels);
@@ -39,39 +41,33 @@ void Kernel::Fit() {
     std::unique_ptr<State> entry_state = EntryStateForLine(i);
 
     std::unique_ptr<PixelStrip> target_strip = target_image_->GetPixelStrip(i);
-
-    if (!target_strip->MakeLabStrip(queue.get()))
-      return;
-
-    target_strip->BuildPallettes(queue, 8, &random);
+    target_strip->BuildDistances(queue.get());
+    target_strip->BuildPallettes(8, &random);
 
     //========== Do Nothing!
 
     DoNothingStrategy do_nothing;
     std::unique_ptr<ScanLine> do_nothing_scan_line = do_nothing.Fit(
         target_strip.get(), entry_state.get());
-    std::unique_ptr<PixelStrip> do_nothing_strip =
+    std::unique_ptr<ColuStrip> do_nothing_strip =
         do_nothing_scan_line->Simulate();
-    double do_nothing_error = do_nothing_strip->DistanceFrom(
-        target_strip.get());
+    float do_nothing_error = target_strip->DistanceFrom(do_nothing_strip.get());
 
     //========== Set background color only.
 
     BackgroundColorStrategy bg_color;
     std::unique_ptr<ScanLine> bg_color_scan_line = bg_color.Fit(
         target_strip.get(), entry_state.get());
-    std::unique_ptr<PixelStrip> bg_color_strip =
-        bg_color_scan_line->Simulate();
-    double bg_color_error = bg_color_strip->DistanceFrom(
-        target_strip.get());
+    std::unique_ptr<ColuStrip> bg_color_strip = bg_color_scan_line->Simulate();
+    float bg_color_error = target_strip->DistanceFrom(bg_color_strip.get());
 
     //========== Playfield Fitting.
 
     PlayfieldStrategy pf_strategy;
     std::unique_ptr<ScanLine> pf_scan_line = pf_strategy.Fit(
         target_strip.get(), entry_state.get());
-    std::unique_ptr<PixelStrip> pf_color_strip = pf_scan_line->Simulate();
-    double pf_error = pf_color_strip->DistanceFrom(target_strip.get());
+    std::unique_ptr<ColuStrip> pf_color_strip = pf_scan_line->Simulate();
+    float pf_error = target_strip->DistanceFrom(pf_color_strip.get());
 
     //========== Pick minimum error result.
 

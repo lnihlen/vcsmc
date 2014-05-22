@@ -2,7 +2,7 @@
 
 #include "cl_buffer_impl.h"
 #include "cl_command_queue_impl.h"
-#include "cl_image_image.h"
+#include "cl_image_impl.h"
 
 namespace vcsmc {
 
@@ -46,16 +46,17 @@ bool CLKernelImpl::SetByteArgument(
 }
 
 bool CLKernelImpl::SetBufferArgument(uint32 index, const CLBuffer* buffer) {
-  CLBuffferImpl* buffer_impl = static_cast<CLBufferImpl*>(buffer);
+  const CLBufferImpl* buffer_impl = static_cast<const CLBufferImpl*>(buffer);
   int result = clSetKernelArg(
       kernel_, index, sizeof(cl_mem), buffer_impl->get());
   return result == CL_SUCCESS;
 }
 
-bool CLKernelImpl::SetImageArugment(uint32 index, const CLImage* image) {
-  CLImageImpl* image_impl = static_cast<CLImageImpl*>(image);
+bool CLKernelImpl::SetImageArgument(uint32 index, const CLImage* image) {
+  const CLImageImpl* image_impl = static_cast<const CLImageImpl*>(image);
   int result = clSetKernelArg(
       kernel_, index, sizeof(cl_mem), image_impl->get());
+  return result == CL_SUCCESS;
 }
 
 bool CLKernelImpl::Enqueue(CLCommandQueue* queue) {

@@ -8,6 +8,7 @@
 
 namespace vcsmc {
 
+class CLBuffer;
 class CLCommandQueue;
 
 class CLKernelImpl : public CLKernel {
@@ -24,8 +25,8 @@ class CLKernelImpl : public CLKernel {
   virtual size_t WorkGroupSize() override;
   virtual bool SetByteArgument(
       uint32 index, size_t size, const uint8* arg) override;
-  virtual bool SetBufferArgument(uint32 index, CLBuffer* buffer) override;
-  virtual bool SetImageArgument(uint32 index, CLImage* image) override;
+  virtual bool SetBufferArgument(uint32 index, const CLBuffer* buffer) override;
+  virtual bool SetImageArgument(uint32 index, const CLImage* image) override;
   virtual bool Enqueue(CLCommandQueue* queue) override;
 
  private:

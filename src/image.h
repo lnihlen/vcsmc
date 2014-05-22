@@ -34,7 +34,7 @@ class Image {
   const uint32 pixel(uint32 x, uint32 y) const {
     return pixels_[(y * width_) + x];
   }
-  const CLImage* cl_image() const { return cl_image_; }
+  const CLImage* cl_image() const { return cl_image_.get(); }
 
  protected:
   const uint32 width_;

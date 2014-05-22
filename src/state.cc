@@ -5,7 +5,7 @@
 #include <iostream>
 
 #include "color.h"
-#include "pixel_strip.h"
+#include "colu_strip.h"
 
 namespace vcsmc {
 
@@ -15,24 +15,20 @@ State::State()
   std::memset(registers_, 0, sizeof(registers_));
 }
 
-void State::PaintInto(PixelStrip* pixel_strip, uint32 until) {
-  assert(pixel_strip->width() == kFrameWidthPixels * 2);
+void State::PaintInto(ColuStrip* colu_strip, uint32 until) {
   assert(color_clock_ < until);
   uint32 local_cc = color_clock_ % kScanLineWidthClocks;
   uint32 local_until = until - color_clock_ + (color_clock_ %
                                                kScanLineWidthClocks);
   uint32 starting_clock = std::max(local_cc, kHBlankWidthClocks);
-  uint32 starting_pixel = (starting_clock - kHBlankWidthClocks) * 2;
+  uint32 starting_column = starting_clock - kHBlankWidthClocks;
   for (uint32 clock = starting_clock; clock < local_until; ++clock) {
     uint8 colu = tia_[TIA::COLUBK];
     if (PlayfieldPaints(clock)) {
       colu = tia_[TIA::COLUPF];
     }
 
-    uint32 color = Color::AtariColorToABGR(colu);
-    // We paint two pixels for every color clock.
-    pixel_strip->SetPixel(starting_pixel++, color);
-    pixel_strip->SetPixel(starting_pixel++, color);
+    colu_strip->SetColu(starting_column++, colu);
   }
 }
 

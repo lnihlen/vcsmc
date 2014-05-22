@@ -1,8 +1,6 @@
 #ifndef SRC_CL_BUFFER_H_
 #define SRC_CL_BUFFER_H_
 
-#include "types.h"
-
 namespace vcsmc {
 
 class CLCommandQueue;
@@ -10,10 +8,10 @@ class CLCommandQueue;
 class CLBuffer {
  public:
   virtual bool EnqueueCopyToDevice(
-      CLCommandQueue* queue, const uint8* bytes) = 0;
+      CLCommandQueue* queue, const void* data) = 0;
   // call queue->Finish() after issuing this before accessing data!
   virtual bool EnqueueCopyFromDevice(
-      CLCommandQueue* queue, uint8* bytes) = 0;
+      CLCommandQueue* queue, void* data) = 0;
 };
 
 }  // namespace vcsmc

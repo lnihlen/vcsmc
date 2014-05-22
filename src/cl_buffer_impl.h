@@ -16,15 +16,14 @@ class CLBufferImpl : public CLBuffer {
 
   // CLBuffer
   virtual bool EnqueueCopyToDevice(
-      CLCommandQueue* queue, const uint8* bytes) override;
+      CLCommandQueue* queue, const void* bytes) override;
   virtual bool EnqueueCopyFromDevice(
-      CLCommandQueue* queue, uint8* bytes) override;
+      CLCommandQueue* queue, void* bytes) override;
 
   const cl_mem get() const { return mem_; }
 
  private:
   size_t size_;
-  cl_event event_;
   cl_mem mem_;
 };
 

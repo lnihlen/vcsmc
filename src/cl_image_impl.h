@@ -4,6 +4,7 @@
 #include <OpenCL/OpenCL.h>
 
 #include "cl_image.h"
+#include "types.h"
 
 namespace vcsmc {
 

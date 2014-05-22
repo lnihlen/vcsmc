@@ -15,20 +15,15 @@ Pallette::Pallette(uint32 num_colus)
       error_(0.0f) {
 }
 
-void Pallette::Compute(
-    PixelStrip* pixel_strip, CLCommandQueue* queue, Random* random) {
-  // Build error distances from each pixel in strip to all Atari colors.
-  std::vector<std::unique_ptr<float[]>> error_distances;
-  BuildErrorDistances(pixel_strip, queue, &error_distances);
-
-  // Pick K colors at random, keeping them still divided by 2, so [0, 127]
+void Pallette::Compute(const PixelStrip* pixel_strip, Random* random) {
+  // Pick K colors at random
   colus_.reserve(num_colus_);
   for (size_t i = 0; i < num_colus_; ++i)
-    colus_.push_back(random->next() % kNTSCColors);
+    colus_.push_back((random->next() % kNTSCColors) * 2);
 
   // Build classification list of bytes that classifies each pixels into a
   // single Atari Color by choosing minimum error of each of the K colors.
-  float total_error = Classify(error_distances, pixel_strip->width());
+  float total_error = Classify(pixel_strip);
 
   // Build scratch area for Color()
   std::vector<std::unique_ptr<float[]>> colu_errors;
@@ -38,85 +33,49 @@ void Pallette::Compute(
     colu_errors.push_back(std::move(errrors));
   }
 
-  Color(error_distances, width, &colu_errors);
+  Color(pixel_strip, &colu_errors);
 
-  float next_total_error = Classify(error_distances, pixel_strip->width());
+  float next_total_error = Classify(pixel_strip);
   while (next_total_error < total_error) {
     total_error = next_total_error;
-    Color(error_distances, width, &colu_errors);
-    next_total_error = Classify(error_distances, pixel_strip->width());
+    Color(pixel_strip, &colu_errors);
+    next_total_error = Classify(pixel_strip);
   }
 }
 
-void Pallette::BuildErrorDistances(
-    PixelStrip * pixel_strip,
-    CLCommandQueue* queue,
-    std::vector<std::unique_ptr<float[]>>* error_distances_out) {
-  error_distances->reserve(kNTSCColors);
-
-  std::vector<std::unique_ptr<CLBuffer>> error_buffers;
-  results_buffers.reserve(kNTSCColors);
-  std::vector<std::unique_ptr<CLKernel>> kernels;
-  kernels.reserve(kNTSCColors);
-
-  for (size_t i = 0; i < kNTSCColors; ++i) {
-    std::unique_ptr<CLBuffer> buffer(CLDeviceContext::MakeBuffer(
-        pixel_strip->width() * sizeof(float)));
-
-    std::unique_ptr<CLKernel> kernel(CLDeviceContext::MakeKernel(kCiede2k));
-    kernel->SetBufferArgument(0, pixel_strip->lab_strip());
-    kernel->SetBufferArgument(1, Color::AtariLabColorBuffer(i * 2));
-    kernel->SetBufferArgument(2, buffer.get());
-    kernel->Enqueue(queue);
-
-    std::unique_ptr<float[]> errors(new float[pixel_strip->width()]);
-    buffer->EnqueueCopyFromDevice(queue, errors.get());
-
-    error_buffers.push_back(std::move(buffer));
-    kernels.push_back(std::move(kernel));
-    error_distances->push_back(std::move(errors));
-  }
-
-  // Block until the math is done and our output buffers are valid.
-  queue->Finish();
-}
-
-float Pallette::Classify(
-    const std::vector<std::unique_ptr<float[]>>& error_distances,
-    uint32 width) {
+float Pallette::Classify(const PixelStrip* pixel_strip) {
   classes.clear();
-  classes.reserve(width);
+  classes.reserve(pixel_strip->width());
   float total_error = 0.0f;
-  for (size_t i = 0; i < width; ++i) {
+  for (size_t i = 0; i < pixel_strip->width(); ++i) {
     uint8 colu_class = 0;
-    float minimum_error = error_distances[colus[0]][i];
+    float minimum_error = pixel_strip->distance(i, colus[0] * 2);
     for (size_t j = 1; j < num_colus_; ++j) {
-      float class_error = error_distances[colus[j]][i];
+      float class_error = pixel_strip->distance(i, colus[j] * 2);
       if (class_error < minimum_error) {
         colu_class = j;
         minimum_error = class_error;
       }
     }
-    classes_out->push_back(colu_class);
+
+    classes.push_back(colu_class);
     total_error += minimum_error;
   }
 
   return total_error;
 }
 
-void Pallette::Color(
-    const std::vector<std::unique_ptr<float[]>>& error_distances,
-    std::vector<std::unique_ptr<float[]>* colu_errors,
-    uint32 width) {
+void Pallette::Color(const PixelStrip* pixel_strip,
+                     std::vector<std::unique_ptr<float[]>* colu_errors) {
   for (std::vector<std::unique_ptr<float[]>::iterator it = colu_errors->begin();
        it != colu_errors->end(); ++it) {
     memset((*i).get(), 0, sizeof(float) * kNTSCColors);
   }
 
-  for (size_t i = 0; i < width; ++i) {
+  for (size_t i = 0; i < pixel_strip->width(); ++i) {
     uint8 pixel_class = classes_[i];
     for (size_t j = 0; j < kNTSCColors; ++j) {
-      colu_errors[pixel_class][j] += error_distances[j][i];
+      colu_errors[pixel_class][j] += pixel_strip->distance(i, j * 2);
     }
   }
 

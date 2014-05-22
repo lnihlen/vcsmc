@@ -1,6 +1,7 @@
 #include "color.h"
 
 #include "cl_buffer.h"
+#include "cl_command_queue.h"
 #include "cl_device_context.h"
 #include "constants.h"
 
@@ -22,8 +23,8 @@ const float* Color::AtariColorToLab(uint8 atari_color) {
 }
 
 // static
-const CLBuffer* AtariLabColorBuffer(uint8 atari_color) {
-  return instance_->atari_color_buffers_[atari_color / 2];
+const CLBuffer* Color::AtariLabColorBuffer(uint8 atari_color) {
+  return instance_->atari_color_buffers_[atari_color / 2].get();
 }
 
 // static
@@ -40,10 +41,10 @@ void Color::Teardown() {
 
 bool Color::CopyColorBuffers() {
   // Make an array of 128 floats of correct width, for copying to card.
-  vector<std::unique_ptr<float[]>> color_strips;
+  std::vector<std::unique_ptr<float[]>> color_strips;
   color_strips.reserve(128);
   for (size_t i = 0; i < 128; ++i) {
-    std::unique_ptr<float[]> color_strip = new float[4 * kFrameWidthPixels];
+    std::unique_ptr<float[]> color_strip(new float[4 * kFrameWidthPixels]);
     for (size_t j = 0; j < 4 * kFrameWidthPixels; ++j)
       color_strip[j] = kAtariNTSCLabColorTable[(i * 4) + (j % 4)];
     color_strips.push_back(std::move(color_strip));
@@ -63,9 +64,11 @@ bool Color::CopyColorBuffers() {
   std::unique_ptr<CLCommandQueue> queue(CLDeviceContext::MakeCommandQueue());
   if (!queue)
     return false;
-  for (size_t i = 0; i < 128; ++i)
+
+  for (size_t i = 0; i < 128; ++i) {
     atari_color_buffers_[i]->EnqueueCopyToDevice(
-        queue, static_cast<const uint8*>(color_strips[i]->get()));
+        queue.get(), color_strips[i].get());
+  }
 
   // Wait for completion.
   queue->Finish();

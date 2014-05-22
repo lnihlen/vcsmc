@@ -8,7 +8,7 @@
 
 namespace vcsmc {
 
-class PixelStrip;
+class ColuStrip;
 
 // State represents a moment in time for the VCS. It is a complete (enough for
 // our purposes) representation of the VCS hardware. It can generate output
@@ -78,8 +78,8 @@ class State {
     REGISTER_COUNT = 3
   };
 
-  // Fill pixels into |pixel_strip| from [color_clock, until)
-  void PaintInto(PixelStrip* pixel_strip, uint32 until);
+  // Fill pixels into |colu_strip| from [color_clock, until)
+  void PaintInto(ColuStrip* pixel_strip, uint32 until);
 
   //====== State Creation Methods
 
