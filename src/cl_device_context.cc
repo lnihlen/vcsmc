@@ -143,6 +143,7 @@ bool CLDeviceContext::LoadAndBuildProgram(Kernels kernel) {
     return false;
   }
 
+  impl_->programs[kernel] = program;
   return true;
 }
 
@@ -177,11 +178,11 @@ std::unique_ptr<CLCommandQueue> CLDeviceContext::DoMakeCommandQueue() {
 }
 
 std::unique_ptr<CLImage> CLDeviceContext::DoMakeImage(const Image* image) {
-  std::unique_ptr<CLImageImpl> iimpl(new CLImageImpl(image));
-  if (!iimpl->Setup(impl_->context))
+  std::unique_ptr<CLImageImpl> image_impl(new CLImageImpl(image));
+  if (!image_impl->Setup(impl_->context))
     return std::unique_ptr<CLImage>();
 
-  return std::unique_ptr<CLImage>(iimpl.release());
+  return std::unique_ptr<CLImage>(image_impl.release());
 }
 
 std::unique_ptr<CLImage> CLDeviceContext::DoMakeImageFromStrip(

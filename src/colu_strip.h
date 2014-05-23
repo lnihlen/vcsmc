@@ -15,7 +15,7 @@ class ColuStrip {
  public:
   ColuStrip();
 
-  uint colu(uint32 column) { return colus_[column]; }
+  uint32 colu(uint32 column) { return colus_[column]; }
   void set_colu(uint32 column, uint8 colu) { colus_[column] = colu; }
 
  private:

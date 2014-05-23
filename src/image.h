@@ -9,6 +9,7 @@ namespace vcsmc {
 
 class CLCommandQueue;
 class CLImage;
+class ColuStrip;
 class PixelStrip;
 
 // Defines a field of uint32 ABGR colors, has a width and height, etc.
@@ -18,14 +19,10 @@ class Image {
   Image(uint32 width, uint32 height);
   bool CopyToDevice(CLCommandQueue* queue);
 
-  // 0-based coords.
-  void SetPixel(uint32 x, uint32 y, uint32 abgr);
-  uint32 GetPixel(uint32 x, uint32 y);
-
   // Builds a copy of our |row| of pixels and returns.
   std::unique_ptr<PixelStrip> GetPixelStrip(uint32 row);
   // Copies contents of |strip| into our own buffer at row.
-  void SetStrip(uint32 row, PixelStrip* strip);
+  void SetStrip(uint32 row, ColuStrip* strip);
 
   const uint32 width() const { return width_; }
   const uint32 height() const { return height_; }

@@ -5,7 +5,10 @@
 #include <iostream>
 
 #include "background_color_strategy.h"
+#include "cl_command_queue.h"
 #include "cl_device_context.h"
+#include "cl_image.h"
+#include "colu_strip.h"
 #include "constants.h"
 #include "do_nothing_strategy.h"
 #include "image.h"
@@ -42,7 +45,7 @@ void Kernel::Fit() {
 
     std::unique_ptr<PixelStrip> target_strip = target_image_->GetPixelStrip(i);
     target_strip->BuildDistances(queue.get());
-    target_strip->BuildPallettes(8, &random);
+    target_strip->BuildPallettes(2, &random);
 
     //========== Do Nothing!
 
@@ -71,6 +74,12 @@ void Kernel::Fit() {
 
     //========== Pick minimum error result.
 
+    std::cout << "row: " << i
+              << " do nothing error: " << do_nothing_error
+              << " bg color error: " << bg_color_error
+              << " pf error: " << pf_error
+              << std::endl;
+
     // Yes I know we need to sort.
     if (pf_error < bg_color_error) {
       output_image_->SetStrip(i, pf_color_strip.get());
@@ -78,7 +87,7 @@ void Kernel::Fit() {
       scan_lines_.push_back(std::move(pf_scan_line));
     } else if (bg_color_error < do_nothing_error) {
       output_image_->SetStrip(i, bg_color_strip.get());
-      total_bytes_ += bg_color_scan_line->bytes();
+     total_bytes_ += bg_color_scan_line->bytes();
       scan_lines_.push_back(std::move(bg_color_scan_line));
     } else {
       output_image_->SetStrip(i, do_nothing_strip.get());

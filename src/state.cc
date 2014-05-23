@@ -28,7 +28,7 @@ void State::PaintInto(ColuStrip* colu_strip, uint32 until) {
       colu = tia_[TIA::COLUPF];
     }
 
-    colu_strip->SetColu(starting_column++, colu);
+    colu_strip->set_colu(starting_column++, colu);
   }
 }
 
@@ -157,7 +157,6 @@ const bool State::PlayfieldPaints(uint32 clock) {
   // PF0 148 - 164
   // PF1 164 - 196
   // PF2 196 - 228
-
   if (clock < 84 || (clock >= 148 && clock < 164)) {
     // PF0 D4 through D7 left to right.
     int pfbit = (clock - (clock < 84 ? 68 : 148)) >> 2;

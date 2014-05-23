@@ -14,13 +14,16 @@ OBJ=background_color_strategy.o                                                \
     cl_image_impl.o                                                            \
     cl_kernel_impl.o                                                           \
     color.o                                                                    \
+    colu_strip.o                                                               \
     do_nothing_strategy.o                                                      \
     image.o                                                                    \
     kernel.o                                                                   \
     log.o                                                                      \
     opcode.o                                                                   \
+    pallette.o                                                                 \
     pixel_strip.o                                                              \
     playfield_strategy.o                                                       \
+    random.o                                                                   \
     scan_line.o state.o                                                        \
     tiff_image_file.o
 

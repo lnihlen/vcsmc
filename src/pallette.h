@@ -42,8 +42,7 @@ class Pallette {
   // those pixels. Build array of kNTSCColors floats of total error for each K
   // color. For each pixel in strip add error distance to the kth color total
   // error in each color. Then find min error color and use it as new color.
-  void Color(const PixelStrip* pixel_strip,
-             std::vector<std::unique_ptr<float[]>>* colu_errors);
+  void Color(const PixelStrip* pixel_strip);
 
   const uint32 num_colus_;
   float error_;

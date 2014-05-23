@@ -4,6 +4,8 @@
 #include <string>
 
 #include "cl_device_context.h"
+#include "cl_image.h"
+#include "color.h"
 #include "image.h"
 #include "kernel.h"
 #include "log.h"
@@ -29,12 +31,6 @@ int main(int argc, char* argv[]) {
   vcsmc::Log::Setup();
   if (!vcsmc::CLDeviceContext::Setup()) {
     std::cerr << "OpenCL setup failed, exiting." << std::endl;
-    return -1;
-  }
-
-  // Setup Color array on device
-  if (!vcsmc::Color::Setup()) {
-    std::cerr << "Error setting up Color Lab cache, exiting." << std::endl;
     return -1;
   }
 

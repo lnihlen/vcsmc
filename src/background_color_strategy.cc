@@ -13,7 +13,7 @@ namespace vcsmc {
 
 std::unique_ptr<ScanLine> BackgroundColorStrategy::Fit(
     PixelStrip* target_strip, State* entry_state) {
-  const Pallette* pallette = target_strip->pallette(0);
+  const Pallette* pallette = target_strip->pallette(1);
 
   // Choose best-fit single color.
   uint8 colubk = pallette->colu(0);

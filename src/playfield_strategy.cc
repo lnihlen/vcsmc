@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "color.h"
-#include "histogram.h"
 #include "opcode.h"
+#include "pallette.h"
 #include "pixel_strip.h"
 #include "scan_line.h"
 #include "state.h"
@@ -17,70 +17,74 @@ std::unique_ptr<ScanLine> PlayfieldStrategy::Fit(
     PixelStrip* target_strip, State* entry_state) {
   assert((target_strip->width() % 8) == 0);
 
-  const Histogram* histo = target_strip->histo();
-  assert(histo);
+  const Pallette* pallette = target_strip->pallette(2);
+  assert(pallette);
 
-  uint8 colubk = histo->colu(0);
-  uint8 colupf = histo->colu(1);
-  uint32 color_bk = Color::AtariColorToABGR(colubk);
-  uint32 color_pf = Color::AtariColorToABGR(colupf);
+  uint8 colubk = pallette->colu(0);
+  uint8 colupf = pallette->colu(1);
 
   // Use first 40 bits to represent playfield. Most significant bit (bit 39)
   // represents the leftmost playfield bit.
   uint64 playfield = 0;
   for (uint32 i = 0; i < target_strip->width(); i += 8) {
     // Compare errors by modeling this bit of playfield as BK or PF color.
-    double bk_error = 0.0;
-    double pf_error = 0.0;
+    float bk_error = 0.0;
+    float pf_error = 0.0;
     for (uint32 offset = i; offset < i + 8; ++offset) {
-      uint32 pixel = target_strip->pixel(offset);
-      bk_error += Color::CartesianDistanceSquaredABGR(pixel, color_bk);
-      pf_error += Color::CartesianDistanceSquaredABGR(pixel, color_pf);
+      bk_error += target_strip->distance(offset, colubk);
+      pf_error += target_strip->distance(offset, colupf);
     }
 
-    playfield = (playfield | (pf_error < bk_error ? 1 : 0)) << 1;
+    playfield = playfield << 1;
+    playfield = playfield | (pf_error < bk_error ? 1 : 0);
   }
 
   uint64 bitmask = 0x8000000000;  // 1 << 39
-  // First 4 pixels are PF0 D4 through D7.
+  // First 4 pixels are PF0 D4 through D7 left to right.
   uint8 pf0_left = 0;
   for (uint32 i = 0; i < 4; ++i) {
-    pf0_left = (pf0_left | (playfield & bitmask ? 0x10 : 0x00)) << 1;
+    pf0_left = pf0_left >> 1;
+    pf0_left = pf0_left | (playfield & bitmask ? 0x80 : 0x00);
     bitmask = bitmask >> 1;
   }
 
-  // Next 8 pixels are PF1 D7 through D0.
+  // Next 8 pixels are PF1 D7 through D0 left to right.
   uint8 pf1_left = 0;
   for (uint32 i = 0; i < 8; ++i) {
-    pf1_left = (pf1_left | (playfield & bitmask ? 0x80 : 0x00)) >> 1;
+    pf1_left = pf1_left << 1;
+    pf1_left = pf1_left | (playfield & bitmask ? 0x01 : 0x00);
     bitmask = bitmask >> 1;
   }
 
-  // Next 8 pixels are PF2 D0 through D7.
+  // Next 8 pixels are PF2 D0 through D7 left to right.
   uint8 pf2_left = 0;
   for (uint32 i = 0; i < 8; ++i) {
-    pf2_left = (pf2_left | (playfield & bitmask ? 0x01 : 0x00)) << 1;
+    pf2_left = pf2_left >> 1;
+    pf2_left = pf2_left | (playfield & bitmask ? 0x80 : 0x00);
     bitmask = bitmask >> 1;
   }
 
   // Next 4 pixels are PF0 D7 through D4.
   uint8 pf0_right = 0;
   for (uint32 i = 0; i < 4; ++i) {
-    pf0_right = (pf0_right | (playfield & bitmask ? 0x10 : 0x00)) << 1;
+    pf0_right = pf0_right >> 1;
+    pf0_right = pf0_right | (playfield & bitmask ? 0x80 : 0x00);
     bitmask = bitmask >> 1;
   }
 
   // Next 8 pixels are PF1 D0 through D7.
   uint8 pf1_right = 0;
   for (uint32 i = 0; i < 8; ++i) {
-    pf1_right = (pf1_right | (playfield & bitmask ? 0x80 : 0x00)) >> 1;
+    pf1_right = pf1_right << 1;
+    pf1_right = pf1_right | (playfield & bitmask ? 0x01 : 0x00);
     bitmask = bitmask >> 1;
   }
 
   // Last 8 pixels are PF2 D7 through D0.
   uint8 pf2_right = 0;
   for (uint32 i = 0; i < 8; ++i) {
-    pf2_right = (pf2_right | (playfield & bitmask ? 0x01 : 0x00)) << 1;
+    pf2_right = pf2_right >> 1;
+    pf2_right = pf2_right | (playfield & bitmask ? 0x80 : 0x00);
     bitmask = bitmask >> 1;
   }
 

@@ -1,5 +1,7 @@
 #include "cl_kernel_impl.h"
 
+#include <cassert>
+
 #include "cl_buffer_impl.h"
 #include "cl_command_queue_impl.h"
 #include "cl_image_impl.h"
@@ -28,11 +30,7 @@ bool CLKernelImpl::Setup(cl_program program,
                                     sizeof(work_group_size_),
                                     &work_group_size_,
                                     NULL);
-  if (result != CL_SUCCESS)
-    return false;
-
-  event_ = clCreateUserEvent(context, &result);
-  return (event_ && result == CL_SUCCESS);
+  return result == CL_SUCCESS;
 }
 
 size_t CLKernelImpl::WorkGroupSize() {
@@ -40,27 +38,32 @@ size_t CLKernelImpl::WorkGroupSize() {
 }
 
 bool CLKernelImpl::SetByteArgument(
-    uint32 index, size_t size, const uint8* arg) {
+    uint32 index, size_t size, const void* arg) {
   int result = clSetKernelArg(kernel_, index, size, arg);
   return result == CL_SUCCESS;
 }
 
 bool CLKernelImpl::SetBufferArgument(uint32 index, const CLBuffer* buffer) {
   const CLBufferImpl* buffer_impl = static_cast<const CLBufferImpl*>(buffer);
-  int result = clSetKernelArg(
-      kernel_, index, sizeof(cl_mem), buffer_impl->get());
+  assert(buffer_impl);
+  const cl_mem buffer_mem = buffer_impl->get();
+  assert(buffer_mem);
+  int result = clSetKernelArg(kernel_, index, sizeof(cl_mem), &buffer_mem);
   return result == CL_SUCCESS;
 }
 
 bool CLKernelImpl::SetImageArgument(uint32 index, const CLImage* image) {
   const CLImageImpl* image_impl = static_cast<const CLImageImpl*>(image);
-  int result = clSetKernelArg(
-      kernel_, index, sizeof(cl_mem), image_impl->get());
+  assert(image_impl);
+  const cl_mem image_mem = image_impl->get();
+  assert(image_mem);
+  int result = clSetKernelArg(kernel_, index, sizeof(cl_mem), &image_mem);
   return result == CL_SUCCESS;
 }
 
 bool CLKernelImpl::Enqueue(CLCommandQueue* queue) {
   CLCommandQueueImpl* queue_impl = static_cast<CLCommandQueueImpl*>(queue);
+  assert(queue_impl);
   size_t global_size = work_group_size_;
   int result = clEnqueueNDRangeKernel(queue_impl->get(),
                                       kernel_,

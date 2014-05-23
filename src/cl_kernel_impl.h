@@ -24,7 +24,7 @@ class CLKernelImpl : public CLKernel {
   // CLKernel
   virtual size_t WorkGroupSize() override;
   virtual bool SetByteArgument(
-      uint32 index, size_t size, const uint8* arg) override;
+      uint32 index, size_t size, const void* arg) override;
   virtual bool SetBufferArgument(uint32 index, const CLBuffer* buffer) override;
   virtual bool SetImageArgument(uint32 index, const CLImage* image) override;
   virtual bool Enqueue(CLCommandQueue* queue) override;
@@ -32,7 +32,6 @@ class CLKernelImpl : public CLKernel {
  private:
   size_t work_group_size_;
   cl_kernel kernel_;
-  cl_event event_;
 };
 
 }  // namespace vcsmc

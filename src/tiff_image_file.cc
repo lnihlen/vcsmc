@@ -3,6 +3,7 @@
 #include <cstring>
 #include <tiffio.h>
 
+#include "cl_image.h"
 #include "types.h"
 
 namespace vcsmc {

@@ -14,7 +14,7 @@ class CLImage;
 class CLKernel {
  public:
   virtual size_t WorkGroupSize() = 0;
-  virtual bool SetByteArgument(uint32 index, size_t size, const uint8* arg) = 0;
+  virtual bool SetByteArgument(uint32 index, size_t size, const void* arg) = 0;
   virtual bool SetBufferArgument(uint32 index, const CLBuffer* buffer) = 0;
   virtual bool SetImageArgument(uint32 index, const CLImage* image) = 0;
   virtual bool Enqueue(CLCommandQueue* queue) = 0;

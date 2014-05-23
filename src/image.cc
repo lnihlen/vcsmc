@@ -8,6 +8,9 @@
 #include "cl_device_context.h"
 #include "cl_image.h"
 #include "cl_kernel.h"
+#include "color.h"
+#include "colu_strip.h"
+#include "constants.h"
 #include "pallette.h"
 #include "pixel_strip.h"
 
@@ -26,22 +29,22 @@ bool Image::CopyToDevice(CLCommandQueue* queue) {
   return cl_image_->EnqueueCopyToDevice(queue);
 }
 
-void Image::SetPixel(uint32 x, uint32 y, uint32 abgr) {
-  *(pixels_.get() + ((y * width_) + x)) = abgr;
-}
-
 std::unique_ptr<PixelStrip> Image::GetPixelStrip(uint32 row) {
   assert(row < height_);
   return std::unique_ptr<PixelStrip>(
     new PixelStrip(this, row));
 }
 
-void Image::SetStrip(uint32 row, PixelStrip* strip) {
+void Image::SetStrip(uint32 row, ColuStrip* strip) {
   assert(row < height_);
-  assert(strip->width() == width_);
-  std::memcpy(pixels_.get() + (row * width_),
-              strip->pixels(),
-              width_ * sizeof(uint32));
+  assert(width_ / 2 == kFrameWidthPixels);
+
+  uint32* px = pixels_.get() + (row * width_);
+  for (uint32 i = 0; i < kFrameWidthPixels; ++i) {
+    uint32 colu_abgr = Color::AtariColorToABGR(strip->colu(i));
+    *(px++) = colu_abgr;
+    *(px++) = colu_abgr;
+  }
 }
 
 }  // namespace vcsmc

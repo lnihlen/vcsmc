@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include "colu_strip.h"
-#include "histogram.h"
 #include "opcode.h"
 #include "state.h"
 

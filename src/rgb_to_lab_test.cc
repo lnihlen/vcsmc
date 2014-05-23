@@ -203,7 +203,7 @@ int main(int argc, char* argv[]) {
   // Compare results.
   for (size_t i = 0; i < 128 * 4; ++i) {
     float diff = fabs((results_packed[i] / kAtariNTSCLabColorTable[i]) - 1.0);
-    if (diff > 0.0001) {
+    if (diff > 0.01) {
       std::cerr << "mismatched results in element " << i
                 << " expected: " << kAtariNTSCLabColorTable[i]
                 << " got: " << results_packed[i]

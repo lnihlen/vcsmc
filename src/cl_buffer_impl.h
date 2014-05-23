@@ -17,6 +17,8 @@ class CLBufferImpl : public CLBuffer {
   // CLBuffer
   virtual bool EnqueueCopyToDevice(
       CLCommandQueue* queue, const void* bytes) override;
+  virtual bool EnqueueFill(
+      CLCommandQueue* queue, const void* pattern, size_t pattern_size) override;
   virtual bool EnqueueCopyFromDevice(
       CLCommandQueue* queue, void* bytes) override;
 

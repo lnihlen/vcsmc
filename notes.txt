@@ -1,3 +1,5 @@
+dasm kernel.asm -lkernel.txt -f3 -v5 -okernel.bin
+
 0. Rip frames out to individual images
 
 Use ffmpeg, -t 30 is to limit to 30 seconds of output, -r 1 can make 1 frame/sec,

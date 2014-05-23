@@ -36,7 +36,7 @@ class PixelStrip {
   const uint32 width() const { return width_; }
   const uint32* pixels() const { return pixels_; }
   const uint32 row_id() const { return row_id_; }
-  const Pallette* pallette(uint32 i) const { return pallettes_[i].get(); }
+  const Pallette* pallette(uint32 i) const { return pallettes_[i - 1].get(); }
   // Returns the error distance for |pixel| from the provided Atari |color|.
   const float distance(uint32 pixel, uint8 color) const {
     return distances_[color / 2][pixel];

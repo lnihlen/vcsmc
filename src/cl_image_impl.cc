@@ -37,7 +37,7 @@ bool CLImageImpl::Setup(cl_context context) {
   image_desc.image_height = height_;
   image_desc.image_depth = 1;
   image_desc.image_array_size = 1;
-  image_desc.image_row_pitch = 0;
+  image_desc.image_row_pitch = width_ * 4;
   image_desc.num_mip_levels = 0;
   image_desc.num_samples = 0;
   image_desc.buffer = NULL;
@@ -59,7 +59,7 @@ bool CLImageImpl::EnqueueCopyToDevice(CLCommandQueue* queue) {
   size_t region[3] = { width_, height_, 1 };
   int result = clEnqueueWriteImage(command_queue->get(),
                                    mem_,
-                                   true,
+                                   false,
                                    origin,
                                    region,
                                    width_ * 4,
