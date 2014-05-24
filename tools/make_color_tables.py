@@ -146,7 +146,7 @@ def main(argv):
   for color_rgb in atari_colors_rgb:
     atari_colors_lab.append(convert_color(color_rgb, LabColor))
 
-  output_file = file('auto/color_table.cc', 'w')
+  output_file = file('../src/auto/color_table.cc', 'w')
   output_file.write(
 """// generated file, do not edit. edit make_color_tables.py instead!
 

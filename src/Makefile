@@ -1,5 +1,6 @@
 # VCSMC Makefile.
-# Dependencies: libtiff, clang
+# Dependencies: libtiff, clang, OpenCL
+# tools dependencies: python colormath, Wand, ImageMagick
 CC=clang
 CFLAGS=-I. -DNTSC -std=c++11 -I/opt/local/include
 # TODO: move mac-specific stuff to mac-specific vars

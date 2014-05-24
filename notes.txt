@@ -533,3 +533,22 @@ f) back to work on k-means clustering algorithm:
   2) then can discard input image and just keep rows
   3) those rows become the input for a given k-means run
 g) profit! :)
+
+===============================================================================
+
+Want to increase complexity of approximate output. We need a few things:
+
+
+a) A logging system. Will repay time investments in implementing with benefits
+when it comes to debugging. Maybe?
+
+b) A Scheduler object. Time to liberate ScanLines from the responsibility of
+scheduling their own lines, and allow them to push state changes into prior
+lines when appropriate.
+
+c) Bank-switching strategy so single frames can fit in a ROM we can simulate.
+(depends on Scheduler)
+
+d) Linker to take binary blobs output by picc and wrap them into a .bin
+
+e) Test rig to compare predicted output to simulated output screen captures.

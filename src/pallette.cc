@@ -1,5 +1,6 @@
 #include "pallette.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -29,24 +30,47 @@ void Pallette::Compute(const PixelStrip* pixel_strip, Random* random) {
 
   // Build classification list of bytes that classifies each pixels into a
   // single Atari Color by choosing minimum error of each of the K colors.
-  float total_error = Classify(pixel_strip);
+  error_ = Classify(pixel_strip);
 
   Color(pixel_strip);
 
-  float next_total_error = Classify(pixel_strip);
-
-  uint32 num_iters = 0;
-  while (next_total_error < total_error) {
-    total_error = next_total_error;
-    Color(pixel_strip);
+  float next_total_error;
+  uint32 stable_count = 0;
+  uint32 num_iters = 1;
+  do {
     next_total_error = Classify(pixel_strip);
-    num_iters++;
+    if (next_total_error == error_) {
+      ++stable_count;
+    } else {
+      error_ = next_total_error;
+    }
+    Color(pixel_strip);
+    ++num_iters;
+  } while (stable_count < 10);
+
+  // Replace indices in |classes_| with final stable color values, while at
+  // the same time build histogram.
+  std::unique_ptr<uint8[]> colu_counts(new uint8[num_colus_]);
+  std::memset(colu_counts.get(), 0, num_colus_);
+  for (size_t i = 0; i < pixel_strip->width(); ++i) {
+    uint8 colu_class = classes_[i];
+    ++colu_counts[colu_class];
+    classes_[i] = colus_[colu_class];
   }
 
-  std::cout << num_iters << " iterations, final pallette: ";
+  std::vector<std::pair<uint8, uint8>> colu_sorted;
+  colu_sorted.reserve(num_colus_);
+  for (size_t i = 0; i < num_colus_; ++i)
+    colu_sorted.push_back(std::make_pair(colu_counts[i], colus_[i]));
+  std::sort(colu_sorted.begin(), colu_sorted.end());
+
+  for (size_t i = 0; i < num_colus_; ++i)
+    colus_[i] = colu_sorted[i].second;
+
+  std::cout << std::dec << num_iters << " iterations, final pallette: ";
   for (size_t i = 0; i < num_colus_; ++i)
     std::cout << std::hex << static_cast<uint32>(colus_[i]) << " ";
-  std::cout << std::endl;
+  std::cout << std::dec << std::endl;
 }
 
 float Pallette::Classify(const PixelStrip* pixel_strip) {
