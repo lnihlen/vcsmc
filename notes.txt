@@ -538,7 +538,6 @@ g) profit! :)
 
 Want to increase complexity of approximate output. We need a few things:
 
-
 a) A logging system. Will repay time investments in implementing with benefits
 when it comes to debugging. Maybe?
 
@@ -552,3 +551,14 @@ c) Bank-switching strategy so single frames can fit in a ROM we can simulate.
 d) Linker to take binary blobs output by picc and wrap them into a .bin
 
 e) Test rig to compare predicted output to simulated output screen captures.
+
+===============================================================================
+
+Scheduling. Strategies issue Constraints which is a State and a collection of
+enums. For each varabiable in State there's an enum in Constraint which defines
+DONT_CARE or REQUIRED. It also defines a deadline, a color_clock value that the
+TIA must be in the state by. Provided to the scheduler (which can reject).
+
+Scheduling works by examining each state variable in order and determining
+which ones need to be changed. Determine earlieast list of availability for each
+state change.
