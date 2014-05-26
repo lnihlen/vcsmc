@@ -562,3 +562,34 @@ TIA must be in the state by. Provided to the scheduler (which can reject).
 Scheduling works by examining each state variable in order and determining
 which ones need to be changed. Determine earlieast list of availability for each
 state change.
+
+===============================================================================
+
+Examine a single register value, such as PF0. Registers have many diverse
+dependency rules. PF0 is used twice during each scanline but may otherwise be
+set. COLUPF has a sort of depencency on the values in PF0-2 in that if any of
+them have a pixel set to render then COLUPF is in use and must not be changed.
+Registers are even more complicated - they are "in use" so long as the value
+stored in them is still intended for another TIA address that has yet to be set.
+
+Plan is to paint a line, and while painting that line update a color_clock time
+constant for each part of the state machine that got used in the painting of
+that line. Could keep a per-register list of Range objects defining periods
+of color_clock time when these objects were in use. Could be called just like
+PaintInto but..
+
+Try working form input to output. Strategies will issue Constraints. Example
+constraint for playfield-only fit:
+
+at start of pixel out for that scanline, GP0 and GP1 are 0. COLUPF is xx.
+COLUBK is yy. PF0 is zz. Rest are don't care.
+16 color clocks later all of the above but now PF1 must be kk.
+32 color clocks later all of the above but now PS2 must be ll.
+etc. etc.
+
+Perhaps we call these Specifications, or Specs. They are supplied to a Scheduler
+which has a Kernel. The Scheduler can accept or reject a Spec. A Strategy can
+bail on lines that don't fit in the scheduler, or suffer degraded service.
+
+Spec is one TIA state change and a deadline. They are accepted or rejected
+individually by the scheduler.
