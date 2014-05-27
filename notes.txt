@@ -591,5 +591,147 @@ Perhaps we call these Specifications, or Specs. They are supplied to a Scheduler
 which has a Kernel. The Scheduler can accept or reject a Spec. A Strategy can
 bail on lines that don't fit in the scheduler, or suffer degraded service.
 
-Spec is one TIA state change and a deadline. They are accepted or rejected
+* Spec is one TIA state change and a deadline. They are accepted or rejected
 individually by the scheduler.
+
+===============================================================================
+
+Back to requirements:
+
+a) Redundant state change elimination. If a previous line has left something in
+a desired state don't bother re-setting it.
+
+b) Register packing - choose state changes earlier than can re-use register
+values.
+
+c) Back-scheduling - If possible, set a state change earlier, in a previous
+scanline.
+
+The first two seem easy if we are issuing individiual Specs. It is (c) that has
+created the most confusion. Perhaps it's best to make a list of every state
+variable and determine when it can be back-scheduled?
+
+    VSYNC  = 0x00,  // vertical sync set-clear
+    VBLANK = 0x01,  // vertical blank set-clear
+    WSYNC  = 0x02,  // (strobe) wait for leading edge of horizontal blank
+    RSYNC  = 0x03,  // (strobe) reset horizontal sync counter
+
+- do not set for now.
+
+    NUSIZ0 = 0x04,  // number-size player-missile 0
+    NUSIZ1 = 0x05,  // number-size player-missile 1
+
+- if associated player is zero, than these can be set anytime.
+- if associated player is nonzero, depends on both old value and new value:
+  * old value because the old code is assuming the player graphics will repeat
+  on the set interval
+  * new value because it should not kick in until desired output scanline.
+
+    COLUP0 = 0x06,  // color-lum player 0
+    COLUP1 = 0x07,  // colur-lum player 1
+
+- if associated player is zero, than these can be set anytime.
+- if associated player is non-zero, then these can be set as soon as last
+  rendering of player color pixel is finished.
+
+    COLUPF = 0x08,  // colur-lum playfield
+
+- can be set after the last pixel on the previous scanline renders playfield
+  color.
+
+    COLUBK = 0x09,  // colur-lum background
+
+- can be set after the last pixel on the previous scanline renders BG color.
+
+    CTRLPF = 0x0a,  // control playfield ball size & collisions
+
+- do not set.
+
+    REFP0  = 0x0b,  // reflect player 0
+    REFP1  = 0x0c,  // reflect player 1
+
+- same rules as NUSIZ - can be set after last rendering of player bitfield
+  on previous scanline, or whenever if player bitfield is 0.
+
+    PF0    = 0x0d,  // playfield register byte 0
+    PF1    = 0x0e,  // playfield register byte 1
+    PF2    = 0x0f,  // playfield register byte 2
+
+- very fixed, predicatble interval when these can be set. Can be set anytime
+  after those times.
+
+    RESP0  = 0x10,  // (strobe) reset player 0
+    RESP1  = 0x11,  // (strobe) reset player 1
+    RESM0  = 0x12,  // (strobe) reset missile 0
+    RESM1  = 0x13,  // (strobe) reset missile 1
+    RESBL  = 0x14,  // (strobe) reset ball
+
+- not subject to back-scheduling at all.
+
+    AUDC0  = 0x15,  // audio control 0
+    AUDC1  = 0x16,  // audio control 1
+    AUDF0  = 0x17,  // audio frequency 0
+    AUDF1  = 0x18,  // audio frequency 1
+    AUDV0  = 0x19,  // audio volume 0
+    AUDV1  = 0x1a,  // audio volume 1
+
+- not used by gfx scheduler.
+
+    GRP0   = 0x1b,  // graphics player 0
+    GRP1   = 0x1c,  // graphics player 1
+
+- just like the nonzero scheduling of NUSIZ and REFP0, can be set after last
+  expected rendering of player bitfield on previous scanline.
+
+    ENAM0  = 0x1d,  // graphics (enable) missile 0
+    ENAM1  = 0x1e,  // graphics (enable) missile 1
+    ENABL  = 0x1f,  // graphics (enable) ball
+
+- not considering for now, wait until after player graphics working.
+
+    HMP0   = 0x20,  // horizontal motion player 0
+    HMP1   = 0x21,  // horizontal motion player 1
+
+- actually *have* to be set before the scanline, but can be set any time after
+  the previous setting of HMOVE
+
+    HMM0   = 0x22,  // horizontal motion missile 0
+    HMM1   = 0x23,  // horizontal motion missile 1
+    HMBL   = 0x24,  // horizontal motion ball
+
+- leave alone for now.
+
+    VDELP0 = 0x25,  // vertical delay player 0
+    VDELP1 = 0x26,  // vertical delay player 1
+
+- while potentially quite powerful probably best to ignore these for now.
+
+    VDELBL = 0x27,  // vertical delay ball
+    RESMP0 = 0x28,  // reset missile 0 to player 0
+    RESMP1 = 0x29,  // reset missile 1 to player 1
+
+- ignoring ball and missile for now so ignoring these too.
+
+    HMOVE  = 0x2a,  // (strobe) apply horizontal motion
+
+- has to be applied at the start of the hblank, so zero scheduling flexibiilty
+
+    HMCLR  = 0x2b,  // (strobe) clear horizontal motion registers
+
+- ???
+
+    CXCLR  = 0x2c,  // (strobe) clear collision latches
+
+- ignore.
+
+so it seems that some things are depending on the last rendering of the relevant
+bitfield, and some things the last rendering of the relevant color.
+
+So when painting a scanline, would it be possible for State to update an MRU
+table? Like kernel provides this MRU table to State::PaintInto().
+
+There's another piece, which is the actual availabiliy of CPU cycles. Idea is to
+introduce an "empty space" opcode which can be arbitrary length. NOP can
+account for 2 cycles, and a rendundant STA can handle 3. But so empty space
+opcode can only be at minimum 2 cycles long, or must be replaced by a LDA.
+Or change from current list of opcodes to a more range-based schedules.
