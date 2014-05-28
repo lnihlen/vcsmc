@@ -6,7 +6,7 @@
 namespace vcsmc {
 
 class PixelStrip;
-class ScanLine;
+class Schedule;
 class State;
 
 // A Strategy defines an approach to generating ScanLines. It has a target line
@@ -18,8 +18,8 @@ class Strategy {
   // Attempts to fit the colustrip, returns a new ScanLine representing best
   // fit. Entry state should be aligned to the color clock at the start of the
   // ScanLine.
-  virtual std::unique_ptr<ScanLine> Fit(
-      PixelStrip* target_strip, State* entry_state) = 0;
+  virtual std::unique_ptr<Schedule> Fit(
+      const PixelStrip* target_strip, const Schedule* starting_schedule) = 0;
 };
 
 }  // namespace vcsmc

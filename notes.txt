@@ -735,3 +735,42 @@ introduce an "empty space" opcode which can be arbitrary length. NOP can
 account for 2 cycles, and a rendundant STA can handle 3. But so empty space
 opcode can only be at minimum 2 cycles long, or must be replaced by a LDA.
 Or change from current list of opcodes to a more range-based schedules.
+
+===============================================================================
+
+Range object, maintains a pair of [start_color_clock, end_color_clock) times.
+OpCodes can produce one if you give them a start time, can also give a duration
+in color clocks. Could be stored interleaved, sort of like OpCodes and States:
+
+range         range        range        range
+      OpCode        OpCode       OpCode
+
+but ranges can be zero and in fact should be because of good OpCode packing, so
+why not have Ranges representing empty space and ranges representing 1 or more
+OpCodes?
+
+* TimeSpan object. Either BusyTimeSpan or IdleTimeSpan. Since it is not possible
+to waste a single clock, and no instructions are only a single clock long, we
+do not allow for TimeSpans to be 1 cpu clock/3 color cycles long. Our unit of
+time is the color clock. A Schedule object contains a list of TimeSpans. It
+starts with a single one that lasts the entire frame, from a few lines before
+the start of the frame all the way to the end. Associated with each
+BusyTimeSpan is a collection of OpCodes in order that are to be executed during
+that time span. TimeSpans know about state, and so can provide not only input
+and exit state transitions but can also paint into pixels and perform the update
+logic currently performed by Scanline.
+
+For OpCodes let's add a variable that tracks what row of output the scanline is
+supporting. This may be useful in debugging, we can put the relevant row in the
+comments in the asm output.
+
+So now instead of competing ScanLines, it's competing Schedules. When starting
+work on a new scan line we make a copy (could it be a weak copy?) of the
+current schedule and this is provided to Strategy to modify. The schedule of the
+winning strategy becomes the new schedule.
+
+Need to add an "unknown" state to the State enum block.
+
+
+* Change TimeSpan to Block. Block has a Range which indicates where it begins
+and when it ends.

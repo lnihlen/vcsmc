@@ -22,21 +22,17 @@ class Kernel {
   // Takes ownership of target_image.
   Kernel(std::unique_ptr<Image> target_image);
 
+  // Finalizes |schedule_|.
   void Fit();
+  // Fills any empty spaces with OpCodes?
+  void Assemble();
 
   // Save output.
   void Save();
 
-  const uint32 bytes() const { return total_bytes_; }
-
  private:
-  // utility method
-  std::unique_ptr<State> EntryStateForLine(uint32 line);
-
-  uint32 total_bytes_;
-
   std::unique_ptr<Image> target_image_;
-  std::vector<std::unique_ptr<ScanLine>> scan_lines_;
+  std::unique_ptr<Schedule> schedule_;
   std::unique_ptr<Image> output_image_;
 };
 
