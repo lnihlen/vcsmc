@@ -6,51 +6,76 @@
 #include "opcode.h"
 #include "pallette.h"
 #include "pixel_strip.h"
-#include "scan_line.h"
+#include "range.h"
+#include "schedule.h"
+#include "spec.h"
 #include "state.h"
 
 namespace vcsmc {
 
-std::unique_ptr<ScanLine> BackgroundColorStrategy::Fit(
-    PixelStrip* target_strip, State* entry_state) {
+std::unique_ptr<Schedule> BackgroundColorStrategy::Fit(
+    const PixelStrip* target_strip, const Schedule* starting_schedule) {
   const Pallette* pallette = target_strip->pallette(1);
 
   // Choose best-fit single color.
-  uint8 colubk = pallette->colu(0);
+  uint8 bg_color = pallette->colu(0);
 
-  // Now figure out most efficient means to pack it in to a new ScanLine.
-  std::unique_ptr<ScanLine> scan_line(new ScanLine(entry_state));
+  std::unique_ptr<Schedule> schedule(new Schedule(*starting_schedule));
+  // All Specs for bg color must be met before we start drawing pixels.
 
-  // Wipe out playfield.
-  scan_line->AddOperation(makeLDA(0));
-  scan_line->AddOperation(makeSTA(State::TIA::PF0));
-  scan_line->AddOperation(makeSTA(State::TIA::PF1));
-  scan_line->AddOperation(makeSTA(State::TIA::PF2));
+  uint32 pixel_start_time =
+      (kScanLineWidthClocks * target_strip->row_id()) + kHBlankWidthClocks;
+  Range range(0, pixel_start_time);
 
-  // Is bg color currently what we need?
-  if (entry_state->tia(State::TIA::COLUBK) != colubk) {
-    //** To me it seems this kind of thinking may best fit back in ScanLine.
-    // Find if a register already has this value
-    if (entry_state->a() == colubk) {
-      scan_line->AddOperation(makeSTA(State::TIA::COLUBK));
-    } else if (entry_state->x() == colubk) {
-      scan_line->AddOperation(makeSTX(State::TIA::COLUBK));
-    } else if (entry_state->y() == colubk) {
-      scan_line->AddOperation(makeSTY(State::TIA::COLUBK));
-    } else {
-      // register packing is a whole 'nother trip.
-      State::Register reg = static_cast<State::Register>(
-          (entry_state->color_clocks() / kScanLineWidthClocks) %
-          State::Register::REGISTER_COUNT);
-      scan_line->AddOperation(std::unique_ptr<op::OpCode>(
-          new op::LoadImmediate(colubk, reg)));
-      scan_line->AddOperation(std::unique_ptr<op::OpCode>(
-          new op::StoreZeroPage(State::TIA::COLUBK, reg)));
-    }
+  // There are a couple of ways to make the VCS paint a uniform line of color.
+  // We could turn off the players by setting GRP0 and GRP1 to 0. If one or
+  // both of them are currently zero this is cheap. We could set the COLUP0 or
+  // COLUP1 to the background color. If one or both of these is already in the
+  // bg color this is cheap. Same thing with playfield, although setting the
+  // COLUPF to the bg color seems cheaper than wiping out the three PF
+  // registers, unless 2 or 3 of them are already zero.
+
+  // Note that we always try to add Specs in descending order of impact to the
+  // strategy. Rule of thumb is how many pixels would be impacted by not meeting
+  // the Spec. So we set BG color first, then wipe out the playfield, then wipe
+  // out the player graphics, etc.
+  Spec colubk(TIA::COLUBK, bg_color, range);
+  schedule->AddSpec(colubk);
+
+  std::list<Spec> zero_playfield;
+  zero_playfield.push_back(Spec(TIA::PF0, 0, range));
+  zero_playfield.push_back(Spec(TIA::PF1, 0, range));
+  zero_playfield.push_back(Spec(TIA::PF2, 0, range));
+  uint32 zpf_cost = schedule->CostToAddSpecs(&zero_playfield);
+
+  Spec colupf(TIA::COLUPF, bg_color, range);
+  uint32 colupf_cost = schedule->CostToAddSpec(colupf);
+  if (zpf_cost < colupf_cost) {
+    schedule->AddSpecs(&zero_playfield);
+  } else {
+    schedule->AddSpec(colupf);
   }
 
-  assert(scan_line->final_state()->tia(State::TIA::COLUBK) == colubk);
-  return scan_line;
+  std::list<Spec> zero_player_graphics;
+  zero_player_graphics.push_back(Spec(TIA::VDELP0, 0, range));
+  zero_player_graphics.push_back(Spec(TIA::VDELP1, 0, range));
+  zero_player_graphics.push_back(Spec(TIA::GRP0, 0, range));
+  zero_player_graphics.push_back(Spec(TIA::GRP1, 0, range));
+  uint32 zpg_cost = schedule->CostToAddSpecs(&zero_player_graphics);
+
+  std::list<Spec> set_player_colors;
+  set_player_colors.push_back(Spec(TIA::COLUP0, bg_color, range));
+  ste_player_colors.push_back(Spec(TIA::COLUP1, bg_color, range));
+  uint32 spc_cost = schedule->CostToAddSpecs(&spc_cost);
+  if (zpg_cost < spc_cost) {
+    schedule->AddSpecs(&zero_player_graphics);
+  } else {
+    schedule->AddSpecs(&set_player_colors);
+  }
+
+  // TODO: missiles and ball.
+
+  return schedule;
 }
 
 }  // namespace vcsmc

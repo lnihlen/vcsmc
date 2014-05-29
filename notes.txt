@@ -771,6 +771,12 @@ winning strategy becomes the new schedule.
 
 Need to add an "unknown" state to the State enum block.
 
-
 * Change TimeSpan to Block. Block has a Range which indicates where it begins
 and when it ends.
+
+===============================================================================
+
+debugging idea: fitter does everything as normal but on final ouput (conversion
+to pixel_strip) we draw bg color as black, pf as gray, p0 as red, p1 as blue,
+etc. to help visualize where we are using what graphics objects.
+

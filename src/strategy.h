@@ -7,7 +7,6 @@ namespace vcsmc {
 
 class PixelStrip;
 class Schedule;
-class State;
 
 // A Strategy defines an approach to generating ScanLines. It has a target line
 // of colors and attempts to generate a ScanLine with minimum error and length

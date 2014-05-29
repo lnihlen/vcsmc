@@ -8,8 +8,9 @@ namespace vcsmc {
 // Attempts to fit the provided ScanLine by only changing the background color.
 class BackgroundColorStrategy : public Strategy {
  public:
-  virtual std::unique_ptr<ScanLine> Fit(PixelStrip* target_strip,
-                                        State* entry_state) override;
+  virtual std::unique_ptr<ScanLine> Fit(
+      const PixelStrip* target_strip,
+      const Schedule* starting_schedule) override;
 };
 
 }  // namespace vcsmc

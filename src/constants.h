@@ -18,6 +18,7 @@ const uint32 kColorClocksPerCPUCycle = 3;
 const uint32 kScanLineWidthCycles = kScanLineWidthClocks /
                                     kColorClocksPerCPUCycle;
 const uint32 kNTSCColors = 128;
+const uint32 kInfiniteCost = 0xffffffff;
 
 // Defines the address and name of every register on the TIA. The ones marked
 // as (strobe) are write-only and writing to them will cause new changes in

@@ -13,13 +13,18 @@ class TimeSpan;
 class Schedule {
  public:
   Schedule();
-  Schedule(const Schedule& Schedule);
+  Schedule(const Schedule& schedule);
   const Schedule& operator=(const Schedule& schedule);
   ~Schedule();
 
-  bool AddSpec(const Spec& spec);
-  // Returns true if Spec can be scheduled, false if not.
-  bool CanAddSpec(const Spec& spec)
+  uint32 AddSpec(const Spec& spec);
+  uint32 AddSpecs(const std::list<Spec>* specs);
+  // Returns the cost in color clocks of adding this spec. If it cannot add
+  // this spec it will return kInfiniteCost.
+  uint32 CostToAddSpec(const Spec& spec);
+  // To avoid the _factorial_ explosion of possibilities of order adding the
+  // Schedule will add specs in the order provded by the list.
+  uint32 CostToAddSpecs(const std::list<Spec>* specs);
 
   std::unique_ptr<ColuStrip> Simulate(uint32 row);
 
@@ -27,7 +32,7 @@ class Schedule {
   // |states_| and |time_spans_| are expected to be interleaved, with the State
   // objects bookending the TimeSpans.
   std::list<std::unique_ptr<State>> states_;
-  std::list<std::unique_ptr<TimeSpan>> time_spans_;
+  std::list<std::unique_ptr<Block>> blocks_;
 };
 
 }  // namespace vcsmc
