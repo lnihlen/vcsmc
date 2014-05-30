@@ -14,11 +14,12 @@ const uint32 kFrameHeightPixels = 180;
 const uint32 kFrameSizeBytes = kFrameWidthPixels * kFrameHeightPixels;
 const uint32 kHBlankWidthClocks = 68;
 const uint32 kScanLineWidthClocks = kFrameWidthPixels + kHBlankWidthClocks;
+const uint32 kFrameSizeClocks = kScanLineWidthClocks * kFrameHeightPixels;
 const uint32 kColorClocksPerCPUCycle = 3;
 const uint32 kScanLineWidthCycles = kScanLineWidthClocks /
                                     kColorClocksPerCPUCycle;
 const uint32 kNTSCColors = 128;
-const uint32 kInfiniteCost = 0xffffffff;
+const uint32 kInfinity = 0xffffffff;
 
 // Defines the address and name of every register on the TIA. The ones marked
 // as (strobe) are write-only and writing to them will cause new changes in

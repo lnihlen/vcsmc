@@ -20,4 +20,19 @@ Range::Range(const Range& range)
     end_time_(range.end_time_) {
 }
 
+const Range& Range::operator=(const Range& range) {
+  start_time_ = range.start_time_;
+  end_time_ = range.end_time_;
+  return *this;
+}
+
+// static
+Range Range::IntersectRanges(const Range& r1, const Range& r2) {
+  uint32 start_time = std::max(r1.start_time(), r2.start_time());
+  uint32 end_time = std::min(r1.end_time(), r2.end_time());
+  if (start_time > end_time)
+    return result;
+  return Range(start_time, end_time);
+}
+
 }  // namespace vcsmc

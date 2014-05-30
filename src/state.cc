@@ -6,21 +6,22 @@
 
 #include "color.h"
 #include "colu_strip.h"
+#include "spec.h"
 
 namespace vcsmc {
 
 State::State()
-    : color_clock_(0) {
+    : tia_known_(0),
+      registers_known(0),
+      range_(0, kFrameSizeClocks) {
   std::memset(tia_, 0, sizeof(tia_));
   std::memset(registers_, 0, sizeof(registers_));
 }
 
-void State::PaintInto(ColuStrip* colu_strip, uint32 until) {
-  assert(color_clock_ < until);
-  uint32 local_cc = color_clock_ % kScanLineWidthClocks;
-  uint32 local_until = until - color_clock_ + (color_clock_ %
-                                               kScanLineWidthClocks);
-  uint32 starting_clock = std::max(local_cc, kHBlankWidthClocks);
+void State::PaintInto(ColuStrip* colu_strip) {
+  uint32 local_clock = range_.start_time() % kScanLineWidthClocks;
+  uint32 local_until = local_clock + range_.duration();
+  uint32 starting_clock = std::max(local_clock, kHBlankWidthClocks);
   uint32 starting_column = starting_clock - kHBlankWidthClocks;
   for (uint32 clock = starting_clock; clock < local_until; ++clock) {
     uint8 colu = tia_[TIA::COLUBK];
@@ -32,22 +33,62 @@ void State::PaintInto(ColuStrip* colu_strip, uint32 until) {
   }
 }
 
+const uint32 State::EarliestTimeAfter(const Spec& spec) const {
+  Range within(IntersectRanges(range_, spec.range()));
+  if (within.IsEmpty())
+    return kInfinity;
+
+  switch(spec.tia()) {
+    // Not supported currently.
+    case TIA::VSYNC:
+    case TIA::VBLANK:
+    case TIA::WSYNC:
+    case TIA::RSYNC:
+      return kInfinity;
+
+    // NUSIZ support coming later.
+    case TIA::NUSIZ0:
+    case TIA::NUSIZ1:
+      return kInfinity;
+
+    case TIA::COLUP0:
+      return EarliestPlayerPaints(false, within);
+
+    case TIA::COLUP1:
+      return EarliestPlayerPaints(true, within);
+
+    case TIA::COLUPF:
+      return EarliestPlayfieldPaints(within);
+
+    case TIA::COLUBK:
+      return EarliestBackgroundPaints(within);
+
+    // Not currently supported.
+    case TIA::CTRLPF:
+      return kInfinity;
+
+    case REFP0:
+      // anywhere player _could_ paint
+  }
+}
+
 std::unique_ptr<State> State::Clone() const {
-  // Make a copy of ourselves.
   std::unique_ptr<State> state(new State(*this));
   return state;
 }
 
-std::unique_ptr<State> State::AdvanceTime(uint32 delta) const {
+std::unique_ptr<State> State::AdvanceTime(uint32 delta) {
   std::unique_ptr<State> state(Clone());
-  // Add to the color_clock_
-  state->color_clock_ += delta;
+  uint32 new_start_time = range_.start_time() + delta;
+  range_.set_end_time(new_start_time);
+  state->range_.set_start_time(new_start_time);
   return state;
 }
 
 std::unique_ptr<State> State::AdvanceTimeAndSetRegister(
-    uint32 delta, Register reg, uint8 value) const {
+    uint32 delta, Register reg, uint8 value) {
   std::unique_ptr<State> state(AdvanceTime(delta));
+  state->registers_known_ |= (1 << static_cast<int>(reg));
   state->registers_[reg] = value;
   return state;
 }
@@ -55,9 +96,10 @@ std::unique_ptr<State> State::AdvanceTimeAndSetRegister(
 std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
     uint32 delta, Register reg, TIA address) const {
   std::unique_ptr<State> state(AdvanceTime(delta));
+  state->tia_known_ |= (1 << static_cast<int>(address));
   uint8 reg_value = state->registers_[reg];
   switch (address) {
-    // interesting code here... :)
+    // interesting code for strobes and the like here... :)
 
     default:
       state->tia_[address] = reg_value;
@@ -144,33 +186,108 @@ std::string State::ByteToHexString(const uint8 value) {
 State::State(const State& state) {
   std::memcpy(tia_, state.tia_, TIA_COUNT);
   std::memcpy(registers_, state.registers_, REGISTER_COUNT);
-  color_clock_ = state.color_clock_;
+  tia_known_ = state.tia_known_;
+  registers_known_ = state.registers_known_;
+  range_ = state.range_;
 }
 
-const bool State::PlayfieldPaints(uint32 clock) {
+const uint32 State::EarliestPlayerPaints(bool p1, const Range& within) const {
+  // If player graphics are zero then they will never paint.
+  TIA grp = p1 ? TIA::GRP1 : TIA::GRP0;
+  if (tia_[grp] == 0)
+    return 0;
+
+  // Start from the end of our |range_| and work our way back in time, stopping
+  // whenever we encounter a pixel that is actually painted by the player. If
+  // no such pixel is encountered then we return 0 to indicate that the spec
+  // can be scheduled before our |range_| time.
+  uint32 duration = within.Duration();
+  assert(within.end_time() >= duration);
+  for (uint32 i = 0; i < duration; ++i) {
+    uint32 color_clock = within.end_time() - i - 1;
+    uint32 local_clock = color_clock % kScanLineWidthClocks;
+    if (PlayerPaints(p1, local_clock))
+      return color_clock;
+  }
+  return 0;
+}
+
+const bool State::PlayerPaints(bool p1, uint32 local_clock) const {
+  // TODO: write me
+  return false;
+}
+
+const bool State::GRP0CouldPaint(uint32 local_clock) const {
+  // TODO: write me
+  return false;
+}
+
+const bool State::GRP1CouldPaint(uint32 local_clock) const {
+  // TODO: write me
+  return false;
+}
+
+const uint32 State::EarliestPlayfieldPaints(const Range& within) const {
+  uint32 duration = within.Duration();
+  assert(within.end_time() >= duration);
+  for (uint32 i = 0; i < duration; ++i) {
+    uint32 color_clock = within.end_time() - i - 1;
+    uint32 local_clock = color_clock % kScanLineWidthClocks;
+    if (PlayfieldPaints(local_clock))
+      return color_clock;
+  }
+  return 0;
+}
+
+const bool State::PlayfieldPaints(uint32 local_clock) {
   assert(clock >= 68);
 
-  // Usage schedule for playfield registers, in color clocks:
-  // PF0 68 up until 84
-  // PF1 84 - 116
-  // PF2 116 - 148
-  // PF0 148 - 164
-  // PF1 164 - 196
-  // PF2 196 - 228
-  if (clock < 84 || (clock >= 148 && clock < 164)) {
+  if (PF0CouldPaint(local_clock)) {
     // PF0 D4 through D7 left to right.
-    int pfbit = (clock - (clock < 84 ? 68 : 148)) >> 2;
+    int pfbit = (local_clock - (local_clock < 84 ? 68 : 148)) >> 2;
     return tia_[TIA::PF0] & (0x10 << pfbit);
-  } else if (clock < 116 || (clock >= 164 && clock < 196)) {
+  } else if (PF1CouldPaint(local_clock)) {
     // PF1 D7 through D0 left to right.
-    int pfbit = (clock - (clock < 116 ? 84 : 164)) >> 2;
+    int pfbit = (locl_clock - (local_clock < 116 ? 84 : 164)) >> 2;
     return tia_[TIA::PF1] & (0x80 >> pfbit);
   } else {
     // PF2 D0 through D7 left to right.
-    assert(clock < 148 || (clock >= 196 && clock < 228));
-    int pfbit = (clock - (clock < 148 ? 116 : 196)) >> 2;
+    assert(PF2CouldPaint(local_clock));
+    int pfbit = (local_clock - (local_clock < 148 ? 116 : 196)) >> 2;
     return tia_[TIA::PF2] & (0x01 << pfbit);
   }
+}
+
+const bool State::PF0CouldPaint(uint32 local_clock) const {
+  return local_clock < 84 || (local_clock >= 148 && local_clock < 164);
+}
+
+const bool State::PF1CouldPaint(uint32 local_clock) const {
+  return local_clock < 116 || (local_clock >= 164 && local_clock < 196);
+}
+
+const bool State::PF2CouldPaint(uint32 local_clock) const {
+  return local_clock < 148 || (local_clock >= 196 && local_clock < 228);
+}
+
+const bool State::EarliestBackgroundPaints(const Range& within) const {
+  uint32 duration = within.Duration();
+  assert(within.end_time() >= duration);
+  for (uint32 i = 0; i < duration; ++i) {
+    uint32 color_clock = within.end_time() - i - 1;
+    uint32 local_clock = color_clock % kScanLineWidthClocks;
+    if (local_clock < kHBlankWidthClocks)
+      continue;
+    if (PlayerPaints(false, local_clock))
+      continue;
+    if (PlayerPaints(true, local_clock))
+      continue;
+    if (PlayfiedPaints(local_clock))
+      continue;
+    // Neither player nor playfield paints, must be the bg color that paints.
+    return color_clock;
+  }
+  return 0;
 }
 
 }  // namespace vcsmc
