@@ -24,7 +24,6 @@ class Range {
 
   // Returns the empty range (0, 0) if the intersection is empty.
   static Range IntersectRanges(const Range& r1, const Range& r2);
-
   // static Range UnionRanges(const Range& r1, const Range& r2);
 
   void set_start_time(uint32 start_time) { start_time_ = start_time; }

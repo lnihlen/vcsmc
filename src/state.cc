@@ -67,8 +67,91 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
     case TIA::CTRLPF:
       return kInfinity;
 
-    case REFP0:
-      // anywhere player _could_ paint
+    case TIA::REFP0:
+      return EarliestPlayerCouldPaint(false, within);
+
+    case TIA::REFP1:
+      return EarliestPlayerCouldPaint(true, within);
+
+    case TIA::PF0:
+      return EarliestPF0CouldPaint(within);
+
+    case TIA::PF1:
+      return EarliestPF1CouldPaint(within);
+
+    case TIA::PF2:
+      return EarliestPF2CouldPaint(within);
+
+    // These are strobe registers and need to happen right when they need to
+    // happen, so are not subject to back-scheduling. Some thought to be given
+    // about how to handle timing on these.
+    case TIA::RESP0:
+    case TIA::RESP1:
+    case TIA::RESM0:
+    case TIA::RESM1:
+    case TIA::RESBL:
+      return kInfinity;
+
+    // Audio registers updated at fixed intervals and not supported by
+    // graphics scheduler.
+    case TIA::AUDC0:
+    case TIA::AUDC1:
+    case TIA::AUDF0:
+    case TIA::AUDF1:
+    case TIA::AUDV0:
+    case TIA::AUDV1:
+      return kInfinity;
+
+    case TIA::GRP0:
+      return EarliestPlayerCouldPaint(false, within);
+
+    case TIA:GRP1:
+      return EarliestPlayerCouldPaint(true, within);
+
+    // Ball and missile support coming later.
+    case TIA::ENAM0:
+    case TIA::ENAM1:
+    case TIA::ENABL:
+      return kInfinity;
+
+    // Some tricky timing considerations here. Leave alone for now but when
+    // adding player supprt this will need revision. These can be written any
+    // time after a prior strobe of HMOVE.
+    case TIA::HMP0:
+    case TIA::HMP1:
+      return kInfinity;
+
+    // Pending missile and ball support.
+    case TIA::HMM0:
+    case TIA::HMM1:
+    case TIA::HMBL:
+      return kInfinity;
+
+    // While potentially quite powerful we will ignore these for now.
+    case TIA::VDELP0:
+    case TIA::VDELP1:
+      return kInfinity;
+
+    // Pending missile and ball support.
+    case TIA::VDELBL:
+    case TIA::RESMP0:
+    case TIA::RESMP1:
+      return kInfinity;
+
+    // Another strobe with zero scheduling flexibility.
+    case TIA::HMOVE:
+      return kInfinity;
+
+    // Potential conflicts with setting any of the other horizontal motion
+    // registers, but otherwise represents an efficient way to get back to a
+    // known state.
+    case TIA::HMCLR:
+      return kInfinity;
+
+    // Non-interactive software has no use for a collision latch that I can
+    // think of.
+    case TIA::CXCLR:
+      return kInfinity;
   }
 }
 
@@ -212,17 +295,25 @@ const uint32 State::EarliestPlayerPaints(bool p1, const Range& within) const {
   return 0;
 }
 
+const uint32 State::EarliestPlayerCouldPaint(
+    bool p1, const Range& within) const {
+  uint32 duration = within.Duration();
+  assert(within.end_time() >= duration);
+  for (uint32 i = 0; i < duration; ++i) {
+    uint32 color_clock = within.end_time() - i - 1;
+    uint32 local_clock = color_clock % kScanLineWidthClocks;
+    if (PlayerCouldPaint(p1, local_clock))
+      return color_clock;
+  }
+  return 0;
+}
+
 const bool State::PlayerPaints(bool p1, uint32 local_clock) const {
   // TODO: write me
   return false;
 }
 
-const bool State::GRP0CouldPaint(uint32 local_clock) const {
-  // TODO: write me
-  return false;
-}
-
-const bool State::GRP1CouldPaint(uint32 local_clock) const {
+const bool State::PlayerCouldPaint(uint32 local_clock) const {
   // TODO: write me
   return false;
 }
@@ -239,35 +330,59 @@ const uint32 State::EarliestPlayfieldPaints(const Range& within) const {
   return 0;
 }
 
+const uint32 State::EarliestPF0CouldPaint(const Range& within) const {
+  Range pf0_right_intersect(Range::IntersectRanges(within, Range(68, 84)));
+  if (!pf0_right_intersect.IsEmpty())
+    return pf0_right_intersect.end_time() - 1;
+
+  Range pf0_left_intersect(Range::IntersectRanges(within, Range(148, 164)));
+  if (!pf0_left_intersect.IsEmpty())
+    return pf0_left_intersect.end_time() - 1;
+
+  return 0;
+}
+
+const uint32 State::EarliestPF1CouldPaint(const Range& within) const {
+  Range pf1_right_intersect(Range::IntersectRanges(within, Range(84, 116)));
+  if (!pf1_right_intersect.IsEmpty())
+    return pf1_right_intersect.end_time() - 1;
+
+  Range pf1_left_intersect(Range::IntersectRanges(within, Range(164, 196)));
+  if (!pf1_left_intersect.IsEmpty())
+    return pf1_left_intersect.end_time() - 1;
+
+  return 0;
+}
+
+const uint32 State::EarliestPF2CouldPaint(const Range& within) const {
+  Range pf2_right_intersect(Range::IntersectRanges(within, Range(116, 148)));
+  if (!pf2_right_intersect.IsEmpty())
+    return pf2_right_intersect.end_time() - 1;
+
+  Range pf2_left_intersect(Range::IntersectRanges(within, Range(196, 228)));
+  if (!pf2_left_interset.IsEmpty())
+    return pf2_left_intersect.end_time() - 1;
+
+  return 0;
+}
+
 const bool State::PlayfieldPaints(uint32 local_clock) {
   assert(clock >= 68);
 
-  if (PF0CouldPaint(local_clock)) {
+  if (local_clock < 84 || (local_clock >= 148 && local_clock < 164)) {
     // PF0 D4 through D7 left to right.
     int pfbit = (local_clock - (local_clock < 84 ? 68 : 148)) >> 2;
     return tia_[TIA::PF0] & (0x10 << pfbit);
-  } else if (PF1CouldPaint(local_clock)) {
+  } else if (local_clock < 116 || (local_clock >= 164 && local_clock < 196)) {
     // PF1 D7 through D0 left to right.
     int pfbit = (locl_clock - (local_clock < 116 ? 84 : 164)) >> 2;
     return tia_[TIA::PF1] & (0x80 >> pfbit);
   } else {
     // PF2 D0 through D7 left to right.
-    assert(PF2CouldPaint(local_clock));
+    assert(local_clock < 148 || (local_clock >= 196 && local_clock < 228));
     int pfbit = (local_clock - (local_clock < 148 ? 116 : 196)) >> 2;
     return tia_[TIA::PF2] & (0x01 << pfbit);
   }
-}
-
-const bool State::PF0CouldPaint(uint32 local_clock) const {
-  return local_clock < 84 || (local_clock >= 148 && local_clock < 164);
-}
-
-const bool State::PF1CouldPaint(uint32 local_clock) const {
-  return local_clock < 116 || (local_clock >= 164 && local_clock < 196);
-}
-
-const bool State::PF2CouldPaint(uint32 local_clock) const {
-  return local_clock < 148 || (local_clock >= 196 && local_clock < 228);
 }
 
 const bool State::EarliestBackgroundPaints(const Range& within) const {

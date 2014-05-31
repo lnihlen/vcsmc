@@ -81,17 +81,20 @@ class State {
   State(const State& state);
 
   // lcoal_clock is [0.. 228)
+  // Returns the earliest time the player actually renders a pixel.
   const uint32 EarliestPlayerPaints(bool p1, const Range& within) const;
+  // Returns the earliest time the player _could_ render a pixel, meaning the
+  // earliest time that the player bitfield is actually be considered for
+  // render.
   const uint32 EarliestPlayerCouldPaint(bool p1, const Range& within) const;
   const bool PlayerPaints(bool p1, uint32 local_clock) const;
-  const bool GRP0CouldPaint(uint32 local_clock) const;
-  const bool GRP1CouldPaint(uint32 local_clock) const;
+  const bool PlayerCouldPaint(bool p1, uint32 local_clock) const;
 
   const uint32 EarliestPlayfieldPaints(const Range& within) const;
+  const uint32 EarliestPF0CouldPaint(const Range& within) const;
+  const uint32 EarliestPF1CouldPaint(const Range& within) const;
+  const uint32 EarliestPF2CouldPaint(const Range& within) const;
   const bool PlayfieldPaints(uint32 local_clock) const;
-  const bool PF0CouldPaint(uint32 local_clock) const;
-  const bool PF1CouldPaint(uint32 local_clock) const;
-  const bool PF2CouldPaint(uint32 local_clock) const;
 
   const uint32 EarliestBackgroundPaints(const Range& within) const;
 
