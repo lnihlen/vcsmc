@@ -6,6 +6,7 @@
 
 namespace vcsmc {
 
+class Block;
 class Spec;
 class State;
 class TimeSpan;
@@ -29,11 +30,14 @@ class Schedule {
   std::unique_ptr<ColuStrip> Simulate(uint32 row);
 
  private:
+  typedef std::list<std::unique_ptr<State>> States;
+  typedef std::list<std::unique_ptr<Block>> Blocks;
+
   std::unique_ptr<Block> initialization_block_;
   // |states_| and |blocks_| are expected to be interleaved, with the State
   // objects bookending the Blocks on both sides.
-  std::list<std::unique_ptr<State>> states_;
-  std::list<std::unique_ptr<Block>> blocks_;
+  States states_;
+  Blocks blocks_;
 };
 
 }  // namespace vcsmc

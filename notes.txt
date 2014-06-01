@@ -832,10 +832,19 @@ State doesn't know what dependencies it has, only what values it has for
 everything. So optimization becomes pretty tough as if input state changes in
 a block this could impact costs. It shouldn't impact correctness if the code
 in State::EarliestTimeAfter() is correct, in that states after the Spec being
-scheduled have already given their consent to have this thing scheduled before
+scheduled have already given their consent to have this Spec scheduled before
 them by returning 0. But it could impact speed, in that earlier decisions made
 about cost of sets of Specs may actually be wrong now. For truly optimal code
 the constraint solver would need to run on _all_ the relevant constraints at
 once. But this makes the ability to answer quick questions like "which one of
 these two sets of Specs is lower cost" much less tractable.
 
+===============================================================================
+
+Over-engineering FTW. Back to something I can implement. Scheduling specs.
+
+From final state, moving backwards
+  uint32 state_clock = EarliestTimeAfter(spec);
+
+ROBOT SPEAK
+I Dream of Wires

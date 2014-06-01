@@ -1,9 +1,11 @@
 #include "schedule.h"
 
+#include <cassert>
+
 namespace vcsmc {
 
 Schedule::Schedule() {
-
+  states_.push_back(std::unique_ptr<State>(new State));
 }
 
 Schedule::Schedule(const Schedule& schedule) {
@@ -11,7 +13,7 @@ Schedule::Schedule(const Schedule& schedule) {
 }
 
 const Schedule& Schedule::operator=(const Schedule& schedule) {
-  // TODO: copy lists
+  // TODO: copy vectors
   return *this;
 }
 
@@ -25,6 +27,50 @@ uint32 Schedule::AddSpecs(const std::list<Spec>* specs) {
 }
 
 uint32 Schedule::CostToAddSpec(const Spec& spec) {
+  assert(states_.size() > 0);
+
+  // Iterate backward through states, looking for a State that returns nonzero
+  // scheduling time.
+  Blocks::reverse_iterator block_it = blocks_.rbegin();
+  States::reverse_iterator state_it = states_.rbegin();
+  for (; state_it != states_.rend(); state_it++) {
+    // If this state ends before this spec can be scheduled we need to go
+    // further back.
+    if ((*state_it)->range().end_time() < spec.range().start_time())
+      continue;
+
+    // If this state begins before this spec can be scheduled then we are at
+    // the correct state to schedule something.
+    if ((*state_it)->range().start_time() < spec.range().start_time())
+      break;
+
+    uint32 state_clock = (*state_it)->EarliestTimeAfter(spec);
+    if (state_clock == kInfinity)
+      return kInfinity;
+
+    // Nonzero return from EarliestTimeAfter(spec)
+    if (state_clock > 0)
+      break;
+
+    if (blocks_it != blocks_.rend())
+      blocsks_it++;
+  }
+
+  // We should have ended on a valid state, this is an odd error condition. Need
+  // to give more thought on what it means.
+  if (state_it == states_.rend()) {
+    assert(false);
+    return kInfinity;
+  }
+
+  // Is it possible that this state already has what we want?
+  if ((*state_it)->tia(spec.tia()) == spec.value())
+    return 0;
+
+  // Are we pointing at a block? Can we append to this block?
+  if (blocks_it != blocks_.rend()) {
+    (*blocks_it)->CostToAppend()
+  }
 }
 
 uint32 Schedule::CostToAddSpecs(const std::list<Spec>* specs) {
@@ -33,48 +79,5 @@ uint32 Schedule::CostToAddSpecs(const std::list<Spec>* specs) {
 std::unique_ptr<ColuStrip> Schedule::Simulate(uint32 row) {
 }
 
-// Quick check - is the spec already met?
-// Finding a place for a spec.
-// we look at the states going in to and out of blocks. Can only append
-// instructions to existing blocks or create new blocks.
-
-// Finding the earliest state we can mutate:
-// Iterate backward through states starting with the last one, and stopping
-// early if we encounter the start_time of the spec range:
-// (a) state returns 0 - ask the state before it.
-// (b) state returns kInfinity. Well shucks. Scheduling not supported. Treat
-// as failure currently.
-// (c) state returns n > 0. This is now the earliest state that we can add the
-// spec to.
-
-// Now we move forward in time, starting with the earliest state, and do the
-// following:
-
-// Attempt simple register packing. If any of the three registers have the
-// value we want then we can re-use and skip the load. Otherwise we pick
-// register based on LRU strategy (the State can keep track of this). In order
-// to avoid invalidating register packing assumptions for future blocks we will
-// want to ensure that register state goes back to unknown at the start of every
-// block. From this we determine the number of clocks that the spec will take
-// to insert.
-// Given a clock count the question is if there's room or not.
-
-// Thinking about Specs that can themselves be scheduled. Or some kind of
-// Intermediate Representation here. Or OpCodes that have a time Range
-// associated with them, or a weak ref back to a Spec, so they can be moved
-// around a bit if needed..
-
-// Examine block right after state, if it exists.
-// if this block ends some time on or after n. Then we can attempt to append
-// instructions to this block. If no block after state, or block ends too early,
-// then we create a new block starting a minimum of 2 clock cycles from last
-// block (for NOP insertion) and choose to append to that.
-
-// OK now that we have our Block, can we schedule within it? Check register
-// states, for now register packing is a simple question of if any of the 3
-// registers coincidentally have the value we need then we can use it and skip
-// the load. There may be a different design that allows for more intelligent
-// register packing but we start with this. After determining the number of
-// cycles we will need to add
 
 }  // namespace vcsmc
