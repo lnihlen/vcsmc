@@ -7,22 +7,23 @@
 namespace vcsmc {
 
 class OpCode;
+class Spec;
 class State;
 
 class Block {
  public:
-  // Need at least one OpCode and a starting State to start a Block.
-  Block(std::unique_ptr<State> state, std::unique_ptr<OpCode> opcode);
-  void AppendOpCode(std::unique_ptr<OpCode> opcode);
+  // Will create a copy of state and set all register values to unknown.
+  Block(const State* state);
+  uint32 CostToAppend(const Spec& spec);
+  void Append(const Spec& spec);
 
-  // Possibly, for light copies of Blocks in the schedule for tentative
-  // scheduling, or other uses when defragging.
-  // void AppendBlock(const Block& block);
+  void AppendBlock(const Block& block);
 
   const State* final_state() const { return *(states_.rbegin()).get() };
+  const Range& range() const { return range_; }
 
  protected:
-  Range time_span_;
+  Range range_;
   std::list<std::unique_ptr<State>> states_;
   std::list<std::unique_ptr<OpCode>> opcodes_;
 };
