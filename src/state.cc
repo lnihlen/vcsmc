@@ -12,15 +12,15 @@ namespace vcsmc {
 
 State::State()
     : tia_known_(0),
-      registers_known(0),
+      registers_known_(0),
       range_(0, kFrameSizeClocks) {
   std::memset(tia_, 0, sizeof(tia_));
   std::memset(registers_, 0, sizeof(registers_));
 }
 
-void State::PaintInto(ColuStrip* colu_strip) {
+void State::PaintInto(ColuStrip* colu_strip) const {
   uint32 local_clock = range_.start_time() % kScanLineWidthClocks;
-  uint32 local_until = local_clock + range_.duration();
+  uint32 local_until = local_clock + range_.Duration();
   uint32 starting_clock = std::max(local_clock, kHBlankWidthClocks);
   uint32 starting_column = starting_clock - kHBlankWidthClocks;
   for (uint32 clock = starting_clock; clock < local_until; ++clock) {
@@ -34,7 +34,7 @@ void State::PaintInto(ColuStrip* colu_strip) {
 }
 
 const uint32 State::EarliestTimeAfter(const Spec& spec) const {
-  Range within(IntersectRanges(range_, spec.range()));
+  Range within(Range::IntersectRanges(range_, spec.range()));
   if (within.IsEmpty())
     return kInfinity;
 
@@ -105,7 +105,7 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
     case TIA::GRP0:
       return EarliestPlayerCouldPaint(false, within);
 
-    case TIA:GRP1:
+    case TIA::GRP1:
       return EarliestPlayerCouldPaint(true, within);
 
     // Ball and missile support coming later.
@@ -152,7 +152,12 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
     // think of.
     case TIA::CXCLR:
       return kInfinity;
+
+    case TIA::TIA_COUNT:
+      return kInfinity;
   }
+
+  return kInfinity;
 }
 
 std::unique_ptr<State> State::Clone() const {
@@ -177,7 +182,7 @@ std::unique_ptr<State> State::AdvanceTimeAndSetRegister(
 }
 
 std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
-    uint32 delta, Register reg, TIA address) const {
+    uint32 delta, Register reg, TIA address) {
   std::unique_ptr<State> state(AdvanceTime(delta));
   state->tia_known_ |= (1 << static_cast<int>(address));
   uint8 reg_value = state->registers_[reg];
@@ -313,7 +318,7 @@ const bool State::PlayerPaints(bool p1, uint32 local_clock) const {
   return false;
 }
 
-const bool State::PlayerCouldPaint(uint32 local_clock) const {
+const bool State::PlayerCouldPaint(bool p1, uint32 local_clock) const {
   // TODO: write me
   return false;
 }
@@ -360,14 +365,14 @@ const uint32 State::EarliestPF2CouldPaint(const Range& within) const {
     return pf2_right_intersect.end_time() - 1;
 
   Range pf2_left_intersect(Range::IntersectRanges(within, Range(196, 228)));
-  if (!pf2_left_interset.IsEmpty())
+  if (!pf2_left_intersect.IsEmpty())
     return pf2_left_intersect.end_time() - 1;
 
   return 0;
 }
 
-const bool State::PlayfieldPaints(uint32 local_clock) {
-  assert(clock >= 68);
+const bool State::PlayfieldPaints(uint32 local_clock) const {
+  assert(local_clock >= 68);
 
   if (local_clock < 84 || (local_clock >= 148 && local_clock < 164)) {
     // PF0 D4 through D7 left to right.
@@ -375,7 +380,7 @@ const bool State::PlayfieldPaints(uint32 local_clock) {
     return tia_[TIA::PF0] & (0x10 << pfbit);
   } else if (local_clock < 116 || (local_clock >= 164 && local_clock < 196)) {
     // PF1 D7 through D0 left to right.
-    int pfbit = (locl_clock - (local_clock < 116 ? 84 : 164)) >> 2;
+    int pfbit = (local_clock - (local_clock < 116 ? 84 : 164)) >> 2;
     return tia_[TIA::PF1] & (0x80 >> pfbit);
   } else {
     // PF2 D0 through D7 left to right.
@@ -385,7 +390,7 @@ const bool State::PlayfieldPaints(uint32 local_clock) {
   }
 }
 
-const bool State::EarliestBackgroundPaints(const Range& within) const {
+const uint32 State::EarliestBackgroundPaints(const Range& within) const {
   uint32 duration = within.Duration();
   assert(within.end_time() >= duration);
   for (uint32 i = 0; i < duration; ++i) {
@@ -397,7 +402,7 @@ const bool State::EarliestBackgroundPaints(const Range& within) const {
       continue;
     if (PlayerPaints(true, local_clock))
       continue;
-    if (PlayfiedPaints(local_clock))
+    if (PlayfieldPaints(local_clock))
       continue;
     // Neither player nor playfield paints, must be the bg color that paints.
     return color_clock;

@@ -7,8 +7,9 @@ namespace vcsmc {
 
 class DoNothingStrategy : public Strategy {
  public:
-  virtual std::unique_ptr<ScanLine> Fit(PixelStrip* target_strip,
-                                        State* entry_state) override;
+  virtual std::unique_ptr<Schedule> Fit(
+      const PixelStrip* target_strip,
+      const Schedule* starting_schedule) override;
 };
 
 }  // namespace vcsmc

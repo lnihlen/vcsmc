@@ -42,7 +42,7 @@ std::unique_ptr<Schedule> BackgroundColorStrategy::Fit(
   Spec colubk(TIA::COLUBK, bg_color, range);
   schedule->AddSpec(colubk);
 
-  std::list<Spec> zero_playfield;
+  std::vector<Spec> zero_playfield;
   zero_playfield.push_back(Spec(TIA::PF0, 0, range));
   zero_playfield.push_back(Spec(TIA::PF1, 0, range));
   zero_playfield.push_back(Spec(TIA::PF2, 0, range));
@@ -56,17 +56,17 @@ std::unique_ptr<Schedule> BackgroundColorStrategy::Fit(
     schedule->AddSpec(colupf);
   }
 
-  std::list<Spec> zero_player_graphics;
+  std::vector<Spec> zero_player_graphics;
   zero_player_graphics.push_back(Spec(TIA::VDELP0, 0, range));
   zero_player_graphics.push_back(Spec(TIA::VDELP1, 0, range));
   zero_player_graphics.push_back(Spec(TIA::GRP0, 0, range));
   zero_player_graphics.push_back(Spec(TIA::GRP1, 0, range));
   uint32 zpg_cost = schedule->CostToAddSpecs(&zero_player_graphics);
 
-  std::list<Spec> set_player_colors;
+  std::vector<Spec> set_player_colors;
   set_player_colors.push_back(Spec(TIA::COLUP0, bg_color, range));
-  ste_player_colors.push_back(Spec(TIA::COLUP1, bg_color, range));
-  uint32 spc_cost = schedule->CostToAddSpecs(&spc_cost);
+  set_player_colors.push_back(Spec(TIA::COLUP1, bg_color, range));
+  uint32 spc_cost = schedule->CostToAddSpecs(&set_player_colors);
   if (zpg_cost < spc_cost) {
     schedule->AddSpecs(&zero_player_graphics);
   } else {

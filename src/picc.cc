@@ -10,7 +10,7 @@
 #include "kernel.h"
 #include "log.h"
 #include "opcode.h"
-#include "scan_line.h"
+#include "schedule.h"
 #include "state.h"
 #include "tiff_image_file.h"
 
@@ -50,8 +50,7 @@ int main(int argc, char* argv[]) {
   // Fit the frame.
   kernel.Fit();
 
-  std::cout << "saving fit for " << input_file << ", "
-            << kernel.bytes() << " bytes." << std::endl;
+  std::cout << "saving fit for " << input_file << "." << std::endl;
 
   // Write the output.
   kernel.Save();

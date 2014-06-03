@@ -9,6 +9,7 @@ LIBS=-lm -lstdc++ -ltiff -framework OpenCL
 
 DEPS=constants.h image_file.h strategy.h types.h
 OBJ=background_color_strategy.o                                                \
+    block.o                                                                    \
     cl_buffer_impl.o                                                           \
     cl_command_queue_impl.o                                                    \
     cl_device_context.o                                                        \
@@ -25,7 +26,10 @@ OBJ=background_color_strategy.o                                                \
     pixel_strip.o                                                              \
     playfield_strategy.o                                                       \
     random.o                                                                   \
-    scan_line.o state.o                                                        \
+    range.o                                                                    \
+    schedule.o                                                                 \
+    spec.o                                                                     \
+    state.o                                                                    \
     tiff_image_file.o
 
 %.o: %.cc $(DEPS)

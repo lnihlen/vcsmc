@@ -4,7 +4,7 @@ namespace vcsmc {
 
 namespace op {
 
-LoadImmediate::LoadImmediate(uint8 value, State::Register reg)
+LoadImmediate::LoadImmediate(uint8 value, Register reg)
     : value_(value),
       register_(reg) { }
 
@@ -29,7 +29,7 @@ const std::string LoadImmediate::assembler() const {
   return asm_string;
 }
 
-StoreZeroPage::StoreZeroPage(State::TIA address, State::Register reg)
+StoreZeroPage::StoreZeroPage(TIA address, Register reg)
     : address_(address),
       register_(reg) { }
 
@@ -74,15 +74,15 @@ std::unique_ptr<op::OpCode> makeLDY(uint8 value) {
   return std::unique_ptr<op::OpCode>(new op::LDY(value));
 }
 
-std::unique_ptr<op::OpCode> makeSTA(State::TIA address) {
+std::unique_ptr<op::OpCode> makeSTA(TIA address) {
   return std::unique_ptr<op::OpCode>(new op::STA(address));
 }
 
-std::unique_ptr<op::OpCode> makeSTX(State::TIA address) {
+std::unique_ptr<op::OpCode> makeSTX(TIA address) {
   return std::unique_ptr<op::OpCode>(new op::STX(address));
 }
 
-std::unique_ptr<op::OpCode> makeSTY(State::TIA address) {
+std::unique_ptr<op::OpCode> makeSTY(TIA address) {
   return std::unique_ptr<op::OpCode>(new op::STY(address));
 }
 

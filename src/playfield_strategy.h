@@ -5,11 +5,12 @@
 
 namespace vcsmc {
 
-// Attempts to fit the provided ScanLine by using only the Playfield.
+// Attempts to fit the provided PixelStrip by using only the Playfield.
 class PlayfieldStrategy : public Strategy {
  public:
-  virtual std::unique_ptr<ScanLine> Fit(PixelStrip* target_strip,
-                                        State* entry_state) override;
+  virtual std::unique_ptr<Schedule> Fit(
+      const PixelStrip* target_strip,
+      const Schedule* starting_schedule) override;
 };
 
 }  // namespace vcsmc

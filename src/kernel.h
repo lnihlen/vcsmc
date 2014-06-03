@@ -9,14 +9,14 @@
 namespace vcsmc {
 
 class Image;
-class ScanLine;
+class Schedule;
 class State;
 
 // A Kernel, while somewhat an abuse of the term, represents a program to render
 // an entire Frame of imagery. It owns a |target_frame_| from which it extracts
-// ColuStrips and attempts various Strategies to fit ScanLines to those strips.
-// It is responsible for stitching all of those ScanLines together into a
-// coherent whole that can be assembled in to 6502 bytecode for running.
+// PixelStrips and attempts various Strategies to fit Schedules to those strips.
+// These Schedules combine to form an overall Schedule which can then be output
+// as 6502 bytecode or assembler and run on the VCS.
 class Kernel {
  public:
   // Takes ownership of target_image.

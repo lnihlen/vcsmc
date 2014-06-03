@@ -7,14 +7,14 @@
 #include "opcode.h"
 #include "pallette.h"
 #include "pixel_strip.h"
-#include "scan_line.h"
+#include "schedule.h"
 #include "state.h"
 #include "types.h"
 
 namespace vcsmc {
 
-std::unique_ptr<ScanLine> PlayfieldStrategy::Fit(
-    PixelStrip* target_strip, State* entry_state) {
+std::unique_ptr<Schedule> PlayfieldStrategy::Fit(
+    const PixelStrip* target_strip, const Schedule* starting_schedule) {
   assert((target_strip->width() % 8) == 0);
 
   const Pallette* pallette = target_strip->pallette(2);
@@ -122,6 +122,7 @@ std::unique_ptr<ScanLine> PlayfieldStrategy::Fit(
   // nop          |       147       |
   // sta PF2      |       153       |
   // sta WSYNC    |       162       |
+/*
   std::unique_ptr<ScanLine> scan_line(new ScanLine(entry_state));
   scan_line->AddOperation(makeLDA(colubk));
   scan_line->AddOperation(makeSTA(State::TIA::COLUBK));
@@ -148,6 +149,8 @@ std::unique_ptr<ScanLine> PlayfieldStrategy::Fit(
   scan_line->AddOperation(makeSTA(State::TIA::PF2));
 
   return scan_line;
+*/
+  return std::unique_ptr<Schedule>(new Schedule(*starting_schedule));
 }
 
 }  // namespace vcsmc

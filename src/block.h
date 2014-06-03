@@ -4,9 +4,15 @@
 #include "range.h"
 #include "types.h"
 
+#include <memory>
+#include <vector>
+
 namespace vcsmc {
 
-class OpCode;
+namespace op {
+  class OpCode;
+}  // namespace op
+
 class Spec;
 class State;
 
@@ -14,18 +20,18 @@ class Block {
  public:
   // Will create a copy of state and set all register values to unknown.
   Block(const State* state);
-  uint32 CostToAppend(const Spec& spec);
+  const uint32 CostToAppend(const Spec& spec) const;
   void Append(const Spec& spec);
 
   void AppendBlock(const Block& block);
 
-  const State* final_state() const { return *(states_.rbegin()).get() };
+  const State* final_state() const { return (*states_.rbegin()).get(); };
   const Range& range() const { return range_; }
 
  protected:
   Range range_;
-  std::list<std::unique_ptr<State>> states_;
-  std::list<std::unique_ptr<OpCode>> opcodes_;
+  std::vector<std::unique_ptr<State>> states_;
+  std::vector<std::unique_ptr<op::OpCode>> opcodes_;
 };
 
 }  // namespace vcsmc

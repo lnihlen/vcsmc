@@ -18,7 +18,7 @@ class Spec;
 // active.
 class State {
  public:
-  // Constructs a default initial state, with all values set to zero.
+  // Constructs a default initial state, with all values set to unknown.
   State();
 
   // Fill pixels into |colu_strip| for all time values within |range_|

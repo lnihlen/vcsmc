@@ -26,13 +26,13 @@ class OpCode {
   // Returns number of bytes this opcode takes as bytecode.
   virtual const uint32 bytes() const = 0;
 
-  // Returns the assember version of this OpCode.
+  // Returns the assembler version of this OpCode.
   virtual const std::string assembler() const = 0;
 };
 
 class LoadImmediate : public OpCode {
  public:
-  LoadImmediate(uint8 value, State::Register reg);
+  LoadImmediate(uint8 value, Register reg);
   virtual std::unique_ptr<State> Transform(State* state) const override;
   virtual const uint32 cycles() const override;
   virtual const uint32 bytes() const override;
@@ -40,7 +40,7 @@ class LoadImmediate : public OpCode {
 
  protected:
   uint8 value_;
-  State::Register register_;
+  Register register_;
 
  private:
   LoadImmediate() { /* Do not call me */ }
@@ -48,30 +48,30 @@ class LoadImmediate : public OpCode {
 
 class LDA : public LoadImmediate {
  public:
-  LDA(uint8 value) : LoadImmediate(value, State::Register::A) {}
+  LDA(uint8 value) : LoadImmediate(value, Register::A) {}
 };
 
 class LDX : public LoadImmediate {
  public:
-  LDX(uint8 value) : LoadImmediate(value, State::Register::X) {}
+  LDX(uint8 value) : LoadImmediate(value, Register::X) {}
 };
 
 class LDY : public LoadImmediate {
  public:
-  LDY(uint8 value) : LoadImmediate(value, State::Register::Y) {}
+  LDY(uint8 value) : LoadImmediate(value, Register::Y) {}
 };
 
 class StoreZeroPage : public OpCode {
  public:
-  StoreZeroPage(State::TIA address, State::Register reg);
+  StoreZeroPage(TIA address, Register reg);
   virtual std::unique_ptr<State> Transform(State* state) const override;
   virtual const uint32 cycles() const override;
   virtual const uint32 bytes() const override;
   virtual const std::string assembler() const override;
 
  protected:
-  State::TIA address_;
-  State::Register register_;
+  TIA address_;
+  Register register_;
 
  private:
   StoreZeroPage() { /* Do not call me */ }
@@ -79,17 +79,17 @@ class StoreZeroPage : public OpCode {
 
 class STA : public StoreZeroPage {
  public:
-  STA(State::TIA address) : StoreZeroPage(address, State::Register::A) {}
+  STA(TIA address) : StoreZeroPage(address, Register::A) {}
 };
 
 class STX : public StoreZeroPage {
  public:
-  STX(State::TIA address) : StoreZeroPage(address, State::Register::X) {}
+  STX(TIA address) : StoreZeroPage(address, Register::X) {}
 };
 
 class STY : public StoreZeroPage {
  public:
-  STY(State::TIA address) : StoreZeroPage(address, State::Register::Y) {}
+  STY(TIA address) : StoreZeroPage(address, Register::Y) {}
 };
 
 class NOP : public OpCode {
@@ -108,9 +108,9 @@ class NOP : public OpCode {
 std::unique_ptr<op::OpCode> makeLDA(uint8 value);
 std::unique_ptr<op::OpCode> makeLDX(uint8 value);
 std::unique_ptr<op::OpCode> makeLDY(uint8 value);
-std::unique_ptr<op::OpCode> makeSTA(State::TIA address);
-std::unique_ptr<op::OpCode> makeSTX(State::TIA address);
-std::unique_ptr<op::OpCode> makeSTY(State::TIA address);
+std::unique_ptr<op::OpCode> makeSTA(TIA address);
+std::unique_ptr<op::OpCode> makeSTX(TIA address);
+std::unique_ptr<op::OpCode> makeSTY(TIA address);
 std::unique_ptr<op::OpCode> makeNOP();
 
 }  // namespace vcsmc
