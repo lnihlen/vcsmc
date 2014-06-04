@@ -168,8 +168,8 @@ std::unique_ptr<State> State::Clone() const {
 std::unique_ptr<State> State::AdvanceTime(uint32 delta) {
   std::unique_ptr<State> state(Clone());
   uint32 new_start_time = range_.start_time() + delta;
-  range_.set_end_time(new_start_time);
-  state->range_.set_start_time(new_start_time);
+  range_.SetEndTime(new_start_time);
+  state->range_.SetStartTime(new_start_time);
   return state;
 }
 

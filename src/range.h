@@ -20,14 +20,15 @@ class Range {
     return start_time_ <= time && time < end_time_;
   }
   const uint32 Duration() const { return end_time_ - start_time_; }
-  const bool IsEmpty() const { return start_time_ == 0 && end_time_ == 0; }
+  const bool IsEmpty() const { return start_time_ == end_time_; }
 
   // Returns the empty range (0, 0) if the intersection is empty.
   static Range IntersectRanges(const Range& r1, const Range& r2);
   // static Range UnionRanges(const Range& r1, const Range& r2);
 
-  void set_start_time(uint32 start_time) { start_time_ = start_time; }
-  void set_end_time(uint32 end_time) { end_time_ = end_time; }
+  void SetStartTime(uint32 start_time);
+  void SetEndTime(uint32 end_time);
+
   const uint32 start_time() const { return start_time_; }
   const uint32 end_time() const { return end_time_; }
 

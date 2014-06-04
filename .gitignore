@@ -1,4 +1,2 @@
 .*.swp
-*.o
-src/picc
-
+out/

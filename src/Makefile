@@ -1,49 +1,57 @@
-# VCSMC Makefile.
+# VCSMC src/ Makefile.
 # Dependencies: libtiff, clang, OpenCL
 # tools dependencies: python colormath, Wand, ImageMagick
-CC=clang
-CFLAGS=-I. -DNTSC -std=c++11 -I/opt/local/include
 # TODO: move mac-specific stuff to mac-specific vars
-LDFLAGS=-L/opt/local/lib
-LIBS=-lm -lstdc++ -ltiff -framework OpenCL
+CFLAGS += -I. -I/opt/local/include
+LDFLAGS += -L/opt/local/lib
+LIBS += -lm -ltiff -framework OpenCL
+OUTTESTS=$(OUT)/tests
 
 DEPS=constants.h image_file.h strategy.h types.h
-OBJ=background_color_strategy.o                                                \
-    block.o                                                                    \
-    cl_buffer_impl.o                                                           \
-    cl_command_queue_impl.o                                                    \
-    cl_device_context.o                                                        \
-    cl_image_impl.o                                                            \
-    cl_kernel_impl.o                                                           \
-    color.o                                                                    \
-    colu_strip.o                                                               \
-    do_nothing_strategy.o                                                      \
-    image.o                                                                    \
-    kernel.o                                                                   \
-    log.o                                                                      \
-    opcode.o                                                                   \
-    pallette.o                                                                 \
-    pixel_strip.o                                                              \
-    playfield_strategy.o                                                       \
-    random.o                                                                   \
-    range.o                                                                    \
-    schedule.o                                                                 \
-    spec.o                                                                     \
-    state.o                                                                    \
-    tiff_image_file.o
+OBJ=$(OUT)/background_color_strategy.o                                         \
+    $(OUT)/block.o                                                             \
+    $(OUT)/cl_buffer_impl.o                                                    \
+    $(OUT)/cl_command_queue_impl.o                                             \
+    $(OUT)/cl_device_context.o                                                 \
+    $(OUT)/cl_image_impl.o                                                     \
+    $(OUT)/cl_kernel_impl.o                                                    \
+    $(OUT)/color.o                                                             \
+    $(OUT)/colu_strip.o                                                        \
+    $(OUT)/do_nothing_strategy.o                                               \
+    $(OUT)/image.o                                                             \
+    $(OUT)/kernel.o                                                            \
+    $(OUT)/log.o                                                               \
+    $(OUT)/opcode.o                                                            \
+    $(OUT)/pallette.o                                                          \
+    $(OUT)/pixel_strip.o                                                       \
+    $(OUT)/playfield_strategy.o                                                \
+    $(OUT)/random.o                                                            \
+    $(OUT)/range.o                                                             \
+    $(OUT)/schedule.o                                                          \
+    $(OUT)/spec.o                                                              \
+    $(OUT)/state.o                                                             \
+    $(OUT)/tiff_image_file.o
 
-%.o: %.cc $(DEPS)
+TEST_OBJ=$(OUTTESTS)/range_unittests.o
+
+$(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -g -o $@ $< $(CFLAGS)
 
-picc: $(OBJ) picc.o
+$(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
+	$(CC) -c -g -o $@ $< $(CFLAGS) -I$(GTEST_INCLUDE)
+
+$(OUT)/picc: $(OBJ) $(OUT)/picc.o
 	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-ciede2k_test: ciede2k_test.o
-	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+tests: $(OUT)/run_unittests | $(OUTTESTS)/
 
-rgb_to_lab_test: rgb_to_lab_test.o
-	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+$(OUT)/run_unittests: $(OBJ) $(TEST_OBJ) | $(OUTTESTS)/
+	$(CC) -g -o $@ $^ $(GTEST_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
+$(OUTTESTS)/:
+	mkdir -p $(OUTTESTS)
+
+.PHONY: clean
 clean:
-	rm -f *.o picc ciede2k_test rgb_to_lab_test
+	rm -f $(OBJ) $(OUT)/picc $(TEST_OBJ) $(OUT)/run_unittests
 
