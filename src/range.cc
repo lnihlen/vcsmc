@@ -36,12 +36,12 @@ Range Range::IntersectRanges(const Range& r1, const Range& r2) {
   return Range(start_time, end_time);
 }
 
-void Range::SetStartTime(uint32 start_time) {
+void Range::set_start_time(uint32 start_time) {
   assert(end_time_ >= start_time);
   start_time_ = start_time;
 }
 
-void Range::SetEndTime(uint32 end_time) {
+void Range::set_end_time(uint32 end_time) {
   assert(end_time >= start_time_);
   end_time_ = end_time;
 }

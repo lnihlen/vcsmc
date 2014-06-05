@@ -32,7 +32,8 @@ OBJ=$(OUT)/background_color_strategy.o                                         \
     $(OUT)/state.o                                                             \
     $(OUT)/tiff_image_file.o
 
-TEST_OBJ=$(OUTTESTS)/range_unittests.o
+TEST_OBJ=$(OUTTESTS)/range_unittests.o                                         \
+         $(OUTTESTS)/state_unittests.o                                         \
 
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -g -o $@ $< $(CFLAGS)

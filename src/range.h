@@ -26,9 +26,8 @@ class Range {
   static Range IntersectRanges(const Range& r1, const Range& r2);
   // static Range UnionRanges(const Range& r1, const Range& r2);
 
-  void SetStartTime(uint32 start_time);
-  void SetEndTime(uint32 end_time);
-
+  void set_start_time(uint32 start_time);
+  void set_end_time(uint32 end_time);
   const uint32 start_time() const { return start_time_; }
   const uint32 end_time() const { return end_time_; }
 

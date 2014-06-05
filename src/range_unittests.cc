@@ -58,21 +58,41 @@ TEST(RangeTest, ContainsRightInMiddle) {
 }
 
 TEST(RangeTest, DurationZeroStartTime) {
-  EXPECT_TRUE(false);
+  vcsmc::Range range(0, 500);
+  EXPECT_EQ(range.end_time(), range.Duration());
 }
 
 TEST(RangeTest, DurationNonZeroStartTime) {
-  EXPECT_TRUE(false);
+  vcsmc::Range range(250, 475);
+  EXPECT_EQ(225U, range.Duration());
 }
 
 TEST(RangeTest, IsEmptyZeroStartTime) {
-  EXPECT_TRUE(false);
+  vcsmc::Range range(0, 0);
+  EXPECT_TRUE(range.IsEmpty());
+
+  vcsmc::Range range_non_empty(0, 1);
+  EXPECT_FALSE(range_non_empty.IsEmpty());
 }
 
 TEST(RangeTest, IsEmptyNonZeroStartTime) {
-  EXPECT_TRUE(false);
+  vcsmc::Range range(10, 10);
+  EXPECT_TRUE(range.IsEmpty());
+
+  vcsmc::Range range_non_empty(10, 11);
+  EXPECT_FALSE(range_non_empty.IsEmpty());
 }
 
 TEST(RangeDeathTest, IllPosedConstructionAsserts) {
   EXPECT_DEATH(vcsmc::Range range(5, 0), "end_time_ >= start_time_");
+}
+
+TEST(RangeDeathTest, BadStartTimeAsserts) {
+  vcsmc::Range range(1000, 2000);
+  EXPECT_DEATH(range.set_start_time(2001), "end_time_ >= start_time");
+}
+
+TEST(RangeDeathTest, BadEndTimeAsserts) {
+  vcsmc::Range range(20, 35);
+  EXPECT_DEATH(range.set_end_time(10), "end_time >= start_time_");
 }

@@ -22,6 +22,12 @@ const uint32 kNTSCColors = 128;
 const uint32 kInfinity = 0xffffffff;
 const uint32 kMinimumIdleTime = 2 * kColorClocksPerCPUCycle;
 
+const uint8 kColuUnpainted = 0xff;
+// The ith most significant bit in this field represents the ith address in the
+// TIA enum below.
+// 0001 1100 0000 0000 0000 0000 0001 1111 0000 0000 0000 1100
+const uint64 kTIAStrobeMask = 0x1c00001f000c;
+
 // Defines the address and name of every register on the TIA. The ones marked
 // as (strobe) are write-only and writing to them will cause new changes in
 // state.

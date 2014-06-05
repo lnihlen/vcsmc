@@ -1,6 +1,5 @@
 #include "state.h"
 
-#include <cassert>
 #include <cstring>
 #include <iostream>
 
@@ -11,23 +10,23 @@
 namespace vcsmc {
 
 State::State()
-    : tia_known_(0),
+    : tia_known_(kTIAStrobeMask),
       registers_known_(0),
       range_(0, kFrameSizeClocks) {
-  std::memset(tia_, 0, sizeof(tia_));
-  std::memset(registers_, 0, sizeof(registers_));
+  // The unknown/known logic asserts on |tia_| or |registers_| access, so we
+  // can skip initialization of their memory areas.
 }
 
 void State::PaintInto(ColuStrip* colu_strip) const {
-  uint32 local_clock = range_.start_time() % kScanLineWidthClocks;
-  uint32 local_until = local_clock + range_.Duration();
+  Range strip_range(Range::IntersectRanges(colu_strip->range(), range_));
+  uint32 local_clock = strip_range.start_time() % kScanLineWidthClocks;
+  uint32 local_until = local_clock + strip_range.Duration();
   uint32 starting_clock = std::max(local_clock, kHBlankWidthClocks);
   uint32 starting_column = starting_clock - kHBlankWidthClocks;
   for (uint32 clock = starting_clock; clock < local_until; ++clock) {
-    uint8 colu = tia_[TIA::COLUBK];
-    if (PlayfieldPaints(clock)) {
-      colu = tia_[TIA::COLUPF];
-    }
+    uint8 colu = tia(TIA::COLUBK);
+    if (PlayfieldPaints(clock))
+      colu = tia(TIA::COLUPF);
 
     colu_strip->set_colu(starting_column++, colu);
   }
@@ -168,28 +167,28 @@ std::unique_ptr<State> State::Clone() const {
 std::unique_ptr<State> State::AdvanceTime(uint32 delta) {
   std::unique_ptr<State> state(Clone());
   uint32 new_start_time = range_.start_time() + delta;
-  range_.SetEndTime(new_start_time);
-  state->range_.SetStartTime(new_start_time);
+  range_.set_end_time(new_start_time);
+  state->range_.set_start_time(new_start_time);
   return state;
 }
 
 std::unique_ptr<State> State::AdvanceTimeAndSetRegister(
-    uint32 delta, Register reg, uint8 value) {
+    uint32 delta, Register axy, uint8 value) {
   std::unique_ptr<State> state(AdvanceTime(delta));
-  state->registers_known_ |= (1 << static_cast<int>(reg));
-  state->registers_[reg] = value;
+  state->registers_known_ |= (1 << static_cast<int>(axy));
+  state->registers_[axy] = value;
   return state;
 }
 
 std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
-    uint32 delta, Register reg, TIA address) {
+    uint32 delta, Register axy, TIA address) {
   std::unique_ptr<State> state(AdvanceTime(delta));
-  state->tia_known_ |= (1 << static_cast<int>(address));
-  uint8 reg_value = state->registers_[reg];
+  uint8 reg_value = state->reg(axy);
   switch (address) {
     // interesting code for strobes and the like here... :)
 
     default:
+      state->tia_known_ |= (1 << static_cast<int>(address));
       state->tia_[address] = reg_value;
       break;
   }
@@ -282,7 +281,7 @@ State::State(const State& state) {
 const uint32 State::EarliestPlayerPaints(bool p1, const Range& within) const {
   // If player graphics are zero then they will never paint.
   TIA grp = p1 ? TIA::GRP1 : TIA::GRP0;
-  if (tia_[grp] == 0)
+  if (tia(grp) == 0)
     return 0;
 
   // Start from the end of our |range_| and work our way back in time, stopping
@@ -377,16 +376,16 @@ const bool State::PlayfieldPaints(uint32 local_clock) const {
   if (local_clock < 84 || (local_clock >= 148 && local_clock < 164)) {
     // PF0 D4 through D7 left to right.
     int pfbit = (local_clock - (local_clock < 84 ? 68 : 148)) >> 2;
-    return tia_[TIA::PF0] & (0x10 << pfbit);
+    return tia(TIA::PF0) & (0x10 << pfbit);
   } else if (local_clock < 116 || (local_clock >= 164 && local_clock < 196)) {
     // PF1 D7 through D0 left to right.
     int pfbit = (local_clock - (local_clock < 116 ? 84 : 164)) >> 2;
-    return tia_[TIA::PF1] & (0x80 >> pfbit);
+    return tia(TIA::PF1) & (0x80 >> pfbit);
   } else {
     // PF2 D0 through D7 left to right.
     assert(local_clock < 148 || (local_clock >= 196 && local_clock < 228));
     int pfbit = (local_clock - (local_clock < 148 ? 116 : 196)) >> 2;
-    return tia_[TIA::PF2] & (0x01 << pfbit);
+    return tia(TIA::PF2) & (0x01 << pfbit);
   }
 }
 

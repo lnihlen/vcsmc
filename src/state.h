@@ -1,6 +1,7 @@
 #ifndef SRC_STATE_H_
 #define SRC_STATE_H_
 
+#include <cassert>
 #include <memory>
 #include <string>
 
@@ -41,7 +42,7 @@ class State {
 
   // Same as above, but the returned state also has new value stored in reg.
   std::unique_ptr<State> AdvanceTimeAndSetRegister(uint32 delta,
-                                                   Register reg,
+                                                   Register axy,
                                                    uint8 value);
 
   // Same as above, but the returned state also simulates the effect of copying
@@ -52,9 +53,10 @@ class State {
   // values while they are in use, and if such a state is invalid this function
   // will return nullptr.
   std::unique_ptr<State> AdvanceTimeAndCopyRegisterToTIA(uint32 delta,
-                                                         Register reg,
+                                                         Register axy,
                                                          TIA address);
   //====== Utility Methods
+  // TODO: move to assembler.cc
 
   // Given a value like Register::A returns "a";
   static std::string RegisterToString(const Register reg);
@@ -65,17 +67,33 @@ class State {
   // the string "$fe".
   static std::string ByteToHexString(const uint8 value);
 
-  const uint8 a() const { return registers_[Register::A]; }
-  const uint8 x() const { return registers_[Register::X]; }
-  const uint8 y() const { return registers_[Register::Y]; }
-  const uint8 tia(TIA address) const { return tia_[address]; }
-  const Range& range() const { return range_; }
-  const bool register_known(Register reg) const {
-    return registers_known_ & (1 << static_cast<int>(reg));
+  const bool register_known(Register axy) const {
+    return registers_known_ & (1 << static_cast<int>(axy));
   }
   const bool tia_known(TIA address) const {
-    return tia_known_ & (1 << static_cast<int>(address));
+    return tia_known_ & (1ULL << static_cast<int>(address));
   }
+  const uint8 a() const {
+    assert(register_known(Register::A));
+    return registers_[Register::A];
+  }
+  const uint8 x() const {
+    assert(register_known(Register::X));
+    return registers_[Register::X];
+  }
+  const uint8 y() const {
+    assert(register_known(Register::Y));
+    return registers_[Register::Y];
+  }
+  const uint8 reg(Register axy) const {
+    assert(register_known(axy));
+    return registers_[axy];
+  }
+  const uint8 tia(TIA address) const {
+    assert(tia_known(address));
+    return tia_[address];
+  }
+  const Range& range() const { return range_; }
 
  private:
   State(const State& state);
