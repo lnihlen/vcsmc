@@ -22,14 +22,6 @@ class State {
   // Constructs a default initial state, with all values set to unknown.
   State();
 
-  // Fill pixels into |colu_strip| for all time values within |range_|
-  void PaintInto(ColuStrip* pixel_strip) const;
-
-  // Returns a color clock value that is the earliest time after which this spec
-  // could be added. Returns 0 if it occurs before this State. Note that this
-  // method can return times earlier than spec.range().begin_time().
-  const uint32 EarliestTimeAfter(const Spec& spec) const;
-
   //====== State Creation Methods
 
   // Produces an exact copy of this State.
@@ -48,13 +40,21 @@ class State {
   // Same as above, but the returned state also simulates the effect of copying
   // the value in reg to the supplied tia address. Note that for some of the
   // strobe values this can have substantial impact on other states within the
-  // new state. Also note that setting some states is invalid, like strobing
-  // HMOVE at times other than at the start of HBLANK, or in general setting
-  // values while they are in use, and if such a state is invalid this function
-  // will return nullptr.
+  // new state.
   std::unique_ptr<State> AdvanceTimeAndCopyRegisterToTIA(uint32 delta,
                                                          Register axy,
                                                          TIA address);
+
+  //====== Simulation and Scheduling
+
+   // Fill pixels into |colu_strip| for all time values within |range_|
+  void PaintInto(ColuStrip* pixel_strip) const;
+
+  // Returns a color clock value that is the earliest time after which this spec
+  // could be added. Returns 0 if it occurs before this State. Note that this
+  // method can return times earlier than spec.range().begin_time().
+  const uint32 EarliestTimeAfter(const Spec& spec) const;
+
   //====== Utility Methods
   // TODO: move to assembler.cc
 

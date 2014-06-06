@@ -15,6 +15,8 @@ class Range {
   Range(uint32 start_time, uint32 end_time);
   Range(const Range& range);
   const Range& operator=(const Range& range);
+  const bool operator==(const Range& range) const;
+  const bool operator!=(const Range& range) const;
 
   const bool Contains(uint32 time) const {
     return start_time_ <= time && time < end_time_;

@@ -1,98 +1,179 @@
+#include "gtest/gtest.h"
 #include "range.h"
 
-#include "gtest/gtest.h"
+namespace vcsmc {
 
 TEST(RangeTest, DefaultRangeIsEmpty) {
-  vcsmc::Range range;
+  Range range;
   EXPECT_TRUE(range.IsEmpty());
 }
 
 TEST(RangeTest, DefaultRangeHasNoDuration) {
-  vcsmc::Range range;
+  Range range;
   EXPECT_EQ(0U, range.Duration());
 }
 
 TEST(RangeTest, ArgumentConstructorCopiesValues) {
-  vcsmc::Range range(0, 10);
+  Range range(0, 10);
   EXPECT_EQ(0U, range.start_time());
   EXPECT_EQ(10U, range.end_time());
 }
 
 TEST(RangeTest, CopyConstructorCopiesValues) {
-  vcsmc::Range range1(2, 15);
-  vcsmc::Range range_copy(range1);
+  Range range1(2, 15);
+  Range range_copy(range1);
   EXPECT_EQ(range1.start_time(), range_copy.start_time());
   EXPECT_EQ(range1.end_time(), range_copy.end_time());
 }
 
 TEST(RangeTest, OperatorEqualCopiesValues) {
-  vcsmc::Range range1(5, 45);
-  vcsmc::Range range_copy = range1;
+  Range range1(5, 45);
+  Range range_copy = range1;
   EXPECT_EQ(range1.start_time(), range_copy.start_time());
   EXPECT_EQ(range1.end_time(), range_copy.end_time());
 }
 
+TEST(RangeTest, ComparisonRangesEqual) {
+  Range range(7, 13);
+  Range range2(7, 13);
+  EXPECT_TRUE(range == range2);
+  EXPECT_FALSE(range != range2);
+}
+
+TEST(RangeTest, ComparisonStartTimesDifferent) {
+  Range range(25, 26);
+  Range range2(13, 26);
+  EXPECT_FALSE(range == range2);
+  EXPECT_TRUE(range != range2);
+}
+
+TEST(RangeTest, ComparisonEndTimesDifferent) {
+  Range range(75, 99);
+  Range range2(75, 275);
+  EXPECT_FALSE(range == range2);
+  EXPECT_TRUE(range != range2);
+}
+
+TEST(RangeTest, ComparisonBothTimesDifferent) {
+  Range range(173, 999);
+  Range range2(411, 193574);
+  EXPECT_FALSE(range == range2);
+  EXPECT_TRUE(range != range2);
+}
+
 TEST(RangeTest, ContainsBeforeRange) {
-  vcsmc::Range range(2, 25);
+  Range range(2, 25);
   EXPECT_FALSE(range.Contains(1));
 }
 
 TEST(RangeTest, ContainsAfterRange) {
-  vcsmc::Range range(1, 100);
+  Range range(1, 100);
   EXPECT_FALSE(range.Contains(200));
 }
 
 TEST(RangeTest, ContainsRightAtStart) {
-  vcsmc::Range range(1000, 2000);
+  Range range(1000, 2000);
   EXPECT_TRUE(range.Contains(1000));
 }
 
 TEST(RangeTest, ContainsRightAtEnd) {
-  vcsmc::Range range(500, 999);
+  Range range(500, 999);
   EXPECT_FALSE(range.Contains(999));
 }
 
 TEST(RangeTest, ContainsRightInMiddle) {
-  vcsmc::Range range(700, 1400);
+  Range range(700, 1400);
   EXPECT_TRUE(range.Contains(1050));
 }
 
 TEST(RangeTest, DurationZeroStartTime) {
-  vcsmc::Range range(0, 500);
+  Range range(0, 500);
   EXPECT_EQ(range.end_time(), range.Duration());
 }
 
 TEST(RangeTest, DurationNonZeroStartTime) {
-  vcsmc::Range range(250, 475);
+  Range range(250, 475);
   EXPECT_EQ(225U, range.Duration());
 }
 
 TEST(RangeTest, IsEmptyZeroStartTime) {
-  vcsmc::Range range(0, 0);
+  Range range(0, 0);
   EXPECT_TRUE(range.IsEmpty());
 
-  vcsmc::Range range_non_empty(0, 1);
+  Range range_non_empty(0, 1);
   EXPECT_FALSE(range_non_empty.IsEmpty());
 }
 
 TEST(RangeTest, IsEmptyNonZeroStartTime) {
-  vcsmc::Range range(10, 10);
+  Range range(10, 10);
   EXPECT_TRUE(range.IsEmpty());
 
-  vcsmc::Range range_non_empty(10, 11);
+  Range range_non_empty(10, 11);
   EXPECT_FALSE(range_non_empty.IsEmpty());
 }
 
+TEST(RangeTest, IntersectRangeBefore) {
+  Range range(1, 25);
+  Range range2(25, 30);
+  Range intersect(Range::IntersectRanges(range, range2));
+  EXPECT_TRUE(intersect.IsEmpty());
+}
+
+TEST(RangeTest, IntersectRangeAfter) {
+  Range range(200, 284);
+  Range range2(20, 100);
+  Range intersect(Range::IntersectRanges(range, range2));
+  EXPECT_TRUE(intersect.IsEmpty());
+}
+
+TEST(RangeTest, IntersectRangeLarger) {
+  Range range(10, 10000);
+  Range range2(50, 60);
+  Range intersect(Range::IntersectRanges(range, range2));
+  EXPECT_EQ(range2, intersect);
+}
+
+TEST(RangeTest, IntersectRangeIdentical) {
+  Range range(75, 99);
+  Range range2(range);
+  Range intersect(Range::IntersectRanges(range, range2));
+  EXPECT_EQ(range, intersect);
+  EXPECT_EQ(range2, intersect);
+}
+
+TEST(RangeTest, IntersectRangeSmaller) {
+  Range range(75, 99);
+  Range range2(50, 999);
+  Range intersect(Range::IntersectRanges(range, range2));
+  EXPECT_EQ(range, intersect);
+}
+
+TEST(RangeTest, IntersectRangeEmptyRange) {
+  Range empty_range(75, 75);
+  Range range(42, 1336);
+  Range intersect = Range::IntersectRanges(empty_range, range);
+  EXPECT_TRUE(intersect.IsEmpty());
+}
+
+TEST(RangeTest, IntersectRangeZero) {
+  Range empty_range;
+  Range range(0, 1777);
+  Range intersect = Range::IntersectRanges(empty_range, range);
+  EXPECT_TRUE(intersect.IsEmpty());
+}
+
 TEST(RangeDeathTest, IllPosedConstructionAsserts) {
-  EXPECT_DEATH(vcsmc::Range range(5, 0), "end_time_ >= start_time_");
+  EXPECT_DEATH(Range range(5, 0), "end_time_ >= start_time_");
 }
 
 TEST(RangeDeathTest, BadStartTimeAsserts) {
-  vcsmc::Range range(1000, 2000);
+  Range range(1000, 2000);
   EXPECT_DEATH(range.set_start_time(2001), "end_time_ >= start_time");
 }
 
 TEST(RangeDeathTest, BadEndTimeAsserts) {
-  vcsmc::Range range(20, 35);
+  Range range(20, 35);
   EXPECT_DEATH(range.set_end_time(10), "end_time >= start_time_");
 }
+
+}  // namespace vcsmc

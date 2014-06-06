@@ -1,6 +1,7 @@
 #ifndef SRC_OPCODE_H_
 #define SRC_OPCODE_H_
 
+#include <cassert>
 #include <memory>
 #include <string>
 
@@ -43,7 +44,7 @@ class LoadImmediate : public OpCode {
   Register register_;
 
  private:
-  LoadImmediate() { /* Do not call me */ }
+  LoadImmediate() { /* Do not call me */ assert(false); }
 };
 
 class LDA : public LoadImmediate {
@@ -74,7 +75,7 @@ class StoreZeroPage : public OpCode {
   Register register_;
 
  private:
-  StoreZeroPage() { /* Do not call me */ }
+  StoreZeroPage() { /* Do not call me */ assert(false); }
 };
 
 class STA : public StoreZeroPage {

@@ -17,6 +17,43 @@ State::State()
   // can skip initialization of their memory areas.
 }
 
+std::unique_ptr<State> State::Clone() const {
+  std::unique_ptr<State> state(new State(*this));
+  return state;
+}
+
+std::unique_ptr<State> State::AdvanceTime(uint32 delta) {
+  assert(delta > 0);
+  std::unique_ptr<State> state(Clone());
+  uint32 new_start_time = range_.start_time() + delta;
+  range_.set_end_time(new_start_time);
+  state->range_.set_start_time(new_start_time);
+  return state;
+}
+
+std::unique_ptr<State> State::AdvanceTimeAndSetRegister(
+    uint32 delta, Register axy, uint8 value) {
+  std::unique_ptr<State> state(AdvanceTime(delta));
+  state->registers_known_ |= (1 << static_cast<int>(axy));
+  state->registers_[axy] = value;
+  return state;
+}
+
+std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
+    uint32 delta, Register axy, TIA address) {
+  std::unique_ptr<State> state(AdvanceTime(delta));
+  uint8 reg_value = state->reg(axy);
+  switch (address) {
+    // interesting code for strobes and the like here... :)
+
+    default:
+      state->tia_known_ |= (1 << static_cast<int>(address));
+      state->tia_[address] = reg_value;
+      break;
+  }
+  return state;
+}
+
 void State::PaintInto(ColuStrip* colu_strip) const {
   Range strip_range(Range::IntersectRanges(colu_strip->range(), range_));
   uint32 local_clock = strip_range.start_time() % kScanLineWidthClocks;
@@ -157,42 +194,6 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
   }
 
   return kInfinity;
-}
-
-std::unique_ptr<State> State::Clone() const {
-  std::unique_ptr<State> state(new State(*this));
-  return state;
-}
-
-std::unique_ptr<State> State::AdvanceTime(uint32 delta) {
-  std::unique_ptr<State> state(Clone());
-  uint32 new_start_time = range_.start_time() + delta;
-  range_.set_end_time(new_start_time);
-  state->range_.set_start_time(new_start_time);
-  return state;
-}
-
-std::unique_ptr<State> State::AdvanceTimeAndSetRegister(
-    uint32 delta, Register axy, uint8 value) {
-  std::unique_ptr<State> state(AdvanceTime(delta));
-  state->registers_known_ |= (1 << static_cast<int>(axy));
-  state->registers_[axy] = value;
-  return state;
-}
-
-std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
-    uint32 delta, Register axy, TIA address) {
-  std::unique_ptr<State> state(AdvanceTime(delta));
-  uint8 reg_value = state->reg(axy);
-  switch (address) {
-    // interesting code for strobes and the like here... :)
-
-    default:
-      state->tia_known_ |= (1 << static_cast<int>(address));
-      state->tia_[address] = reg_value;
-      break;
-  }
-  return state;
 }
 
 // static
