@@ -28,6 +28,11 @@ class StateTest : public ::testing::Test {
         EXPECT_EQ(s1->tia(tia), s2->tia(tia));
     }
   }
+
+  void ExpectUnpainted(const ColuStrip* colu_strip) const {
+    for (uint32 i = 0; i < kFrameWidthPixels; ++i)
+      EXPECT_EQ(kColuUnpainted, colu_strip->colu(i));
+  }
 };
 
 TEST_F(StateTest, InitialStateHasFullProgramRange) {
@@ -196,21 +201,73 @@ TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeCXCLR) {
 }
 
 TEST_F(StateTest, PaintIntoBeforeStateRange) {
+  std::unique_ptr<State> state(new State);
+  state = state->AdvanceTimeAndSetRegister(
+      kScanLineWidthClocks, Register::A, 0x00);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(
+      kScanLineWidthClocks, Register::A, TIA::COLUBK);
+  ColuStrip colu_strip(1);
+  state->PaintInto(&colu_strip);
+  ExpectUnpainted(&colu_strip);
 }
 
 TEST_F(StateTest, PaintIntoAfterStateRange) {
+  std::unique_ptr<State> original_state(new State);
+  std::unique_ptr<State> state = original_state->AdvanceTimeAndSetRegister(
+      kScanLineWidthClocks, Register::X, 0xfe);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(
+      kScanLineWidthClocks, Register::X, TIA::COLUPF);
+  ColuStrip colu_strip(7);
+  original_state->PaintInto(&colu_strip);
+  ExpectUnpainted(&colu_strip);
+}
+
+TEST_F(StateTest, PaintIntoDuringHBlank) {
 }
 
 TEST_F(StateTest, PaintBackgroundPartial) {
+  std::unique_ptr<State> state(new State);
+  state = state->AdvanceTimeAndSetRegister(1, Register::Y, 0x00);
+  state = state->AdvanceTimeAndSetRegister(1, Register::X, 0x02);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::X, TIA::COLUBK);
+  state = state->AdvanceTimeAndSetRegister(1, Register::A, kColuUnpainted);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUPF);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::PF0);
+  // Advance state to end of HBlank + 5 pixels.
+  uint32 hb_plus_five = kHBlankWidthClocks + 5 - state->range().start_time();
+  state = state->AdvanceTimeAndCopyRegisterToTIA(
+      hb_plus_five, Register::Y, TIA::PF1);
+  // Make and discard a next state, to set this state's upper bound at +13 pix.
+  state->AdvanceTimeAndCopyRegisterToTIA(13, Register::Y, TIA::PF2);
+  ColuStrip colu_strip(0);
+  state->PaintInto(&colu_strip);
+  for (uint32 i = 0; i < 5; ++i)
+    EXPECT_EQ(kColuUnpainted, colu_strip.colu(i));
+  for (uint32 i = 5; i < 18; ++i)
+    EXPECT_EQ(0x02, colu_strip.colu(i));
+  for (uint32 i = 18; i < kFrameWidthPixels; ++i)
+    EXPECT_EQ(kColuUnpainted, colu_strip.colu(i));
 }
 
 TEST_F(StateTest, PaintBackgroundEntire) {
+  std::unique_ptr<State> state(new State);
+  state = state->AdvanceTimeAndSetRegister(1, Register::Y, 0x00);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::COLUBK);
+  state = state->AdvanceTimeAndSetRegister(1, Register::A, kColuUnpainted);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUPF);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::PF0);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::PF1);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::PF2);
+  ColuStrip colu_strip(1);
+  state->PaintInto(&colu_strip);
+  for (uint32 i = 0; i < kFrameWidthPixels; ++i)
+    EXPECT_EQ(0x00, colu_strip.colu(i));
 }
 
 TEST_F(StateTest, PaintPlayfieldPartial) {
 }
 
-TEST_F(StateTest, PaintPlayerXYZ) {
+TEST_F(StateTest, EarliestTimeAfterXXX) {
 }
 
 TEST(StateDeathTest, AdvanceTimeZero) {

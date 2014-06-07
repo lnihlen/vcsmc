@@ -17,7 +17,7 @@ class ColuStrip {
  public:
   ColuStrip(uint32 row);
 
-  uint32 colu(uint32 column) { return colus_[column]; }
+  const uint32 colu(uint32 column) const { return colus_[column]; }
   void set_colu(uint32 column, uint8 colu) { colus_[column] = colu; }
   const Range& range() const { return range_; }
 
