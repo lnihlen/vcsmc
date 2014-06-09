@@ -62,8 +62,14 @@ void State::PaintInto(ColuStrip* colu_strip) const {
   uint32 starting_column = starting_clock - kHBlankWidthClocks;
   for (uint32 clock = starting_clock; clock < local_until; ++clock) {
     uint8 colu = tia(TIA::COLUBK);
-    if (PlayfieldPaints(clock))
-      colu = tia(TIA::COLUPF);
+    if (PlayfieldPaints(clock)) {
+      // If D1 of CTRLPF is set the playfield paints with COLUP0 on the left
+      // side and COLUP1 on the right side.
+      if (tia(TIA::CTRLPF) & 0x02)
+        colu = local_clock < 148 ? tia(TIA::COLUP0) : tia(TIA::COLUP1);
+      else
+        colu = tia(TIA::COLUPF);
+    }
 
     colu_strip->set_colu(starting_column++, colu);
   }
@@ -371,22 +377,51 @@ const uint32 State::EarliestPF2CouldPaint(const Range& within) const {
   return 0;
 }
 
+// playfield schedules
+// +-----------+------+---------------------+--------------------+
+// | playfield | left | right mirroring off | right mirroring on |
+// +-----------+------+---------------------+--------------------+
+// |    PF0    |  68  |        148          |        212         |
+// |    PF1    |  84  |        164          |        180         |
+// |    PF2    | 116  |        196          |        148         |
+// +-----------+------+---------------------+--------------------+
+
 const bool State::PlayfieldPaints(uint32 local_clock) const {
   assert(local_clock >= 68);
 
-  if (local_clock < 84 || (local_clock >= 148 && local_clock < 164)) {
-    // PF0 D4 through D7 left to right.
-    int pfbit = (local_clock - (local_clock < 84 ? 68 : 148)) >> 2;
-    return tia(TIA::PF0) & (0x10 << pfbit);
-  } else if (local_clock < 116 || (local_clock >= 164 && local_clock < 196)) {
-    // PF1 D7 through D0 left to right.
-    int pfbit = (local_clock - (local_clock < 116 ? 84 : 164)) >> 2;
-    return tia(TIA::PF1) & (0x80 >> pfbit);
+  if (local_clock < 148 || !(tia(TIA::CTRLPF) & 0x01)) {
+    if (local_clock < 84 || (local_clock >= 148 && local_clock < 164)) {
+      // PF0 D4 through D7 left to right.
+      int pfbit = (local_clock - (local_clock < 84 ? 68 : 148)) >> 2;
+      return tia(TIA::PF0) & (0x10 << pfbit);
+    } else if (local_clock < 116 || (local_clock >= 164 && local_clock < 196)) {
+      // PF1 D7 through D0 left to right.
+      int pfbit = (local_clock - (local_clock < 116 ? 84 : 164)) >> 2;
+      return tia(TIA::PF1) & (0x80 >> pfbit);
+    } else {
+      // PF2 D0 through D7 left to right.
+      assert(local_clock < 148 || (local_clock >= 196 && local_clock < 228));
+      int pfbit = (local_clock - (local_clock < 148 ? 116 : 196)) >> 2;
+      return tia(TIA::PF2) & (0x01 << pfbit);
+    }
   } else {
-    // PF2 D0 through D7 left to right.
-    assert(local_clock < 148 || (local_clock >= 196 && local_clock < 228));
-    int pfbit = (local_clock - (local_clock < 148 ? 116 : 196)) >> 2;
-    return tia(TIA::PF2) & (0x01 << pfbit);
+    // We are on the right side of the screen and mirroring is turned on.
+    assert(local_clock >= 148);
+    assert(tia(TIA::CTRLPF) & 0x01);
+    if (local_clock < 180) {
+      // PF2 D7 through D0 left to right.
+      int pfbit = (local_clock - 148) >> 2;
+      return tia(TIA::PF2) & (0x80 >> pfbit);
+    } else if (local_clock < 212) {
+      // PF1 D0 through D7 left to right.
+      int pfbit = (local_clock - 180) >> 2;
+      return tia(TIA::PF1) & (0x01 << pfbit);
+    } else {
+      // PF0 D7 through D4 left to right.
+      assert(local_clock < 228);
+      int pfbit = (local_clock - 212) >> 2;
+      return tia(TIA::PF0) & (0x80 >> pfbit);
+    }
   }
 }
 
