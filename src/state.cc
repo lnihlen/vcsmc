@@ -66,7 +66,7 @@ void State::PaintInto(ColuStrip* colu_strip) const {
       // If D1 of CTRLPF is set the playfield paints with COLUP0 on the left
       // side and COLUP1 on the right side.
       if (tia(TIA::CTRLPF) & 0x02)
-        colu = local_clock < 148 ? tia(TIA::COLUP0) : tia(TIA::COLUP1);
+        colu = clock < 148 ? tia(TIA::COLUP0) : tia(TIA::COLUP1);
       else
         colu = tia(TIA::COLUPF);
     }

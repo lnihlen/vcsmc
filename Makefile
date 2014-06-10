@@ -1,7 +1,7 @@
 # VCSMC main Makefile
 # assumes GNU make 3.80 or up
 export CC=clang
-export CFLAGS=-std=c++11
+export CFLAGS=-std=c++11 -Wall
 export LDFLAGS=
 export LIBS=-lstdc++
 export OUT=$(CURDIR)/out

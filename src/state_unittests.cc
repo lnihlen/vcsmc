@@ -1,5 +1,6 @@
 #include "colu_strip.h"
 #include "gtest/gtest.h"
+#include "spec.h"
 #include "state.h"
 
 namespace vcsmc {
@@ -303,14 +304,14 @@ TEST_F(StateTest, PaintPlayfieldEntireRepeatedNoScore) {
   state->PaintInto(&colu_strip);
   uint32 col = 0;
   for (uint32 i = 0; i < 2; ++i) {
-    // pf0 paints bit 4 - 7 left to right at 4 bits per pixel. First 3 bits
+    // pf0 paints bits 4 - 7 left to right at 4 bits per pixel. First 3 bits
     // are 0, so that's 12 colus of the BG color.
     for (uint32 j = 0; j < 12; ++j)  // 1 000
       EXPECT_EQ(colubk, colu_strip.colu(col++));
     for (uint32 j = 0; j < 4; ++j)  // 1
       EXPECT_EQ(colupf, colu_strip.colu(col++));
 
-    // pf1 paints bit 7 - 0, 01001011
+    // pf1 paints bits 7 - 0, 01001011
     for (uint32 j = 0; j < 4; ++j)  // 0 1001011
       EXPECT_EQ(colubk, colu_strip.colu(col++));
     for (uint32 j = 0; j < 4; ++j)  // 1 001011
@@ -324,7 +325,7 @@ TEST_F(StateTest, PaintPlayfieldEntireRepeatedNoScore) {
     for (uint32 j = 0; j < 8; ++j)  // 11
       EXPECT_EQ(colupf, colu_strip.colu(col++));
 
-    // pf2 paints bit 0 - 7, 00101101
+    // pf2 paints bits 0 - 7, 00101101
     for (uint32 j = 0; j < 4; ++j)  // 0010110 1
       EXPECT_EQ(colupf, colu_strip.colu(col++));
     for (uint32 j = 0; j < 4; ++j)  // 001011 0
@@ -474,38 +475,218 @@ TEST_F(StateTest, PaintPlayfieldEntireRepeatedWithScore) {
   uint32 col = 0;
   for (uint32 i = 0; i < 2; ++i) {
     uint8 colupx = i == 0 ? colup0 : colup1;
-    EXPECT_TRUE(false);
+    // pf0 paints bits 4 - 7, 1011
+    for (uint32 j = 0; j < 8; ++j)  // 10 11
+      EXPECT_EQ(colupx, colu_strip.colu(col++));
+    for (uint32 j = 0; j < 4; ++j)  // 1 0
+      EXPECT_EQ(colubk, colu_strip.colu(col++));
+    for (uint32 j = 0; j < 4; ++j)  // 1
+      EXPECT_EQ(colupx, colu_strip.colu(col++));
+
+    // pf1 paints bits 7 - 0, 11010010
+    for (uint32 j = 0; j < 8; ++j)  // 11 010010
+      EXPECT_EQ(colupx, colu_strip.colu(col++));
+    for (uint32 j = 0; j < 4; ++j)  // 0 10010
+      EXPECT_EQ(colubk, colu_strip.colu(col++));
+    for (uint32 j = 0; j < 4; ++j)  // 1 0010
+      EXPECT_EQ(colupx, colu_strip.colu(col++));
+    for (uint32 j = 0; j < 8; ++j)  // 00 10
+      EXPECT_EQ(colubk, colu_strip.colu(col++));
+    for (uint32 j = 0; j < 4; ++j)  // 1 0
+      EXPECT_EQ(colupx, colu_strip.colu(col++));
+    for (uint32 j = 0; j < 4; ++j)  // 0
+      EXPECT_EQ(colubk, colu_strip.colu(col++));
+
+    // pf2 paints bits 0 - 7, 11100001
+    for (uint32 j = 0; j < 4; ++j)  // 1110000 1
+      EXPECT_EQ(colupx, colu_strip.colu(col++));
+    for (uint32 j = 0; j < 16; ++j)  // 111 0000
+      EXPECT_EQ(colubk, colu_strip.colu(col++));
+    for (uint32 j = 0; j < 12; ++j)  // 111
+      EXPECT_EQ(colupx, colu_strip.colu(col++));
   }
+
+  EXPECT_EQ(kFrameWidthPixels, col);
 }
 
 TEST_F(StateTest, PaintPlayfieldEntireMirroredWithScore) {
+  std::unique_ptr<State> state(new State);
+  // pf0 gets 0xe7 = 1110 1000
+  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0xe7);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF0);
+  // pf1 gets 0x75 = 0111 0101
+  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x75);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF1);
+  // pf2 gets 0x87 = 1000 0111
+  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x87);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF2);
+  const uint8 colubk = 0x40;
+  state = state->AdvanceTimeAndSetRegister(1, Register::A, colubk);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUBK);
+  const uint8 colupf = 0x20;
+  state = state->AdvanceTimeAndSetRegister(1, Register::A, colupf);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUPF);
+  const uint8 colup0 = 0x10;
+  state = state->AdvanceTimeAndSetRegister(1, Register::A, colup0);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUP0);
+  const uint8 colup1 = 0x00;
+  state = state->AdvanceTimeAndSetRegister(1, Register::A, colup1);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUP1);
+  // enable playfield mirroring and enable score color mode
+  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x03);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::CTRLPF);
+
+  // should still be in HBLANK
+  EXPECT_GT(kHBlankWidthClocks, state->range().start_time());
+  ColuStrip colu_strip(0);
+  state->PaintInto(&colu_strip);
+  uint32 col = 0;
+
+  // left side pf0 paints bits 4 - 7, 1110
+  for (uint32 i = 0; i < 4; ++i)   // 111 0
+    EXPECT_EQ(colubk, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 12; ++i)  // 111
+    EXPECT_EQ(colup0, colu_strip.colu(col++));
+
+  // left side pf1 paints bits 7 - 0, 01110101
+  for (uint32 i = 0; i < 4; ++i)  // 0 1110101
+    EXPECT_EQ(colubk, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 12; ++i)  // 111 0101
+    EXPECT_EQ(colup0, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 4; ++i)  // 0 101
+    EXPECT_EQ(colubk, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 4; ++i)  // 1 01
+    EXPECT_EQ(colup0, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 4; ++i)  // 0 1
+    EXPECT_EQ(colubk, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 4; ++i)  // 1
+    EXPECT_EQ(colup0, colu_strip.colu(col++));
+
+  // left side pf2 paints bits 0 - 7, 10000111
+  for (uint32 i = 0; i < 12; ++i)  // 10000 111
+    EXPECT_EQ(colup0, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 16; ++i)  // 1 0000
+    EXPECT_EQ(colubk, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 4; ++i)  // 1
+    EXPECT_EQ(colup0, colu_strip.colu(col++));
+
+  // right side pf2 paints bits 7 - 0, 10000111
+  for (uint32 i = 0; i < 4; ++i)  // 1 0001111
+    EXPECT_EQ(colup1, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 16; ++i)  // 0000 111
+    EXPECT_EQ(colubk, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 12; ++i)  // 111
+    EXPECT_EQ(colup1, colu_strip.colu(col++));
+
+  // right side pf1 paints bits 0 - 7, 01110101
+  for (uint32 i = 0; i < 4; ++i)  // 0111010 1
+    EXPECT_EQ(colup1, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 4; ++i)  // 011101 0
+    EXPECT_EQ(colubk, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 4; ++i)  // 01110 1
+    EXPECT_EQ(colup1, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 4; ++i)  // 0111 0
+    EXPECT_EQ(colubk, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 12; ++i)  // 0 111
+    EXPECT_EQ(colup1, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 4; ++i)  // 0
+    EXPECT_EQ(colubk, colu_strip.colu(col++));
+
+  // right side pf0 paints bits 7 - 4, 1110
+  for (uint32 i = 0; i < 12; ++i)  // 111 0
+    EXPECT_EQ(colup1, colu_strip.colu(col++));
+  for (uint32 i = 0; i < 4; ++i)  // 0
+    EXPECT_EQ(colubk, colu_strip.colu(col++));
+
+  EXPECT_EQ(kFrameWidthPixels, col);
 }
 
-TEST_F(StateTest, EarliestTimeAfterXXX) {
+TEST_F(StateTest, EarliestTimeAfterWithSpecBeforeState) {
+  std::unique_ptr<State> state(new State);
+  state = state->AdvanceTimeAndSetRegister(25, Register::A, 0x00);
+  Spec before(TIA::COLUP0, 0x00, Range(0, 10));
+  EXPECT_EQ(kInfinity, state->EarliestTimeAfter(before));
+}
 
+TEST_F(StateTest, EarliestTimeAfterWithSpecAfterState) {
+  std::unique_ptr<State> state(new State);
+  state->AdvanceTimeAndSetRegister(3, Register::X, 0xff);
+  Spec after(TIA::PF2, 0x77, Range(7, 11));
+  EXPECT_EQ(kInfinity, state->EarliestTimeAfter(after));
+}
+
+TEST_F(StateTest, EarliestTimeAfterCTRLPF) {
+}
+
+TEST_F(StateTest, EarliestTimeAfterCOLUPF) {
+  // COLUPF can be set any time the TIA is not rendering the playfield color,
+  // i.e. any time the TIA is not rendering a 1 in the playfield.
+
+  // Ideas for test cases:
+
+  // A state within the HBLANK should always return 0.
+
+  // A state that straddles a line break and has pf1 painting on the previous
+  // line should return the color clock of the last pixel in that line.
+
+  // A state in the middle of a line with no 1s in playfield should return 0.
+
+  // A state with 1 pixel color followed by 0s should return that time.
+
+  // A state with a 1 on its rightmost pixel should return kInfinity
+
+  // Test on the left and right of the field with mirroring turned on as well.
+
+  std::unique_ptr<State> state(new State);
+}
+
+TEST_F(StateTest, EarliestTimeAfterCOLUBK) {
+}
+
+TEST_F(StateTest, EarliestTimeAfterPF0) {
+}
+
+TEST_F(StateTest, EarliestTimeAfterPF1) {
+}
+
+TEST_F(StateTest, EarliestTimeAfterPF2) {
 }
 
 TEST(StateDeathTest, AdvanceTimeZero) {
   std::unique_ptr<State> state(new State);
-  EXPECT_DEATH(state = state->AdvanceTime(0), "delta > 0");
+  EXPECT_DEATH(state->AdvanceTime(0), "delta > 0");
 }
 
 TEST(StateDeathTest, AdvanceTimeAndCopyRegisterToTIAUnknownRegister) {
+  std::unique_ptr<State> state(new State);
+  EXPECT_DEATH(
+      state->AdvanceTimeAndCopyRegisterToTIA(1, Register::X, TIA::PF0),
+      "register_known");
 }
 
 TEST(StateDeathTest, TIAUnknownAccess) {
+  std::unique_ptr<State> state(new State);
+  EXPECT_DEATH(state->tia(TIA::HMM0), "tia_known");
 }
 
 TEST(StateDeathTest, RegisterUnknownAccess) {
+  std::unique_ptr<State> state(new State);
+  EXPECT_DEATH(state->reg(Register::Y), "register_known");
 }
 
 TEST(StateDeathTest, RegisterAUnknownAccess) {
+  std::unique_ptr<State> state(new State);
+  EXPECT_DEATH(state->a(), "register_known");
 }
 
 TEST(StateDeathTest, RegisterXUnknownAccess) {
+  std::unique_ptr<State> state(new State);
+  EXPECT_DEATH(state->x(), "register_known");
 }
 
 TEST(StateDeathTest, RegisteryYUnknownAccess) {
+  std::unique_ptr<State> state(new State);
+  EXPECT_DEATH(state->y(), "register_known");
 }
 
 }  // namespace vcsmc
