@@ -621,8 +621,14 @@ TEST_F(StateTest, EarliestTimeAfterCTRLPF) {
 TEST_F(StateTest, EarliestTimeAfterCOLUPF) {
   // COLUPF can be set any time the TIA is not rendering the playfield color,
   // i.e. any time the TIA is not rendering a 1 in the playfield.
+  std::unique_ptr<State> state(new State);
 
-  // Ideas for test cases:
+  // A state within the HBLANK should always return 0.
+  state = state->AdvanceTimeAndSetRegister(
+      kHBlankWidthClocks, Register::A, 0x00);
+  EXPECT_EQ(0,
+      state->EarliestTimeAfter(
+          Spec(TIA::COLUPF, 0xfe, Range(0, kFrameSizeClocks))));
 
   // A state within the HBLANK should always return 0.
 
@@ -637,7 +643,6 @@ TEST_F(StateTest, EarliestTimeAfterCOLUPF) {
 
   // Test on the left and right of the field with mirroring turned on as well.
 
-  std::unique_ptr<State> state(new State);
 }
 
 TEST_F(StateTest, EarliestTimeAfterCOLUBK) {

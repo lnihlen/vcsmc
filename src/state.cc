@@ -332,9 +332,12 @@ const bool State::PlayerCouldPaint(bool p1, uint32 local_clock) const {
 const uint32 State::EarliestPlayfieldPaints(const Range& within) const {
   uint32 duration = within.Duration();
   assert(within.end_time() >= duration);
-  for (uint32 i = 0; i < duration; ++i) {
-    uint32 color_clock = within.end_time() - i - 1;
+  for (uint32 i = 1; i < duration; ++i) {
+    uint32 color_clock = within.end_time() - i;
     uint32 local_clock = color_clock % kScanLineWidthClocks;
+    if (local_clock < kHBlankWidthClocks)
+      continue;
+
     if (PlayfieldPaints(local_clock))
       return color_clock;
   }
