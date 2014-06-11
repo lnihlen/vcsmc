@@ -1,9 +1,8 @@
 #ifndef SRC_CL_IMAGE_IMPL_H_
 #define SRC_CL_IMAGE_IMPL_H_
 
-#include <OpenCL/OpenCL.h>
-
 #include "cl_image.h"
+#include "cl_include.h"
 #include "types.h"
 
 namespace vcsmc {

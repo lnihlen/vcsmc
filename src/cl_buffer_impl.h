@@ -1,9 +1,9 @@
 #ifndef SRC_CL_BUFFER_IMPL_H_
 #define SRC_CL_BUFFER_IMPL_H_
 
-#include <OpenCL/OpenCL.h>
-
 #include "cl_buffer.h"
+#include "cl_include.h"
+#include "types.h"
 
 namespace vcsmc {
 

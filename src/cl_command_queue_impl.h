@@ -1,9 +1,8 @@
 #ifndef SRC_CL_COMMAND_QUEUE_IMPL_H_
 #define SRC_CL_COMMAND_QUEUE_IMPL_H_
 
-#include <OpenCL/OpenCL.h>
-
 #include "cl_command_queue.h"
+#include "cl_include.h"
 
 namespace vcsmc {
 

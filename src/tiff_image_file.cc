@@ -14,7 +14,6 @@ std::unique_ptr<Image> TiffImageFile::Load() {
     return nullptr;
 
   uint32 width, height;
-  uint32* pixels;
   TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &width);
   TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &height);
 

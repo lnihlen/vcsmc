@@ -2,8 +2,7 @@
 
 #include <cassert>
 #include <iostream>
-#include <memory>
-#include <OpenCL/OpenCL.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -12,6 +11,7 @@
 #include "cl_buffer_impl.h"
 #include "cl_command_queue_impl.h"
 #include "cl_image_impl.h"
+#include "cl_include.h"
 #include "cl_kernel_impl.h"
 #include "image.h"
 #include "pixel_strip.h"

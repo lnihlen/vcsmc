@@ -1,11 +1,23 @@
 # VCSMC src/ Makefile.
 # Dependencies: libtiff, clang, OpenCL
 # tools dependencies: python colormath, Wand, ImageMagick
-# TODO: move mac-specific stuff to mac-specific vars
-CFLAGS += -I. -I/opt/local/include
-LDFLAGS += -L/opt/local/lib
-LIBS += -lm -ltiff -framework OpenCL
+CFLAGS+=-I.
+LIBS+=-lm -ltiff
 OUTTESTS=$(OUT)/tests
+
+UNAME:=$(shell uname)
+
+# Linux-specific build flags
+ifeq ($(UNAME), Linux)
+LIBS+=-lOpenCL -lpthread
+endif
+
+# OS X-specific build flags
+ifeq ($(UNAME), Darwin)
+CFLAGS += -I/opt/local/include
+LDFLAGS += -L/opt/local/lib
+LIBS += -framework OpenCL
+endif
 
 DEPS=constants.h image_file.h strategy.h types.h
 OBJ=$(OUT)/background_color_strategy.o                                         \

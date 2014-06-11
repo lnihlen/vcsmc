@@ -1,9 +1,9 @@
 #ifndef SRC_CL_KERNEL_IMPL_H_
 #define SRC_CL_KERNEL_IMPL_H_
 
-#include <OpenCL/OpenCL.h>
 #include <string>
 
+#include "cl_include.h"
 #include "cl_kernel.h"
 
 namespace vcsmc {

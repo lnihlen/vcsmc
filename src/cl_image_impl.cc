@@ -1,8 +1,7 @@
 #include "cl_image_impl.h"
 
-#include <OpenCL/OpenCL.h>
-
 #include "cl_command_queue_impl.h"
+#include "cl_include.h"
 #include "image.h"
 #include "pixel_strip.h"
 

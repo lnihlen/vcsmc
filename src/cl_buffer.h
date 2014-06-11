@@ -1,6 +1,8 @@
 #ifndef SRC_CL_BUFFER_H_
 #define SRC_CL_BUFFER_H_
 
+#include "types.h"
+
 namespace vcsmc {
 
 class CLCommandQueue;

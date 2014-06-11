@@ -1,6 +1,7 @@
 #ifndef SRC_CL_DEVICE_CONTEXT_H_
 #define SRC_CL_DEVICE_CONTEXT_H_
 
+#include <memory>
 #include <string>
 
 #include "types.h"
