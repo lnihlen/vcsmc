@@ -1,6 +1,7 @@
 #include "cl_buffer_impl.h"
 
 #include <cassert>
+#include <cstring>
 
 #include "cl_command_queue_impl.h"
 
