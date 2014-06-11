@@ -1,6 +1,10 @@
 #ifndef SRC_CL_BUFFER_IMPL_H_
 #define SRC_CL_BUFFER_IMPL_H_
 
+#if defined(NVIDIA_OPENCL_LAMENESS)
+#include <memory>
+#endif
+
 #include "cl_buffer.h"
 #include "cl_include.h"
 #include "types.h"
@@ -27,6 +31,10 @@ class CLBufferImpl : public CLBuffer {
  private:
   size_t size_;
   cl_mem mem_;
+
+#if defined(NVIDIA_OPENCL_LAMENESS)
+  std::unique_ptr<uint8[]> fill_buffer_;
+#endif
 };
 
 }  // namespace vcsmc

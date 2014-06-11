@@ -10,13 +10,14 @@ UNAME:=$(shell uname)
 # Linux-specific build flags
 ifeq ($(UNAME), Linux)
 LIBS+=-lOpenCL -lpthread
+CFLAGS+=-DNVIDIA_OPENCL_LAMENESS
 endif
 
 # OS X-specific build flags
 ifeq ($(UNAME), Darwin)
-CFLAGS += -I/opt/local/include
-LDFLAGS += -L/opt/local/lib
-LIBS += -framework OpenCL
+CFLAGS+=-I/opt/local/include
+LDFLAGS+=-L/opt/local/lib
+LIBS+=-framework OpenCL
 endif
 
 DEPS=constants.h image_file.h strategy.h types.h

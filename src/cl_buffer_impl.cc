@@ -37,8 +37,29 @@ bool CLBufferImpl::EnqueueCopyToDevice(
 
 bool CLBufferImpl::EnqueueFill(
     CLCommandQueue* queue, const void* pattern, size_t pattern_size) {
+  assert(size_ % pattern_size == 0);
   CLCommandQueueImpl* queue_impl = static_cast<CLCommandQueueImpl*>(queue);
   assert(queue_impl);
+
+#if defined(NVIDIA_OPENCL_LAMENESS)
+  assert(!fill_buffer_);
+  fill_buffer_.reset(new uint8[size_]);
+  uint8* buffer_ptr = fill_buffer_.get();
+  size_t number_of_copies = size_ / pattern_size;
+  for (size_t i = 0; i < number_of_copies; ++i) {
+    std::memcpy(buffer_ptr, pattern, pattern_size);
+    buffer_ptr += pattern_size;
+  }
+  int result = clEnqueueWriteBuffer(queue_impl->get(),
+                                    mem_,
+                                    CL_TRUE,
+                                    0,
+                                    size_,
+                                    fill_buffer_.get(),
+                                    0,
+                                    NULL,
+                                    NULL);
+#else
   int result = clEnqueueFillBuffer(queue_impl->get(),
                                    mem_,
                                    pattern,
@@ -48,6 +69,7 @@ bool CLBufferImpl::EnqueueFill(
                                    0,
                                    NULL,
                                    NULL);
+#endif  // NVIDIA_OPENCL_LAMENESS
   return result == CL_SUCCESS;
 }
 

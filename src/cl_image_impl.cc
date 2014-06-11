@@ -30,6 +30,18 @@ bool CLImageImpl::Setup(cl_context context) {
   image_format.image_channel_order = CL_RGBA;
   image_format.image_channel_data_type = CL_UNORM_INT8;
 
+  int result = 0;
+
+#if defined(NVIDIA_OPENCL_LAMENESS)
+  mem_ = clCreateImage2D(context,
+                         CL_MEM_READ_ONLY,
+                         &image_format,
+                         width_,
+                         height_,
+                         width_ * 4,
+                         NULL,
+                         &result);
+#else
   cl_image_desc image_desc;
   image_desc.image_type = CL_MEM_OBJECT_IMAGE2D;
   image_desc.image_width = width_;
@@ -41,13 +53,13 @@ bool CLImageImpl::Setup(cl_context context) {
   image_desc.num_samples = 0;
   image_desc.buffer = NULL;
 
-  int result = 0;
   mem_ = clCreateImage(context,
                        CL_MEM_READ_ONLY,
                        &image_format,
                        &image_desc,
                        NULL,
                        &result);
+#endif  // NVIDIA_OPENCL_LAMENESS
 
   return mem_ && result == CL_SUCCESS;
 }

@@ -1,6 +1,7 @@
 #ifndef SRC_TYPES_H_
 #define SRC_TYPES_H_
 
+#include <cstddef>
 #include <cstdint>
 
 typedef std::uint64_t uint64;
