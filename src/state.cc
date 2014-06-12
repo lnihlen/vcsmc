@@ -46,6 +46,9 @@ std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
   switch (address) {
     // interesting code for strobes and the like here... :)
 
+    // TODO: consider adding an assert here to verify that EarliestTimeAfter()
+    // would actually allow the transition during the duration of |this| state.
+
     default:
       state->tia_known_ |= (1 << static_cast<int>(address));
       state->tia_[address] = reg_value;
@@ -100,6 +103,10 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
       return EarliestPlayerPaints(true, within);
 
     case TIA::COLUPF:
+      // If in score mode we ignore COLUPF for all playfield rendering, so it
+      // goes unused.
+      if (tia(TIA::CTRLPF) & 0x02)
+        return 0;
       return EarliestPlayfieldPaints(within);
 
     case TIA::COLUBK:
@@ -332,7 +339,7 @@ const bool State::PlayerCouldPaint(bool p1, uint32 local_clock) const {
 const uint32 State::EarliestPlayfieldPaints(const Range& within) const {
   uint32 duration = within.Duration();
   assert(within.end_time() >= duration);
-  for (uint32 i = 1; i < duration; ++i) {
+  for (uint32 i = 1; i <= duration; ++i) {
     uint32 color_clock = within.end_time() - i;
     uint32 local_clock = color_clock % kScanLineWidthClocks;
     if (local_clock < kHBlankWidthClocks)
