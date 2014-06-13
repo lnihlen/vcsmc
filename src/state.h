@@ -27,6 +27,11 @@ class State {
   // Produces an exact copy of this State.
   std::unique_ptr<State> Clone() const;
 
+  // Returns a new State that is a copy of this one but with empty |range_|
+  // starting at this State's range_.end_time(), and with all register values
+  // reset to unknown.
+  std::unique_ptr<State> MakeEntryState() const;
+
   // Given this state at |color_clock_| = t, produce a new State which is an
   // exact copy of this one but at color_clock_ = t + delta time. ALSO HAS THE
   // SIDE EFFECT OF MODIFYING OUR OWN TIME RANGE.

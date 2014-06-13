@@ -22,6 +22,13 @@ std::unique_ptr<State> State::Clone() const {
   return state;
 }
 
+std::unique_ptr<State> State::MakeEntryState() const {
+  std::unique_ptr<State> state(Clone());
+  state->registers_known_ = 0;
+  state->range_ = Range(range_.end_time(), range_.end_time());
+  return state;
+}
+
 std::unique_ptr<State> State::AdvanceTime(uint32 delta) {
   assert(delta > 0);
   std::unique_ptr<State> state(Clone());
@@ -103,8 +110,7 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
       return EarliestPlayerPaints(true, within);
 
     case TIA::COLUPF:
-      // If in score mode we ignore COLUPF for all playfield rendering, so it
-      // goes unused.
+      // If in score mode we ignore COLUPF for all playfield rendering.
       if (tia(TIA::CTRLPF) & 0x02)
         return 0;
       return EarliestPlayfieldPaints(within);
@@ -336,6 +342,15 @@ const bool State::PlayerCouldPaint(bool p1, uint32 local_clock) const {
   return false;
 }
 
+// playfield schedules
+// +-----------+------+---------------------+--------------------+
+// | playfield | left | right mirroring off | right mirroring on |
+// +-----------+------+---------------------+--------------------+
+// |    PF0    |  68  |        148          |        212         |
+// |    PF1    |  84  |        164          |        180         |
+// |    PF2    | 116  |        196          |        148         |
+// +-----------+------+---------------------+--------------------+
+
 const uint32 State::EarliestPlayfieldPaints(const Range& within) const {
   uint32 duration = within.Duration();
   assert(within.end_time() >= duration);
@@ -352,11 +367,22 @@ const uint32 State::EarliestPlayfieldPaints(const Range& within) const {
 }
 
 const uint32 State::EarliestPF0CouldPaint(const Range& within) const {
-  Range pf0_right_intersect(Range::IntersectRanges(within, Range(68, 84)));
+  uint32 last_scanline_start =
+      (range_.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
+  Range pf0_right;
+  if (tia(TIA::CTRLPF) & 0x01) {
+    pf0_right =
+        Range(last_scanline_start + 212, last_scanline_start + 212 + 16);
+  } else {
+    pf0_right =
+        Range(last_scanline_start + 148, last_scanline_start + 148 + 16);
+  }
+  Range pf0_right_intersect(Range::IntersectRanges(within, pf0_right));
   if (!pf0_right_intersect.IsEmpty())
     return pf0_right_intersect.end_time() - 1;
 
-  Range pf0_left_intersect(Range::IntersectRanges(within, Range(148, 164)));
+  Range pf0_left(last_scanline_start + 68, last_scanline_start + 68 + 16);
+  Range pf0_left_intersect(Range::IntersectRanges(within, pf0_left));
   if (!pf0_left_intersect.IsEmpty())
     return pf0_left_intersect.end_time() - 1;
 
@@ -386,15 +412,6 @@ const uint32 State::EarliestPF2CouldPaint(const Range& within) const {
 
   return 0;
 }
-
-// playfield schedules
-// +-----------+------+---------------------+--------------------+
-// | playfield | left | right mirroring off | right mirroring on |
-// +-----------+------+---------------------+--------------------+
-// |    PF0    |  68  |        148          |        212         |
-// |    PF1    |  84  |        164          |        180         |
-// |    PF2    | 116  |        196          |        148         |
-// +-----------+------+---------------------+--------------------+
 
 const bool State::PlayfieldPaints(uint32 local_clock) const {
   assert(local_clock >= 68);
@@ -438,8 +455,8 @@ const bool State::PlayfieldPaints(uint32 local_clock) const {
 const uint32 State::EarliestBackgroundPaints(const Range& within) const {
   uint32 duration = within.Duration();
   assert(within.end_time() >= duration);
-  for (uint32 i = 0; i < duration; ++i) {
-    uint32 color_clock = within.end_time() - i - 1;
+  for (uint32 i = 1; i <= duration; ++i) {
+    uint32 color_clock = within.end_time() - i;
     uint32 local_clock = color_clock % kScanLineWidthClocks;
     if (local_clock < kHBlankWidthClocks)
       continue;

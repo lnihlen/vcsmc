@@ -92,7 +92,7 @@ uint32 Schedule::CostToAddSpec(const Spec& spec) {
     // Are we pointing at a block? Can we append to this block?
     if (block_index < blocks_.size() && block_index > 0) {
       const Block* block = blocks_[block_index].get();
-      uint32 block_append_cost = block->CostToAppend(spec);
+      uint32 block_append_cost = block->ClocksToAppend(spec);
       uint32 block_end_time = block->range().end_time() + block_append_cost;
 
       // Would adding to this block allow the spec to occur within time?

@@ -106,7 +106,6 @@ TEST_F(StateTest, CloneCopiesInitialState) {
 }
 
 TEST_F(StateTest, CloneCopiesLaterState) {
-  // Set registers A and Y, along with a few TIA values.
   std::unique_ptr<State> state(new State);
   state = state->AdvanceTimeAndSetRegister(2, Register::A, 0x7c);
   state = state->AdvanceTimeAndCopyRegisterToTIA(3, Register::A, TIA::GRP1);
@@ -117,10 +116,25 @@ TEST_F(StateTest, CloneCopiesLaterState) {
   state = state->AdvanceTimeAndCopyRegisterToTIA(3, Register::Y, TIA::COLUBK);
   state = state->AdvanceTimeAndCopyRegisterToTIA(3, Register::A, TIA::NUSIZ1);
 
-  // Make a copy of end state.
   std::unique_ptr<State> clone = state->Clone();
   EXPECT_EQ(state->range(), clone->range());
   CompareStatesExceptRange(state.get(), clone.get());
+}
+
+TEST_F(StateTest, MakeEntryState) {
+  std::unique_ptr<State> state(new State);
+  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x42);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUBK);
+  state = state->AdvanceTimeAndSetRegister(1, Register::Y, 0xee);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::PF2);
+
+  std::unique_ptr<State> entry_state = state->MakeEntryState();
+  CompareStatesTIA(state.get(), entry_state.get());
+  EXPECT_FALSE(entry_state->register_known(Register::A));
+  EXPECT_FALSE(entry_state->register_known(Register::X));
+  EXPECT_FALSE(entry_state->register_known(Register::Y));
+  EXPECT_EQ(Range(state->range().end_time(), state->range().end_time()),
+      entry_state->range());
 }
 
 TEST_F(StateTest, AdvanceTimeClonesAndSetsRanges) {
@@ -172,33 +186,43 @@ TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAClonesAndSetsTIAValue) {
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeWSYNC) {
+  // TODO
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeRSYNC) {
+  // TODO
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeRESP0) {
+  // TODO
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeRESP1) {
+  // TODO
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeRESM0) {
+  // TODO
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeRESM1) {
+  // TODO
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeRESBL) {
+  // TODO
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeHMOVE) {
+  // TODO
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeHMCLR) {
+  // TODO
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeCXCLR) {
+  // TODO
 }
 
 TEST_F(StateTest, PaintIntoBeforeStateRange) {
@@ -615,12 +639,6 @@ TEST_F(StateTest, EarliestTimeAfterWithSpecAfterState) {
   EXPECT_EQ(kInfinity, state->EarliestTimeAfter(after));
 }
 
-TEST_F(StateTest, EarliestTimeAfterCTRLPF) {
-  // bit 0 is mirroring, can only be changed during hblank or left side of pf.
-  // bit 1 is score mode, can be changed any time PF isn't rendering actively.
-  // other bits are tbd.
-}
-
 TEST_F(StateTest, EarliestTimeAfterCOLUPF) {
   // COLUPF can be set any time the TIA is not rendering the playfield color,
   // i.e. any time the TIA is not rendering a 1 in the playfield.
@@ -743,15 +761,102 @@ TEST_F(StateTest, EarliestTimeAfterCOLUPF) {
 }
 
 TEST_F(StateTest, EarliestTimeAfterCOLUBK) {
+  // COLUBK can be set anytime the background isn't rendering, so any time
+  // anything else is rendering.
+  std::unique_ptr<State> state(new State);
+  std::unique_ptr<State> hblank_state =
+      state->AdvanceTimeAndSetRegister(kScanLineWidthClocks, Register::X, 0x00);
+  std::unique_ptr<State> no_pf_state =
+      hblank_state->AdvanceTimeAndCopyRegisterToTIA(
+          kHBlankWidthClocks, Register::X, TIA::PF0);
+  // A state within the hblank should always return 0.
+  EXPECT_EQ(0,
+      hblank_state->EarliestTimeAfter(
+          Spec(TIA::COLUBK, 0x00, Range(0, kFrameSizeClocks))));
+
+  // A state containing an empty playfield should return its end time - 1.
+  state = no_pf_state->AdvanceTimeAndSetRegister(12, Register::Y, 0xff);
+  EXPECT_EQ(no_pf_state->range().end_time() - 1,
+      no_pf_state->EarliestTimeAfter(
+          Spec(TIA::COLUBK, 0xfe, no_pf_state->range())));
+
+  // A state containing a completely full playfield should return 0.
+  std::unique_ptr<State> full_pf_state =
+      state->AdvanceTimeAndCopyRegisterToTIA(4, Register::Y, TIA::PF1);
+  state = full_pf_state->AdvanceTimeAndSetRegister(20, Register::A, 0x0f0);
+  EXPECT_EQ(0,
+      full_pf_state->EarliestTimeAfter(
+          Spec(TIA::COLUBK, 0xd3, full_pf_state->range())));
+
+  // A state with playfield on both ends and background in the middle should
+  // return the right edge of the middle.
+  std::unique_ptr<State> middle_pf_state =
+      state->AdvanceTimeAndCopyRegisterToTIA(4, Register::A, TIA::PF2);
+  state = middle_pf_state->AdvanceTimeAndCopyRegisterToTIA(
+      32, Register::X, TIA::CTRLPF);
+  // Should be 8 pixels of pf1 lit, followed by 16 pixels of pf2 unlit, followed
+  // by 8 pixels of pf2 lit. so |start_time| + 23
+  EXPECT_EQ(middle_pf_state->range().start_time() + 23,
+      middle_pf_state->EarliestTimeAfter(
+          Spec(TIA::COLUBK, 0xee, Range(0, kFrameSizeClocks))));
+
+  // TODO: CTRLPF?
+  // TODO: Players?
+  // TODO: Missile?
+  // TODO: Ball?
+}
+
+TEST_F(StateTest, EarliestTimeAfterCTRLPF) {
+  // Bit 0 is mirroring, can only be _changed_ during hblank or left side of pf.
+  // Bit 1 is score mode, can be _changed_ any time PF isn't rendering actively.
+  // other bits are tbd.
 }
 
 TEST_F(StateTest, EarliestTimeAfterPF0) {
+  // PF0 can be set any time it is not being used to render the playfield.
+  std::unique_ptr<State> state(new State);
+  state = state->AdvanceTimeAndSetRegister(
+      kScanLineWidthClocks, Register::A, 0x00);
+  std::unique_ptr<State> hblank_state = state->AdvanceTimeAndCopyRegisterToTIA(
+      kScanLineWidthClocks, Register::A, TIA::CTRLPF);
+  std::unique_ptr<State> pf0_state = hblank_state->AdvanceTime(
+      kHBlankWidthClocks - 16);
+  // State within the HBlank should return 0.
+  EXPECT_EQ(0, hblank_state->EarliestTimeAfter(
+      Spec(TIA::PF0, 0x42, Range(0, kFrameSizeClocks))));
+
+  // State containing first range of PF0 should report when PF0 ends. We start
+  // with 16 clocks of HBlank, followed by the 16 pixels of PF0, ending with
+  // 16 pixels of PF1.
+  std::unique_ptr<State> middle_state = pf0_state->AdvanceTime(16 + 16 + 16);
+  EXPECT_EQ(pf0_state->range().start_time() + 31,
+    pf0_state->EarliestTimeAfter(Spec(TIA::PF0, 0x69, pf0_state->range())));
+
+  // State in the middle of the two PF0s should return 0.
+  std::unique_ptr<State> ending_state = middle_state->AdvanceTime(32);
+  EXPECT_EQ(0,
+      middle_state->EarliestTimeAfter(
+          Spec(TIA::PF0, 0x77, middle_state->range())));
+
+  // State ending within right-side PF0 should return its end.
+
+  // State straddling line but starting in right side PF0 should return end of
+  // right-side PF0.
+
+  // State straddling an entire line should return end of right PF0.
+
+  // ** If a State encompasses an entire line, a Spec with range that ends any
+  // time before the rightmost pf0 ends should return kInfinity.
+
+  // Should test left and right side with mirroring turned on as well.
 }
 
 TEST_F(StateTest, EarliestTimeAfterPF1) {
+  // PF1 can be set any time it is not being used to render the playfield.
 }
 
 TEST_F(StateTest, EarliestTimeAfterPF2) {
+  // PF2 can be set any time it is not being used to render the playfield.
 }
 
 TEST(StateDeathTest, AdvanceTimeZero) {

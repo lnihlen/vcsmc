@@ -22,14 +22,15 @@ class Schedule {
   const Schedule& operator=(const Schedule& schedule);
   ~Schedule();
 
-  uint32 AddSpec(const Spec& spec);
-  uint32 AddSpecs(const std::vector<Spec>* specs);
   // Returns the cost in color clocks of adding this spec. If it cannot add
-  // this spec it will return kInfiniteCost.
+  // this spec it will return kInfinity.
   uint32 CostToAddSpec(const Spec& spec);
   // To avoid the _factorial_ explosion of possibilities of order adding the
   // Schedule will add specs in the order provded by the list.
   uint32 CostToAddSpecs(const std::vector<Spec>* specs);
+
+  uint32 AddSpec(const Spec& spec);
+  uint32 AddSpecs(const std::vector<Spec>* specs);
 
   std::unique_ptr<ColuStrip> Simulate(uint32 row);
 
