@@ -113,8 +113,8 @@ class State {
   const bool PlayerPaints(bool p1, uint32 local_clock) const;
   const bool PlayerCouldPaint(bool p1, uint32 local_clock) const;
 
-  const uint32 EarliestPlayfieldPaints(const Range& within) const;
-  const uint32 EarliestPF0CouldPaint(const Range& within) const;
+  const uint32 EarliestPlayfieldPaints() const;
+  const uint32 EarliestPF0CouldPaint() const;
   const uint32 EarliestPF1CouldPaint(const Range& within) const;
   const uint32 EarliestPF2CouldPaint(const Range& within) const;
   const bool PlayfieldPaints(uint32 local_clock) const;

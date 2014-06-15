@@ -48,6 +48,7 @@ class Block {
   uint32 total_bytes_;
   std::vector<std::unique_ptr<State>> states_;
   std::vector<std::unique_ptr<op::OpCode>> opcodes_;
+  uint32 register_usage_times_[Register::REGISTER_COUNT];
 };
 
 }  // namespace vcsmc

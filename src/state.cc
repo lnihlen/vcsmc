@@ -90,52 +90,64 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
   if (within.IsEmpty())
     return kInfinity;
 
+  uint32 state_earliest = kInfinity;
+
   switch(spec.tia()) {
     // Not supported currently.
     case TIA::VSYNC:
     case TIA::VBLANK:
     case TIA::WSYNC:
     case TIA::RSYNC:
-      return kInfinity;
+      break;
 
     // NUSIZ support coming later.
     case TIA::NUSIZ0:
     case TIA::NUSIZ1:
-      return kInfinity;
+      break;
 
     case TIA::COLUP0:
-      return EarliestPlayerPaints(false, within);
+      state_earliest = EarliestPlayerPaints(false, within);
+      break;
 
     case TIA::COLUP1:
-      return EarliestPlayerPaints(true, within);
+      state_earliest = EarliestPlayerPaints(true, within);
+      break;
 
     case TIA::COLUPF:
       // If in score mode we ignore COLUPF for all playfield rendering.
       if (tia(TIA::CTRLPF) & 0x02)
-        return 0;
-      return EarliestPlayfieldPaints(within);
+         state_earliest = 0;
+      else
+        state_earliest = EarliestPlayfieldPaints();
+      break;
 
     case TIA::COLUBK:
-      return EarliestBackgroundPaints(within);
+      state_earliest = EarliestBackgroundPaints(within);
+      break;
 
     // Not currently supported.
     case TIA::CTRLPF:
-      return kInfinity;
+      break;
 
     case TIA::REFP0:
-      return EarliestPlayerCouldPaint(false, within);
+      state_earliest = EarliestPlayerCouldPaint(false, within);
+      break;
 
     case TIA::REFP1:
-      return EarliestPlayerCouldPaint(true, within);
+      state_earliest = EarliestPlayerCouldPaint(true, within);
+      break;
 
     case TIA::PF0:
-      return EarliestPF0CouldPaint(within);
+      state_earliest = EarliestPF0CouldPaint();
+      break;
 
     case TIA::PF1:
-      return EarliestPF1CouldPaint(within);
+      state_earliest = EarliestPF1CouldPaint(within);
+      break;
 
     case TIA::PF2:
-      return EarliestPF2CouldPaint(within);
+      state_earliest = EarliestPF2CouldPaint(within);
+      break;
 
     // These are strobe registers and need to happen right when they need to
     // happen, so are not subject to back-scheduling. Some thought to be given
@@ -145,7 +157,7 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
     case TIA::RESM0:
     case TIA::RESM1:
     case TIA::RESBL:
-      return kInfinity;
+      break;
 
     // Audio registers updated at fixed intervals and not supported by
     // graphics scheduler.
@@ -155,64 +167,73 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
     case TIA::AUDF1:
     case TIA::AUDV0:
     case TIA::AUDV1:
-      return kInfinity;
+      break;
 
     case TIA::GRP0:
-      return EarliestPlayerCouldPaint(false, within);
+      state_earliest = EarliestPlayerCouldPaint(false, within);
+      break;
 
     case TIA::GRP1:
-      return EarliestPlayerCouldPaint(true, within);
+      state_earliest = EarliestPlayerCouldPaint(true, within);
+      break;
 
     // Ball and missile support coming later.
     case TIA::ENAM0:
     case TIA::ENAM1:
     case TIA::ENABL:
-      return kInfinity;
+      break;
 
     // Some tricky timing considerations here. Leave alone for now but when
     // adding player supprt this will need revision. These can be written any
     // time after a prior strobe of HMOVE.
     case TIA::HMP0:
     case TIA::HMP1:
-      return kInfinity;
+      break;
 
     // Pending missile and ball support.
     case TIA::HMM0:
     case TIA::HMM1:
     case TIA::HMBL:
-      return kInfinity;
+      break;
 
     // While potentially quite powerful we will ignore these for now.
     case TIA::VDELP0:
     case TIA::VDELP1:
-      return kInfinity;
+      break;
 
     // Pending missile and ball support.
     case TIA::VDELBL:
     case TIA::RESMP0:
     case TIA::RESMP1:
-      return kInfinity;
+      break;
 
     // Another strobe with zero scheduling flexibility.
     case TIA::HMOVE:
-      return kInfinity;
+      break;
 
     // Potential conflicts with setting any of the other horizontal motion
     // registers, but otherwise represents an efficient way to get back to a
     // known state.
     case TIA::HMCLR:
-      return kInfinity;
+      break;
 
     // Non-interactive software has no use for a collision latch that I can
     // think of.
     case TIA::CXCLR:
-      return kInfinity;
+      break;
 
     case TIA::TIA_COUNT:
-      return kInfinity;
+      break;
   }
 
-  return kInfinity;
+  if (state_earliest == kInfinity ||
+      (state_earliest >= spec.range().end_time()))
+    return kInfinity;
+
+  if (state_earliest == 0 && (spec.range().start_time() < range_.start_time()))
+    return 0;
+
+  return std::max(state_earliest, within.start_time());
 }
 
 // static
@@ -351,11 +372,10 @@ const bool State::PlayerCouldPaint(bool p1, uint32 local_clock) const {
 // |    PF2    | 116  |        196          |        148         |
 // +-----------+------+---------------------+--------------------+
 
-const uint32 State::EarliestPlayfieldPaints(const Range& within) const {
-  uint32 duration = within.Duration();
-  assert(within.end_time() >= duration);
+const uint32 State::EarliestPlayfieldPaints() const {
+  uint32 duration = range_.Duration();
   for (uint32 i = 1; i <= duration; ++i) {
-    uint32 color_clock = within.end_time() - i;
+    uint32 color_clock = range_.end_time() - i;
     uint32 local_clock = color_clock % kScanLineWidthClocks;
     if (local_clock < kHBlankWidthClocks)
       continue;
@@ -366,7 +386,7 @@ const uint32 State::EarliestPlayfieldPaints(const Range& within) const {
   return 0;
 }
 
-const uint32 State::EarliestPF0CouldPaint(const Range& within) const {
+const uint32 State::EarliestPF0CouldPaint() const {
   uint32 last_scanline_start =
       (range_.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
   Range pf0_right;
@@ -377,14 +397,32 @@ const uint32 State::EarliestPF0CouldPaint(const Range& within) const {
     pf0_right =
         Range(last_scanline_start + 148, last_scanline_start + 148 + 16);
   }
-  Range pf0_right_intersect(Range::IntersectRanges(within, pf0_right));
+  Range pf0_right_intersect(Range::IntersectRanges(range_, pf0_right));
   if (!pf0_right_intersect.IsEmpty())
     return pf0_right_intersect.end_time() - 1;
 
   Range pf0_left(last_scanline_start + 68, last_scanline_start + 68 + 16);
-  Range pf0_left_intersect(Range::IntersectRanges(within, pf0_left));
+  Range pf0_left_intersect(Range::IntersectRanges(range_, pf0_left));
   if (!pf0_left_intersect.IsEmpty())
     return pf0_left_intersect.end_time() - 1;
+
+  // It's possible that the range spans to the previous scanline, and could
+  // interesect with the right-side pf0 there.
+  if (range_.start_time() < last_scanline_start) {
+    uint32 prev_scanline_start = last_scanline_start - kScanLineWidthClocks;
+    Range pf0_prev_right;
+    if (tia(TIA::CTRLPF) & 0x01) {
+      pf0_prev_right =
+          Range(prev_scanline_start + 212, prev_scanline_start + 212 + 16);
+    } else {
+      pf0_prev_right =
+          Range(prev_scanline_start + 148, prev_scanline_start + 148 + 16);
+    }
+    Range pf0_prev_right_intersect(
+        Range::IntersectRanges(range_, pf0_prev_right));
+    if (!pf0_prev_right_intersect.IsEmpty())
+      return pf0_prev_right_intersect.end_time() - 1;
+  }
 
   return 0;
 }
