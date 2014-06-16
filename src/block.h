@@ -1,6 +1,7 @@
 #ifndef _SRC_BLOCK_H_
 #define _SRC_BLOCK_H_
 
+#include "constants.h"
 #include "range.h"
 #include "types.h"
 
@@ -29,14 +30,14 @@ class Block {
   // Returns 0 if this |spec| can be scheduled before this Block. Returns the
   // time within the block (currently always the end) if this spec should be
   // appended to this block. Returns kInfinity on error.
-  const uint32 EarliestTimeAfter(const Spec& spec) const;
+  uint32 EarliestTimeAfter(const Spec& spec) const;
 
   // Returns the number of clock cycles that would be consumed by appending
   // |spec| to the end of this Block.
-  const uint32 ClocksToAppend(const Spec& spec) const;
+  uint32 ClocksToAppend(const Spec& spec) const;
 
   void Append(const Spec& spec);
-  void AppendBlock(const Block& block);
+  void AppendBlock(std::unique_ptr<Block> block);
 
   const State* final_state() const { return (*states_.rbegin()).get(); };
   const Range& range() const { return range_; }

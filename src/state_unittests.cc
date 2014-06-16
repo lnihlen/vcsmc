@@ -639,13 +639,6 @@ TEST_F(StateTest, EarliestTimeAfterWithSpecAfterState) {
   EXPECT_EQ(kInfinity, state->EarliestTimeAfter(after));
 }
 
-// TODO: need to add tests that move the Spec::range() around to various points
-// within the state. Should be able to just append additional EXPECT clauses to
-// the current ones without creating new States.
-// TODO: furthermore, all tests that use the state range in the spec should
-// now fail as that should return range.start_time(). We only return 0 with the
-// additional condition that the provided Spec has a start time _earlier_ than
-// the state range start time.
 TEST_F(StateTest, EarliestTimeAfterCOLUPF) {
   // COLUPF can be set any time the TIA is not rendering the playfield color,
   // i.e. any time the TIA is not rendering a 1 in the playfield.
@@ -801,18 +794,29 @@ TEST_F(StateTest, EarliestTimeAfterCOLUPF) {
   EXPECT_EQ(rightmost_state->range().end_time() - 1,
       rightmost_state->EarliestTimeAfter(
           Spec(TIA::COLUPF, 0x00, rightmost_state->range())));
+  EXPECT_EQ(kInfinity,
+      rightmost_state->EarliestTimeAfter(
+          Spec(TIA::COLUPF, 0x00, Range(rightmost_state->range().start_time(),
+              rightmost_state->range().end_time() - 1))));
   std::unique_ptr<State> rightmost_mirror =
       state->AdvanceTimeAndCopyRegisterToTIA(84, Register::X, TIA::CTRLPF);
   state = rightmost_mirror->AdvanceTimeAndSetRegister(16, Register::X, 0x03);
   EXPECT_EQ(rightmost_mirror->range().end_time() - 1,
       rightmost_mirror->EarliestTimeAfter(
           Spec(TIA::COLUPF, 0x00, rightmost_mirror->range())));
+  EXPECT_EQ(kInfinity,
+      rightmost_mirror->EarliestTimeAfter(
+          Spec(TIA::COLUPF, 0x00, Range(rightmost_mirror->range().start_time(),
+              rightmost_mirror->range().end_time() - 1))));
   std::unique_ptr<State> rightmost_score =
       state->AdvanceTimeAndCopyRegisterToTIA(16, Register::X, CTRLPF);
   state = rightmost_score->AdvanceTime(kScanLineWidthCycles);
   EXPECT_EQ(rightmost_score->range().start_time(),
       rightmost_score->EarliestTimeAfter(
           Spec(TIA::COLUPF, 0x00, rightmost_score->range())));
+  EXPECT_EQ(0,
+      rightmost_score->EarliestTimeAfter(
+          Spec(TIA::COLUPF, 0x00, Range(0, kFrameSizeClocks))));
 }
 
 TEST_F(StateTest, EarliestTimeAfterCOLUBK) {
@@ -828,12 +832,18 @@ TEST_F(StateTest, EarliestTimeAfterCOLUBK) {
   EXPECT_EQ(0,
       hblank_state->EarliestTimeAfter(
           Spec(TIA::COLUBK, 0x00, Range(0, kFrameSizeClocks))));
+  EXPECT_EQ(hblank_state->range().start_time() + 4,
+      hblank_state->EarliestTimeAfter(Spec(TIA::COLUBK, 0x00,
+          Range(hblank_state->range().start_time() + 4, kFrameSizeClocks))));
 
-  // A state containing an empty playfield should return its end time - 1.
+  // A state containing an empty playfield should not allow scheduling before.
   state = no_pf_state->AdvanceTimeAndSetRegister(12, Register::Y, 0xff);
   EXPECT_EQ(no_pf_state->range().end_time() - 1,
       no_pf_state->EarliestTimeAfter(
           Spec(TIA::COLUBK, 0xfe, no_pf_state->range())));
+  EXPECT_EQ(kInfinity,
+      no_pf_state->EarliestTimeAfter(Spec(TIA::COLUBK, 0xfe,
+          Range(0, no_pf_state->range().end_time() - 1))));
 
   // A state containing a completely full playfield should return 0.
   std::unique_ptr<State> full_pf_state =
@@ -842,6 +852,10 @@ TEST_F(StateTest, EarliestTimeAfterCOLUBK) {
   EXPECT_EQ(0,
       full_pf_state->EarliestTimeAfter(
           Spec(TIA::COLUBK, 0xd3, Range(0, kFrameSizeClocks))));
+  EXPECT_EQ(full_pf_state->range().start_time() + 2,
+      full_pf_state->EarliestTimeAfter(
+          Spec(TIA::COLUBK, 0xd3, Range(full_pf_state->range().start_time() + 2,
+              full_pf_state->range().end_time() + 10))));
 
   // A state with playfield on both ends and background in the middle should
   // return the right edge of the middle.
@@ -854,6 +868,14 @@ TEST_F(StateTest, EarliestTimeAfterCOLUBK) {
   EXPECT_EQ(middle_pf_state->range().start_time() + 23,
       middle_pf_state->EarliestTimeAfter(
           Spec(TIA::COLUBK, 0xee, Range(0, kFrameSizeClocks))));
+  EXPECT_EQ(kInfinity,
+      middle_pf_state->EarliestTimeAfter(
+          Spec(TIA::COLUBK, 0xef,
+              Range(0, middle_pf_state->range().start_time() + 23))));
+  EXPECT_EQ(middle_pf_state->range().start_time() + 30,
+      middle_pf_state->EarliestTimeAfter(Spec(TIA::COLUBK, 0xef,
+          Range(middle_pf_state->range().start_time() + 30,
+              middle_pf_state->range().end_time() + 30))));
 
   // TODO: CTRLPF?
   // TODO: Players?
@@ -861,14 +883,17 @@ TEST_F(StateTest, EarliestTimeAfterCOLUBK) {
   // TODO: Ball?
 }
 
+// Bit 0 is mirroring, can only be changed during hblank or left side of pf.
+// Bit 1 is score mode, can be changed any time PF isn't rendering actively.
+// The union of these is that CTRLPF can only be changed during HBlank.
+// TODO: remaining bits.
 TEST_F(StateTest, EarliestTimeAfterCTRLPF) {
-  // Bit 0 is mirroring, can only be _changed_ during hblank or left side of pf.
-  // Bit 1 is score mode, can be _changed_ any time PF isn't rendering actively.
-  // other bits are tbd.
+  std::unique_ptr<State> hblank_state(new State);
+  // TODO
 }
 
+// PF0 can be set any time it is not being used to render the playfield.
 TEST_F(StateTest, EarliestTimeAfterPF0) {
-  // PF0 can be set any time it is not being used to render the playfield.
   std::unique_ptr<State> state(new State);
   state = state->AdvanceTimeAndSetRegister(
       kScanLineWidthClocks, Register::A, 0x00);
@@ -879,13 +904,19 @@ TEST_F(StateTest, EarliestTimeAfterPF0) {
   // State within the HBlank should return 0.
   EXPECT_EQ(0, hblank_state->EarliestTimeAfter(
       Spec(TIA::PF0, 0x42, Range(0, kFrameSizeClocks))));
+  EXPECT_EQ(hblank_state->range().start_time() + 16,
+      hblank_state->EarliestTimeAfter(Spec(TIA::PF0, 0x42,
+          Range(hblank_state->range().start_time() + 16, kFrameSizeClocks))));
 
   // State containing first range of PF0 should report when PF0 ends. We start
   // with 16 clocks of HBlank, followed by the 16 pixels of PF0, ending with
   // 16 pixels of PF1.
   std::unique_ptr<State> middle_state = pf0_state->AdvanceTime(16 + 16 + 16);
-  EXPECT_EQ(pf0_state->range().start_time() + 31,
-    pf0_state->EarliestTimeAfter(Spec(TIA::PF0, 0x69, pf0_state->range())));
+  EXPECT_EQ(pf0_state->range().start_time() + 16 + 15,
+      pf0_state->EarliestTimeAfter(Spec(TIA::PF0, 0x69, pf0_state->range())));
+  EXPECT_EQ(kInfinity,
+      pf0_state->EarliestTimeAfter(Spec(TIA::PF0, 0x96,
+          Range(0, pf0_state->range().start_time() + 16 + 15))));
 
   // State in the middle of the two PF0s should return 0. |middle_state| starts
   // with 16 pixels of PF1, and then consumes 16 pixels of PF2.
@@ -893,6 +924,9 @@ TEST_F(StateTest, EarliestTimeAfterPF0) {
   EXPECT_EQ(0,
       middle_state->EarliestTimeAfter(
           Spec(TIA::PF0, 0x77, Range(0, kFrameSizeClocks))));
+  EXPECT_EQ(middle_state->range().start_time() + 10,
+      middle_state->EarliestTimeAfter(Spec(TIA::PF0, 0x44,
+          Range(middle_state->range().start_time() + 10, kFrameSizeClocks))));
 
   // State ending within right-side PF0 should return its end. |ending_state|
   // starts with 16 pixels of PF2 left side and ends with 8 pixels of right side
@@ -901,6 +935,10 @@ TEST_F(StateTest, EarliestTimeAfterPF0) {
   EXPECT_EQ(ending_state->range().end_time() - 1,
       ending_state->EarliestTimeAfter(
           Spec(TIA::PF0, 0x99, ending_state->range())));
+  EXPECT_EQ(kInfinity,
+      ending_state->EarliestTimeAfter(
+          Spec(TIA::PF0, 0x99,
+              Range(0, ending_state->range().end_time() - 1))));
 
   // State straddling line but starting in right side PF0 should return end of
   // right-side PF0. |straddle_state| starts with 8 pixels of right side pf0 and
@@ -910,6 +948,9 @@ TEST_F(StateTest, EarliestTimeAfterPF0) {
   EXPECT_EQ(straddle_state->range().start_time() + 7,
       straddle_state->EarliestTimeAfter(
           Spec(TIA::PF0, 0x00, straddle_state->range())));
+  EXPECT_EQ(kInfinity,
+      straddle_state->EarliestTimeAfter(Spec(TIA::PF0, 0x00,
+          Range(0, straddle_state->range().start_time() + 7))));
 
   // State holding an entire line should return end of right PF0. |line_state|
   // starts on the first bit of pf0 and ends on the next line start.
@@ -933,6 +974,9 @@ TEST_F(StateTest, EarliestTimeAfterPF0) {
       hblank_mirror->EarliestTimeAfter(Spec(TIA::PF0, 0xde, Range(
           hblank_mirror->range().start_time() - 25,
           hblank_mirror->range().start_time() + kScanLineWidthClocks))));
+  EXPECT_EQ(hblank_mirror->range().start_time(),
+      hblank_mirror->EarliestTimeAfter(
+          Spec(TIA::PF0, 0xde, hblank_mirror->range())));
 
   // State that holds all of the scan line up to right side mirrored pf0 should
   // return left side pf0 for in-range queries.
@@ -941,19 +985,26 @@ TEST_F(StateTest, EarliestTimeAfterPF0) {
   EXPECT_EQ(left_mirror->range().start_time() + 15,
       left_mirror->EarliestTimeAfter(
           Spec(TIA::PF0, 0xed, left_mirror->range())));
+  EXPECT_EQ(kInfinity,
+      left_mirror->EarliestTimeAfter(Spec(TIA::PF0, 0x12,
+          Range(0, left_mirror->range().start_time() + 15))));
 
   state = right_span_mirror->AdvanceTime(16 + kHBlankWidthClocks);
   EXPECT_EQ(right_span_mirror->range().start_time() + 15,
       right_span_mirror->EarliestTimeAfter(
         Spec(TIA::PF0, 0xad, right_span_mirror->range())));
+  EXPECT_EQ(kInfinity,
+      right_span_mirror->EarliestTimeAfter(Spec(TIA::PF0, 0x32,
+          Range(0, right_span_mirror->range().start_time() + 15))));
 }
 
+// PF1 can be set any time it is not being used to render the playfield.
 TEST_F(StateTest, EarliestTimeAfterPF1) {
-  // PF1 can be set any time it is not being used to render the playfield.
+
 }
 
+// PF2 can be set any time it is not being used to render the playfield.
 TEST_F(StateTest, EarliestTimeAfterPF2) {
-  // PF2 can be set any time it is not being used to render the playfield.
 }
 
 TEST(StateDeathTest, AdvanceTimeZero) {

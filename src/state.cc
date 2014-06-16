@@ -122,7 +122,7 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
       break;
 
     case TIA::COLUBK:
-      state_earliest = EarliestBackgroundPaints(within);
+      state_earliest = EarliestBackgroundPaints();
       break;
 
     // Not currently supported.
@@ -490,11 +490,10 @@ const bool State::PlayfieldPaints(uint32 local_clock) const {
   }
 }
 
-const uint32 State::EarliestBackgroundPaints(const Range& within) const {
-  uint32 duration = within.Duration();
-  assert(within.end_time() >= duration);
+const uint32 State::EarliestBackgroundPaints() const {
+  uint32 duration = range_.Duration();
   for (uint32 i = 1; i <= duration; ++i) {
-    uint32 color_clock = within.end_time() - i;
+    uint32 color_clock = range_.end_time() - i;
     uint32 local_clock = color_clock % kScanLineWidthClocks;
     if (local_clock < kHBlankWidthClocks)
       continue;

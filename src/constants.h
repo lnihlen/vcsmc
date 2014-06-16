@@ -16,17 +16,26 @@ const uint32 kHBlankWidthClocks = 68;
 const uint32 kScanLineWidthClocks = kFrameWidthPixels + kHBlankWidthClocks;
 const uint32 kFrameSizeClocks = kScanLineWidthClocks * kFrameHeightPixels;
 const uint32 kColorClocksPerCPUCycle = 3;
-const uint32 kScanLineWidthCycles = kScanLineWidthClocks /
-                                    kColorClocksPerCPUCycle;
+const uint32 kScanLineWidthCycles =
+    kScanLineWidthClocks / kColorClocksPerCPUCycle;
 const uint32 kNTSCColors = 128;
 const uint32 kInfinity = 0xffffffff;
-const uint32 kMinimumIdleTime = 2 * kColorClocksPerCPUCycle;
 
 const uint8 kColuUnpainted = 0xff;
 // The ith most significant bit in this field represents the ith address in the
 // TIA enum below.
 // 0001 1100 0000 0000 0000 0000 0001 1111 0000 0000 0000 1100
 const uint64 kTIAStrobeMask = 0x1c00001f000c;
+
+const uint32 kLoadImmediateCPUCycles = 2u;
+const uint32 kLoadImmediateColorClocks =
+    kLoadImmediateCPUCycles * kColorClocksPerCPUCycle;
+const uint32 kStoreZeroPageCPUCycles = 3u;
+const uint32 kStoreZeroPageColorClocks =
+    kStoreZeroPageCPUCycles * kColorClocksPerCPUCycle;
+const uint32 kNoOpCPUCycles = 2u;
+const uint32 kNoOpColorClocks = kNoOpCPUCycles * kColorClocksPerCPUCycle;
+const uint32 kMinimumIdleTime = 2 * kColorClocksPerCPUCycle;
 
 // Defines the address and name of every register on the TIA. The ones marked
 // as (strobe) are write-only and writing to them will cause new changes in

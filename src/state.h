@@ -119,7 +119,7 @@ class State {
   const uint32 EarliestPF2CouldPaint(const Range& within) const;
   const bool PlayfieldPaints(uint32 local_clock) const;
 
-  const uint32 EarliestBackgroundPaints(const Range& within) const;
+  const uint32 EarliestBackgroundPaints() const;
 
   uint8 tia_[TIA::TIA_COUNT];
   uint64 tia_known_;
