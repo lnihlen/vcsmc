@@ -121,6 +121,8 @@ class State {
 
   const uint32 EarliestBackgroundPaints() const;
 
+  const uint32 EarliestTimeInHBlank(const Range& within) const;
+
   uint8 tia_[TIA::TIA_COUNT];
   uint64 tia_known_;
   uint8 registers_[Register::REGISTER_COUNT];

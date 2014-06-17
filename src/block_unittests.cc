@@ -42,12 +42,65 @@ TEST(BlockTest, StateConstructor) {
   EXPECT_EQ(0, block.bytes());
 }
 
+// A Block with every state within returning 0 for a given Spec should also
+// return 0.
 TEST(BlockTest, EarliestTimeAfterScheduleBefore) {
-  // TODO
+  // Build a block within the HBlank and then ask for a CTRLPF Spec, which since
+  // the entire block is in HBlank should return 0.
+  std::unique_ptr<State> state(new State);
+  state = state->AdvanceTime(16);
+  Block block(state.get());
+  block.Append(Spec(TIA::COLUBK, 0x00, Range(0, kFrameSizeClocks)));
+  block.Append(Spec(TIA::COLUPF, 0xfe, Range(0, kFrameSizeClocks)));
+  block.Append(Spec(TIA::PF0, 0x00, Range(0, kFrameSizeClocks)));
+  block.Append(Spec(TIA::PF1, 0xaa, Range(0, kFrameSizeClocks)));
+  block.Append(Spec(TIA::PF2, 0xef, Range(0, kFrameSizeClocks)));
+  EXPECT_EQ(0,
+      block.EarliestTimeAfter(
+          Spec(TIA::CTRLPF, 0x02, Range(0, kFrameSizeClocks))));
 }
 
+// A Block with one state returning nonzero scheduling needs to indicate it can
+// support an append of the Spec by returning its current end_time() - 1.
 TEST(BlockTest, EarliestTimeAfterScheduleAppend) {
-  // TODO
+
+}
+
+// Blocks could suggest the creation of a new Block if they return a time
+// greater than their range().end_time().
+TEST(BlockTest, EarliestTimeAfterNewBlock) {
+  std::unique_ptr<State> state(new State);
+  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x00);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::CTRLPF);
+  // Start block halfway through right side PF1.
+  state = state->AdvanceTime(kHBlankWidthClocks - 2 + 16 + 32 + 32 + 16 + 16);
+  Block block(state.get());
+  block.Append(Spec(TIA::COLUBK, 0x00, Range(0, kFrameSizeClocks)));
+  block.Append(Spec(TIA::COLUPF, 0xfe, Range(0, kFrameSizeClocks)));
+  // The block should suggest the creation of a new Block starting at the
+  // beginning of the second line, which is well after this block ends but the
+  // earliest that the Block final_state should recommend a change to PF2.
+  EXPECT_EQ(kScanLineWidthClocks - 1,
+      block.EarliestTimeAfter(Spec(TIA::PF2, 0xff,
+          Range(0, kScanLineWidthClocks + kHBlankWidthClocks + 16 + 32))));
+  // The block should still respect the range of the Spec, and return the
+  // range().start_time() of that Spec if it is later than the earliest the
+  // |final_state| could schedule.
+  EXPECT_EQ(kScanLineWidthClocks + 32,
+      block.EarliestTimeAfter(Spec(TIA::PF2, 0x52,
+          Range(kScanLineWidthClocks + 32,
+              kScanLineWidthClocks + kHBlankWidthClocks + 16 + 32))));
+  // If the Spec calls for something sooner and there's still room regular
+  // appends should work as expected.
+  EXPECT_EQ(block.range().end_time() - 1,
+      block.EarliestTimeAfter(Spec(TIA::PF2, 0x2b,
+          Range(block.final_state()->range().start_time(),
+            kScanLineWidthClocks))));
+  // Logically, a Spec that requires a change within a deadline unacceptable
+  // to the final state should return an error.
+  EXPECT_EQ(kInfinity,
+      block.EarliestTimeAfter(Spec(TIA::PF2, 0x2b,
+          Range(kScanLineWidthClocks - 16, kScanLineWidthClocks))));
 }
 
 TEST(BlockTest, EarliestTimeAfterScheduleError) {

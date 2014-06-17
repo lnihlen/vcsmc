@@ -886,10 +886,47 @@ TEST_F(StateTest, EarliestTimeAfterCOLUBK) {
 // Bit 0 is mirroring, can only be changed during hblank or left side of pf.
 // Bit 1 is score mode, can be changed any time PF isn't rendering actively.
 // The union of these is that CTRLPF can only be changed during HBlank.
-// TODO: remaining bits.
+// TODO: remaining bits?
 TEST_F(StateTest, EarliestTimeAfterCTRLPF) {
   std::unique_ptr<State> hblank_state(new State);
-  // TODO
+  std::unique_ptr<State> line_state =
+      hblank_state->AdvanceTime(kHBlankWidthClocks);
+  EXPECT_EQ(0, hblank_state->EarliestTimeAfter(
+      Spec(TIA::CTRLPF, 0x03, Range(0, kHBlankWidthClocks))));
+  EXPECT_EQ(32, hblank_state->EarliestTimeAfter(
+      Spec(TIA::CTRLPF, 0x00, Range(32, kScanLineWidthClocks))));
+
+  std::unique_ptr<State> straddle_state =
+      line_state->AdvanceTime(kFrameWidthPixels - 10);
+  EXPECT_EQ(kInfinity, line_state->EarliestTimeAfter(
+      Spec(TIA::CTRLPF, 0xff, line_state->range())));
+  EXPECT_EQ(kInfinity, line_state->EarliestTimeAfter(
+      Spec(TIA::CTRLPF, 0x30, Range(0, kFrameSizeClocks))));
+
+  std::unique_ptr<State> state =
+      straddle_state->AdvanceTime(kScanLineWidthClocks);
+  EXPECT_EQ(straddle_state->range().start_time() + 10,
+      straddle_state->EarliestTimeAfter(Spec(TIA::CTRLPF, 0x00,
+          Range(0, kFrameSizeClocks))));
+  EXPECT_EQ(straddle_state->range().start_time() + 10 + kHBlankWidthClocks - 1,
+      straddle_state->EarliestTimeAfter(Spec(TIA::CTRLPF, 0xff,
+          Range(straddle_state->range().start_time() + 10 +
+                  kHBlankWidthClocks - 1,
+              kFrameSizeClocks))));
+  EXPECT_EQ(kInfinity,
+      straddle_state->EarliestTimeAfter(Spec(TIA::CTRLPF, 0xf0,
+          Range(straddle_state->range().start_time() + 1,
+              straddle_state->range().start_time() + 8))));
+  EXPECT_EQ(kInfinity,
+      straddle_state->EarliestTimeAfter(Spec(TIA::CTRLPF, 0x0f,
+          Range(straddle_state->range().start_time() + 10 +
+                  kHBlankWidthClocks + 5,
+              straddle_state->range().start_time() + 10 +
+                  kHBlankWidthClocks + 70))));
+  EXPECT_EQ(straddle_state->range().start_time() + 10 + 16,
+      straddle_state->EarliestTimeAfter(Spec(TIA::CTRLPF, 0xef,
+          Range(straddle_state->range().start_time() + 10 + 16,
+              straddle_state->range().start_time() + 10 + 32))));
 }
 
 // PF0 can be set any time it is not being used to render the playfield.

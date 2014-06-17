@@ -127,6 +127,7 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
 
     // Not currently supported.
     case TIA::CTRLPF:
+      state_earliest = EarliestTimeInHBlank(within);
       break;
 
     case TIA::REFP0:
@@ -507,6 +508,30 @@ const uint32 State::EarliestBackgroundPaints() const {
     return color_clock;
   }
   return 0;
+}
+
+const uint32 State::EarliestTimeInHBlank(const Range& within) const {
+  uint32 last_scanline_start =
+      (range_.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
+  Range last_scanline_hblank(last_scanline_start,
+      last_scanline_start + kHBlankWidthClocks);
+  Range section(Range::IntersectRanges(range_, last_scanline_hblank));
+
+  // If we have no time within the HBlank of our last line return kInfinity.
+  if (section.IsEmpty())
+    return kInfinity;
+
+  // If the spec has no time within the HBlank of our last line return
+  // kInfinity.
+  if (Range::IntersectRanges(section, within).IsEmpty())
+    return kInfinity;
+
+  // If HBlank begins before we begin we can return 0.
+  if (last_scanline_start < range_.start_time())
+    return 0;
+
+  // Otherwise we begin earlier than HBlank we we return the start of the blank.
+  return last_scanline_start;
 }
 
 }  // namespace vcsmc
