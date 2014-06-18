@@ -22,18 +22,16 @@ std::unique_ptr<State> State::Clone() const {
   return state;
 }
 
-std::unique_ptr<State> State::MakeEntryState() const {
-  std::unique_ptr<State> state(Clone());
-  state->registers_known_ = 0;
-  state->range_ = Range(range_.end_time(), range_.end_time());
-  return state;
-}
-
 std::unique_ptr<State> State::AdvanceTime(uint32 delta) {
   assert(delta > 0);
   std::unique_ptr<State> state(Clone());
   uint32 new_start_time = range_.start_time() + delta;
   range_.set_end_time(new_start_time);
+  // The new |state| has a copy of our |range_|, which may have had an end
+  // time less than the new start time. If so, we reset the new |state| to
+  // have an empty range starting at |new_start_time|.
+  if (state->range_.end_time() < new_start_time)
+    state->range_.set_end_time(new_start_time);
   state->range_.set_start_time(new_start_time);
   return state;
 }
@@ -61,6 +59,19 @@ std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
       state->tia_[address] = reg_value;
       break;
   }
+  return state;
+}
+
+std::unique_ptr<State> State::MakeEntryState(uint32 delta) {
+  std::unique_ptr<State> state;
+  if (delta > 0) {
+    state = AdvanceTime(delta);
+    state->range_ = Range(range_.end_time(), range_.end_time());
+  } else {
+    state = Clone();
+    state->range_ = Range(range_.start_time(), range_.start_time());
+  }
+  state->registers_known_ = 0;
   return state;
 }
 

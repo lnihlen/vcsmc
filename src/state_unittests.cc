@@ -128,13 +128,40 @@ TEST_F(StateTest, MakeEntryState) {
   state = state->AdvanceTimeAndSetRegister(1, Register::Y, 0xee);
   state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::PF2);
 
-  std::unique_ptr<State> entry_state = state->MakeEntryState();
+  std::unique_ptr<State> entry_state = state->MakeEntryState(10);
   CompareStatesTIA(state.get(), entry_state.get());
   EXPECT_FALSE(entry_state->register_known(Register::A));
   EXPECT_FALSE(entry_state->register_known(Register::X));
   EXPECT_FALSE(entry_state->register_known(Register::Y));
   EXPECT_EQ(Range(state->range().end_time(), state->range().end_time()),
       entry_state->range());
+}
+
+TEST_F(StateTest, MakeEntryStateZeroDelta) {
+  std::unique_ptr<State> state(new State);
+  state = state->AdvanceTimeAndSetRegister(19, Register::X, 0xa9);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::X, TIA::CTRLPF);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(21, Register::X, TIA::PF1);
+  std::unique_ptr<State> entry_state = state->MakeEntryState(0);
+  CompareStatesTIA(state.get(), entry_state.get());
+  EXPECT_FALSE(entry_state->register_known(Register::A));
+  EXPECT_FALSE(entry_state->register_known(Register::X));
+  EXPECT_FALSE(entry_state->register_known(Register::Y));
+  EXPECT_EQ(Range(state->range().start_time(), state->range().start_time()),
+      entry_state->range());
+}
+
+// An entry state starts with an empty range, test advancing time on that.
+TEST_F(StateTest, AdvanceTimeEntryState) {
+  std::unique_ptr<State> state(new State);
+  std::unique_ptr<State> ending_state = state->AdvanceTime(1024);
+
+  std::unique_ptr<State> entry_state = ending_state->MakeEntryState(1024);
+  EXPECT_EQ(Range(1024, 2048), ending_state->range());
+
+  std::unique_ptr<State> entry_advance = entry_state->AdvanceTime(2048);
+  EXPECT_EQ(Range(2048, 4096), entry_state->range());
+  EXPECT_EQ(Range(4096, 4096), entry_advance->range());
 }
 
 TEST_F(StateTest, AdvanceTimeClonesAndSetsRanges) {
@@ -1037,7 +1064,133 @@ TEST_F(StateTest, EarliestTimeAfterPF0) {
 
 // PF1 can be set any time it is not being used to render the playfield.
 TEST_F(StateTest, EarliestTimeAfterPF1) {
+  // State within HBlank should always return 0.
+  std::unique_ptr<State> state(new State);
+  state = state->AdvanceTimeAndSetRegister(1, Register::X, 0x00);
+  std::unique_ptr<State> hblank_state =
+      state->AdvanceTimeAndCopyRegisterToTIA(1, Register::X, TIA::CTRLPF);
+  std::unique_ptr<State> hblank_and_pf0 =
+      hblank_state->AdvanceTime(kHBlankWidthClocks - 12);
+  EXPECT_EQ(0, hblank_state->EarliestTimeAfter(
+      Spec(TIA::PF1, 0x00, Range(0, kHBlankWidthClocks + 16))));
+  EXPECT_EQ(15, hblank_state->EarliestTimeAfter(
+      Spec(TIA::PF1, 0xff, Range(15, kScanLineWidthClocks))));
 
+  // State containing HBlank and PF0 should always return 0. Test range starts
+  // 10 pixels in to HBlank and ends 8 pixels in to PF0.
+  std::unique_ptr<State> left_pf0_and_pf1 = hblank_and_pf0->AdvanceTime(10 + 8);
+  EXPECT_EQ(0, hblank_and_pf0->EarliestTimeAfter(
+      Spec(TIA::PF1, 0x10, Range(0, kHBlankWidthClocks))));
+  EXPECT_EQ(hblank_and_pf0->range().start_time(),
+      hblank_and_pf0->EarliestTimeAfter(
+          Spec(TIA::PF1, 0x20, hblank_and_pf0->range())));
+
+  // State containing PF0 and PF1 should return end_time() - 1. Test range
+  // starts 8 pixels within left PF0 and ends 4 pixels within left PF1.
+  std::unique_ptr<State> within_left_pf1 = left_pf0_and_pf1->AdvanceTime(8 + 4);
+  EXPECT_EQ(left_pf0_and_pf1->range().end_time() - 1,
+      left_pf0_and_pf1->EarliestTimeAfter(
+          Spec(TIA::PF1, 0x30, Range(0, kFrameSizeClocks))));
+  EXPECT_EQ(kInfinity,
+      left_pf0_and_pf1->EarliestTimeAfter(Spec(TIA::PF1, 0x40,
+          Range(0, left_pf0_and_pf1->range().end_time()))));
+  EXPECT_EQ(kInfinity,
+      left_pf0_and_pf1->EarliestTimeAfter(Spec(TIA::PF1, 0x50,
+          Range(left_pf0_and_pf1->range().start_time(),
+              left_pf0_and_pf1->range().start_time() + 4))));
+
+  // State entirely within PF1 should return end_time() - 1. Test range covers
+  // the middle 16 pixels of left side PF1, leaving 8 on each side.
+  std::unique_ptr<State> left_pf1_and_pf2 = within_left_pf1->AdvanceTime(16);
+  EXPECT_EQ(within_left_pf1->range().end_time() - 1,
+      within_left_pf1->EarliestTimeAfter(Spec(TIA::PF1, 0x60,
+          Range(0, kScanLineWidthClocks))));
+  EXPECT_EQ(kInfinity, within_left_pf1->EarliestTimeAfter(Spec(TIA::PF1, 0x70,
+      Range(0, kHBlankWidthClocks + 16 + 8 + 8))));
+  EXPECT_EQ(kInfinity, within_left_pf1->EarliestTimeAfter(Spec(TIA::PF1, 0x80,
+      Range(kHBlankWidthClocks + 8, kHBlankWidthClocks + 12))));
+
+  // State starting within left-side PF1 and ending outside of it should return
+  // the last pixel in left-side PF1. Test range covers last 8 pixels of left
+  // side pf1 and 17 pixels of left side PF2.
+  std::unique_ptr<State> left_pf2_and_right_pf0 =
+      left_pf1_and_pf2->AdvanceTime(8 + 17);
+  EXPECT_EQ(kHBlankWidthClocks + 16 + 31,
+      left_pf1_and_pf2->EarliestTimeAfter(Spec(TIA::PF1, 0x90,
+        Range(0, kScanLineWidthClocks))));
+  EXPECT_EQ(kInfinity, left_pf1_and_pf2->EarliestTimeAfter(Spec(TIA::PF1, 0xa0,
+        Range(0, kHBlankWidthClocks + 16 + 31))));
+
+  // State between left-side PF1 and right-side PF1 should return 0. Test range
+  // covers 15 pixels of left side PF2 and 3 pixels of right-side PF0.
+  std::unique_ptr<State> right_pf0_and_pf1 =
+      left_pf2_and_right_pf0->AdvanceTime(15 + 3);
+  EXPECT_EQ(0, left_pf2_and_right_pf0->EarliestTimeAfter(Spec(TIA::PF1, 0xb0,
+      Range(0, left_pf2_and_right_pf0->range().start_time() + 3))));
+  EXPECT_EQ(left_pf2_and_right_pf0->range().start_time(),
+      left_pf2_and_right_pf0->EarliestTimeAfter(Spec(TIA::PF1, 0xc0,
+          left_pf2_and_right_pf0->range())));
+
+  // State starting in right-side PF0 and ending in right-side PF1 should return
+  // end_time() - 1. Test range covers 13 pixels of right_side PF0 and 23 pixels
+  // of right-side PF1.
+  std::unique_ptr<State> right_pf1_to_hblank =
+      right_pf0_and_pf1->AdvanceTime(13 + 23);
+  EXPECT_EQ(right_pf0_and_pf1->range().end_time() - 1,
+      right_pf0_and_pf1->EarliestTimeAfter(Spec(TIA::PF1, 0xd0,
+          Range(0, kHBlankWidthClocks))));
+  EXPECT_EQ(kInfinity, right_pf0_and_pf1->EarliestTimeAfter(Spec(TIA::PF1, 0xe0,
+      Range(right_pf0_and_pf1->range().start_time(),
+          right_pf0_and_pf1->range().end_time() - 4))));
+  EXPECT_EQ(kInfinity, right_pf0_and_pf1->EarliestTimeAfter(Spec(TIA::PF1, 0xf0,
+      Range(0, kHBlankWidthClocks))));
+
+  // State starting in right-side PF1 and ending in next line HBlank should
+  // return last pixel in right-side PF1. Test range covers 9 pixels of right
+  // side PF1, 32 pixels of PF2, and 11 pixels of next line HBlank.
+  state = right_pf1_to_hblank->AdvanceTime(9 + 32 + 11);
+  EXPECT_EQ(right_pf1_to_hblank->range().start_time() + 8,
+      right_pf1_to_hblank->EarliestTimeAfter(Spec(TIA::PF1, 0x01,
+          Range(0, 2 * kScanLineWidthClocks))));
+  EXPECT_EQ(kInfinity, right_pf1_to_hblank->EarliestTimeAfter(
+      Spec(TIA::PF1, 0x11,
+          Range(0, right_pf1_to_hblank->range().start_time() + 8))));
+
+  std::unique_ptr<State> left_pf1_to_right_pf1 =
+      state->AdvanceTime(kHBlankWidthClocks - 11 + 16 + 9);
+
+  // State starting in left-side PF1 and ending in right-side PF1 should return
+  // end_time() - 1. Test range covers 23 pixels of left pf1 through to 19
+  // pixels of right PF1.
+  std::unique_ptr<State> right_pf1_to_left_pf1 =
+      left_pf1_to_right_pf1->AdvanceTime(23 + 32 + 16 + 19);
+  EXPECT_EQ(left_pf1_to_right_pf1->range().end_time() - 1,
+      left_pf1_to_right_pf1->EarliestTimeAfter(Spec(TIA::PF1, 0x21,
+          Range(0, kFrameSizeClocks))));
+  EXPECT_EQ(kInfinity, left_pf1_to_right_pf1->EarliestTimeAfter(
+      Spec(TIA::PF1, 0x31,
+          Range(left_pf1_to_right_pf1->range().start_time() + 23 + 16,
+              left_pf1_to_right_pf1->range().start_time() + 23 + 32 + 13))));
+
+  // State starting in right-side PF1 and ending in left-side PF1 on next line
+  // should return end_time() - 1. Test range covers 13 pixels of right PF1
+  // through to 14 pixels of left side PF1 on the next line.
+  state = right_pf1_to_left_pf1->AdvanceTimeAndSetRegister(
+      13 + 32 + kHBlankWidthClocks + 16 + 14, Register::Y, 0x01);
+  EXPECT_EQ(right_pf1_to_left_pf1->range().end_time() - 1,
+      right_pf1_to_left_pf1->EarliestTimeAfter(Spec(TIA::PF1, 0x41,
+          Range(0, kFrameSizeClocks))));
+  EXPECT_EQ(kInfinity, right_pf1_to_left_pf1->EarliestTimeAfter(
+      Spec(TIA::PF1, 0x51, Range(right_pf1_to_left_pf1->range().start_time(),
+          right_pf1_to_left_pf1->range().start_time() + 13 + 32))));
+  EXPECT_EQ(kInfinity, right_pf1_to_left_pf1->EarliestTimeAfter(
+      Spec(TIA::PF1, 0x61, Range(
+          right_pf1_to_left_pf1->range().start_time() + 13 + 32 + 26,
+          right_pf1_to_left_pf1->range().start_time() + 13 + 32 +
+              kHBlankWidthClocks))));
+
+  // Turn mirroring on. Repeat a few of the above.
+  // ***
 }
 
 // PF2 can be set any time it is not being used to render the playfield.

@@ -8,13 +8,14 @@
 namespace vcsmc {
 
 Block::Block() : total_bytes_(0) {
-  states_.push_back(std::unique_ptr<State>(new State));
+  std::unique_ptr<State> state(new State);
+  states_.push_back(state->MakeEntryState(0));
   for (uint8 i = 0; i < Register::REGISTER_COUNT; ++i)
     register_usage_times_[i] = kInfinity;
 }
 
-Block::Block(const State* state) : total_bytes_(0) {
-  std::unique_ptr<State> entry_state = state->MakeEntryState();
+Block::Block(State* state, uint32 delta) : total_bytes_(0) {
+  std::unique_ptr<State> entry_state = state->MakeEntryState(delta);
   range_ = entry_state->range();
   states_.push_back(std::move(entry_state));
   for (uint8 i = 0; i < Register::REGISTER_COUNT; ++i)

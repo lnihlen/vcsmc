@@ -26,8 +26,7 @@ TEST(BlockTest, StateConstructor) {
   state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::X, TIA::PF0);
   std::unique_ptr<State> entry_state =
       state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::COLUBK);
-  state = entry_state->AdvanceTime(1);
-  Block block(entry_state.get());
+  Block block(entry_state.get(), 1);
 
   // All register values should be unknown.
   EXPECT_FALSE(block.final_state()->register_known(Register::A));
@@ -48,8 +47,7 @@ TEST(BlockTest, EarliestTimeAfterScheduleBefore) {
   // Build a block within the HBlank and then ask for a CTRLPF Spec, which since
   // the entire block is in HBlank should return 0.
   std::unique_ptr<State> state(new State);
-  state = state->AdvanceTime(16);
-  Block block(state.get());
+  Block block(state.get(), 16);
   block.Append(Spec(TIA::COLUBK, 0x00, Range(0, kFrameSizeClocks)));
   block.Append(Spec(TIA::COLUPF, 0xfe, Range(0, kFrameSizeClocks)));
   block.Append(Spec(TIA::PF0, 0x00, Range(0, kFrameSizeClocks)));
@@ -71,10 +69,11 @@ TEST(BlockTest, EarliestTimeAfterScheduleAppend) {
 TEST(BlockTest, EarliestTimeAfterNewBlock) {
   std::unique_ptr<State> state(new State);
   state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x00);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::CTRLPF);
+  std::unique_ptr<State> entry_state =
+      state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::CTRLPF);
   // Start block halfway through right side PF1.
-  state = state->AdvanceTime(kHBlankWidthClocks - 2 + 16 + 32 + 32 + 16 + 16);
-  Block block(state.get());
+  Block block(entry_state.get(),
+      kHBlankWidthClocks - 2 + 16 + 32 + 32 + 16 + 16);
   block.Append(Spec(TIA::COLUBK, 0x00, Range(0, kFrameSizeClocks)));
   block.Append(Spec(TIA::COLUPF, 0xfe, Range(0, kFrameSizeClocks)));
   // The block should suggest the creation of a new Block starting at the
@@ -117,7 +116,7 @@ TEST(BlockTest, ClocksToAppendRegsUnknown) {
 }
 
 TEST(BlockTest, ClocksToAppendRegsKnownButDifferent) {
-  Block block;
+  // TODO
 }
 
 TEST(BlockTest, ClocksToAppendRegsKnownAndSame) {
@@ -136,12 +135,20 @@ TEST(BlockTest, ClocksToAppendStrobeAlwaysCheaperButNotFree) {
 }
 
 TEST(BlockTest, AppendRegsAndTIAUnknown) {
-  Block block;
+  std::unique_ptr<State> state(new State);
+  std::unique_ptr<State> entry_state = state->AdvanceTimeAndSetRegister(
+      162, Register::X, 0x00);
+
+  Block block(entry_state.get(), 158);
   Spec colupf_spec(TIA::COLUPF, 0xfe, Range(0, kScanLineWidthCycles));
   uint32 colupf_clocks = block.ClocksToAppend(colupf_spec);
   block.Append(colupf_spec);
   EXPECT_TRUE(block.final_state()->tia_known(TIA::COLUPF));
-  EXPECT_EQ(Range(0, colupf_clocks), block.range());
+  EXPECT_TRUE(block.final_state()->range().IsEmpty());
+  EXPECT_EQ(block.range().end_time(),
+      block.final_state()->range().start_time());
+  EXPECT_EQ(Range(entry_state->range().end_time(),
+      entry_state->range().end_time() + colupf_clocks), block.range());
   EXPECT_LT(0, block.bytes());
   EXPECT_EQ(colupf_clocks, block.clocks());
   uint32 known_count = 0;
@@ -162,9 +169,13 @@ TEST(BlockTest, AppendDuplicateRegisterValue) {
   Spec colubk_spec(TIA::COLUBK, 0xfe, Range(0, kScanLineWidthCycles));
   block.Append(colubk_spec);
   uint32 colubk_clocks = block.clocks();
+  EXPECT_EQ(Range(0, colubk_clocks), block.range());
+  EXPECT_EQ(Range(colubk_clocks, colubk_clocks), block.final_state()->range());
   uint32 colubk_bytes = block.bytes();
   Spec ctrlpf_spec(TIA::CTRLPF, 0xfe, Range(0, kScanLineWidthCycles));
   block.Append(ctrlpf_spec);
+  EXPECT_EQ(Range(block.range().end_time(), block.range().end_time()),
+      block.final_state()->range());
   uint32 ctrlpf_clocks = block.clocks() - colubk_clocks;
   uint32 ctrlpf_bytes = block.bytes() - colubk_bytes;
   ASSERT_GT(colubk_clocks, ctrlpf_clocks);
@@ -179,9 +190,13 @@ TEST(BlockTest, AppendNoChangeToTIA) {
   block.Append(p0_spec);
   uint32 block_bytes = block.bytes();
   uint32 block_clocks = block.clocks();
+  EXPECT_EQ(Range(0, block_clocks), block.range());
+  EXPECT_EQ(Range(block_clocks, block_clocks), block.final_state()->range());
   block.Append(p0_spec);
   EXPECT_EQ(block_bytes, block.bytes());
   EXPECT_EQ(block_clocks, block.clocks());
+  EXPECT_EQ(Range(0, block_clocks), block.range());
+  EXPECT_EQ(Range(block_clocks, block_clocks), block.final_state()->range());
 }
 
 TEST(BlockTest, AppendStrobeAlwaysCheaperButNotFree) {

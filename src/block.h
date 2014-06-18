@@ -22,10 +22,10 @@ class Block {
   // Creates a Block with default initial state of everything unknown.
   Block();
 
-  // Will create a copy of state and set all register values to unknown. The
-  // |range_| of this Block will be empty and it will start at the end time of
-  // the range supplied in |state|.
-  explicit Block(const State* state);
+  // Will advance time on |state| by |delta| and set all register values to
+  // unknown. The |range_| of this Block will be empty and it will start at the
+  // advanced end time of the range supplied in |state|.
+  explicit Block(State* state, uint32 delta);
 
   // Returns 0 if this |spec| can be scheduled before this Block. Returns the
   // time within the block (currently always the end) if this spec should be
@@ -39,6 +39,8 @@ class Block {
   void Append(const Spec& spec);
   void AppendBlock(std::unique_ptr<Block> block);
 
+  // Returns the last state in |states_|, considered to be the exit state of the
+  // Block. Note that the final state should always have an empty range().
   const State* final_state() const { return (*states_.rbegin()).get(); };
   const Range& range() const { return range_; }
   uint32 bytes() const { return total_bytes_; }

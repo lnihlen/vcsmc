@@ -27,14 +27,9 @@ class State {
   // Produces an exact copy of this State.
   std::unique_ptr<State> Clone() const;
 
-  // Returns a new State that is a copy of this one but with empty |range_|
-  // starting at this State's range_.end_time(), and with all register values
-  // reset to unknown.
-  std::unique_ptr<State> MakeEntryState() const;
-
   // Given this state at |color_clock_| = t, produce a new State which is an
   // exact copy of this one but at color_clock_ = t + delta time. ALSO HAS THE
-  // SIDE EFFECT OF MODIFYING OUR OWN TIME RANGE.
+  // SIDE EFFECT OF MODIFYING OUR OWN TIME RANGE. |delta| must be > 0.
   std::unique_ptr<State> AdvanceTime(uint32 delta);
 
   // Same as above, but the returned state also has new value stored in reg.
@@ -49,6 +44,14 @@ class State {
   std::unique_ptr<State> AdvanceTimeAndCopyRegisterToTIA(uint32 delta,
                                                          Register axy,
                                                          TIA address);
+
+  // Returns a new State that is a copy of this one but with empty |range_|
+  // and with all register values reset to unknown. Modifies this State's
+  // range().end_time() just like AdvanceTime(delta) but in this case |delta|
+  // may also be zero. If Delta is zero the entry state will have an empty
+  // range starting at our start_time(), otherwise it will have an empty range
+  // starting at this State's end_time().
+  std::unique_ptr<State> MakeEntryState(uint32 delta);
 
   //====== Simulation and Scheduling
 
