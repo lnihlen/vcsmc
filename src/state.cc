@@ -154,7 +154,7 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
       break;
 
     case TIA::PF1:
-      state_earliest = EarliestPF1CouldPaint(within);
+      state_earliest = EarliestPF1CouldPaint();
       break;
 
     case TIA::PF2:
@@ -413,13 +413,14 @@ const uint32 State::EarliestPF0CouldPaint() const {
   if (!pf0_right_intersect.IsEmpty())
     return pf0_right_intersect.end_time() - 1;
 
-  Range pf0_left(last_scanline_start + 68, last_scanline_start + 68 + 16);
+  Range pf0_left(last_scanline_start + kHBlankWidthClocks,
+      last_scanline_start + kHBlankWidthClocks + 16);
   Range pf0_left_intersect(Range::IntersectRanges(range_, pf0_left));
   if (!pf0_left_intersect.IsEmpty())
     return pf0_left_intersect.end_time() - 1;
 
   // It's possible that the range spans to the previous scanline, and could
-  // interesect with the right-side pf0 there.
+  // intersect with the right-side PF0 there.
   if (range_.start_time() < last_scanline_start) {
     uint32 prev_scanline_start = last_scanline_start - kScanLineWidthClocks;
     Range pf0_prev_right;
@@ -439,14 +440,43 @@ const uint32 State::EarliestPF0CouldPaint() const {
   return 0;
 }
 
-const uint32 State::EarliestPF1CouldPaint(const Range& within) const {
-  Range pf1_right_intersect(Range::IntersectRanges(within, Range(84, 116)));
+const uint32 State::EarliestPF1CouldPaint() const {
+  uint32 last_scanline_start =
+      (range_.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
+  Range pf1_right;
+  if (tia(TIA::CTRLPF) & 0x01) {
+    pf1_right =
+        Range(last_scanline_start + 180, last_scanline_start + 180 + 32);
+  } else {
+    pf1_right =
+        Range(last_scanline_start + 164, last_scanline_start + 164 + 32);
+  }
+  Range pf1_right_intersect(Range::IntersectRanges(range_, pf1_right));
   if (!pf1_right_intersect.IsEmpty())
     return pf1_right_intersect.end_time() - 1;
 
-  Range pf1_left_intersect(Range::IntersectRanges(within, Range(164, 196)));
+  Range pf1_left(last_scanline_start + 84, last_scanline_start + 84 + 32);
+  Range pf1_left_intersect(Range::IntersectRanges(range_, pf1_left));
   if (!pf1_left_intersect.IsEmpty())
     return pf1_left_intersect.end_time() - 1;
+
+  // It's possible that the range spans to the previous scanline, and could
+  // intersect with the right-side PF0 there.
+  if (range_.start_time() < last_scanline_start) {
+    uint32 prev_scanline_start = last_scanline_start - kScanLineWidthClocks;
+    Range pf1_prev_right;
+    if (tia(TIA::CTRLPF) & 0x01) {
+      pf1_prev_right =
+          Range(prev_scanline_start + 180, prev_scanline_start + 180 + 32);
+    } else {
+      pf1_prev_right =
+          Range(prev_scanline_start + 164, prev_scanline_start + 164 + 32);
+    }
+    Range pf1_prev_right_intersect(
+        Range::IntersectRanges(range_, pf1_prev_right));
+    if (!pf1_prev_right_intersect.IsEmpty())
+      return pf1_prev_right_intersect.end_time() - 1;
+  }
 
   return 0;
 }

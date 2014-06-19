@@ -59,8 +59,7 @@ class State {
   void PaintInto(ColuStrip* pixel_strip) const;
 
   // Returns a color clock value that is the earliest time after which this spec
-  // could be added. Returns 0 if it occurs before this State. Note that this
-  // method can return times earlier than spec.range().begin_time().
+  // could be added. Returns 0 if it occurs before this State.
   const uint32 EarliestTimeAfter(const Spec& spec) const;
 
   //====== Utility Methods
@@ -118,7 +117,7 @@ class State {
 
   const uint32 EarliestPlayfieldPaints() const;
   const uint32 EarliestPF0CouldPaint() const;
-  const uint32 EarliestPF1CouldPaint(const Range& within) const;
+  const uint32 EarliestPF1CouldPaint() const;
   const uint32 EarliestPF2CouldPaint(const Range& within) const;
   const bool PlayfieldPaints(uint32 local_clock) const;
 
