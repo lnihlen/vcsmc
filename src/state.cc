@@ -7,6 +7,30 @@
 #include "colu_strip.h"
 #include "spec.h"
 
+namespace {
+
+// playfield schedules
+// +-----------+------+---------------------+--------------------+
+// | playfield | left | right mirroring off | right mirroring on |
+// +-----------+------+---------------------+--------------------+
+// |    PF0    |  68  |        148          |        212         |
+// |    PF1    |  84  |        164          |        180         |
+// |    PF2    | 116  |        196          |        148         |
+// +-----------+------+---------------------+--------------------+
+const uint32 kPF0Left = 68;
+const uint32 kPF1Left = 84;
+const uint32 kPF2Left = 116;
+const uint32 kPF0Right = 148;
+const uint32 kPF1Right = 164;
+const uint32 kPF2Right = 196;
+const uint32 kPF0RightM = 212;
+const uint32 kPF1RightM = 180;
+const uint32 kPF2RightM = 148;
+const uint32 kPFMidline = 148;
+
+}
+
+
 namespace vcsmc {
 
 State::State()
@@ -87,7 +111,7 @@ void State::PaintInto(ColuStrip* colu_strip) const {
       // If D1 of CTRLPF is set the playfield paints with COLUP0 on the left
       // side and COLUP1 on the right side.
       if (tia(TIA::CTRLPF) & 0x02)
-        colu = clock < 148 ? tia(TIA::COLUP0) : tia(TIA::COLUP1);
+        colu = clock < kPFMidline ? tia(TIA::COLUP0) : tia(TIA::COLUP1);
       else
         colu = tia(TIA::COLUPF);
     }
@@ -136,9 +160,8 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
       state_earliest = EarliestBackgroundPaints();
       break;
 
-    // Not currently supported.
     case TIA::CTRLPF:
-      state_earliest = EarliestTimeInHBlank(within);
+      state_earliest = EarliestTimeInHBlank();
       break;
 
     case TIA::REFP0:
@@ -150,15 +173,9 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
       break;
 
     case TIA::PF0:
-      state_earliest = EarliestPF0CouldPaint();
-      break;
-
     case TIA::PF1:
-      state_earliest = EarliestPF1CouldPaint();
-      break;
-
     case TIA::PF2:
-      state_earliest = EarliestPF2CouldPaint(within);
+      state_earliest = EarliestPFXCouldPaint(spec.tia());
       break;
 
     // These are strobe registers and need to happen right when they need to
@@ -239,7 +256,7 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
   }
 
   if (state_earliest == kInfinity ||
-      (state_earliest >= spec.range().end_time()))
+      (state_earliest >= within.end_time() - 1))
     return kInfinity;
 
   if (state_earliest == 0 && (spec.range().start_time() < range_.start_time()))
@@ -375,15 +392,6 @@ const bool State::PlayerCouldPaint(bool p1, uint32 local_clock) const {
   return false;
 }
 
-// playfield schedules
-// +-----------+------+---------------------+--------------------+
-// | playfield | left | right mirroring off | right mirroring on |
-// +-----------+------+---------------------+--------------------+
-// |    PF0    |  68  |        148          |        212         |
-// |    PF1    |  84  |        164          |        180         |
-// |    PF2    | 116  |        196          |        148         |
-// +-----------+------+---------------------+--------------------+
-
 const uint32 State::EarliestPlayfieldPaints() const {
   uint32 duration = range_.Duration();
   for (uint32 i = 1; i <= duration; ++i) {
@@ -398,135 +406,144 @@ const uint32 State::EarliestPlayfieldPaints() const {
   return 0;
 }
 
-const uint32 State::EarliestPF0CouldPaint() const {
+
+const uint32 State::EarliestPFXCouldPaint(TIA pf) const {
   uint32 last_scanline_start =
       (range_.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
-  Range pf0_right;
+  uint32 right_pf_begin = 0;
+  uint32 right_pf_end = 0;
   if (tia(TIA::CTRLPF) & 0x01) {
-    pf0_right =
-        Range(last_scanline_start + 212, last_scanline_start + 212 + 16);
-  } else {
-    pf0_right =
-        Range(last_scanline_start + 148, last_scanline_start + 148 + 16);
-  }
-  Range pf0_right_intersect(Range::IntersectRanges(range_, pf0_right));
-  if (!pf0_right_intersect.IsEmpty())
-    return pf0_right_intersect.end_time() - 1;
+    switch (pf) {
+      case TIA::PF0:
+        right_pf_begin = kPF0RightM;
+        right_pf_end = kPF0RightM + 16;
+        break;
 
-  Range pf0_left(last_scanline_start + kHBlankWidthClocks,
-      last_scanline_start + kHBlankWidthClocks + 16);
-  Range pf0_left_intersect(Range::IntersectRanges(range_, pf0_left));
-  if (!pf0_left_intersect.IsEmpty())
-    return pf0_left_intersect.end_time() - 1;
+      case TIA::PF1:
+        right_pf_begin = kPF1RightM;
+        right_pf_end = kPF1RightM + 32;
+        break;
+
+      case TIA::PF2:
+        right_pf_begin = kPF2RightM;
+        right_pf_end = kPF2RightM + 32;
+        break;
+
+      default:
+        assert(false);
+        break;
+    }
+  } else {
+    switch (pf) {
+      case TIA::PF0:
+        right_pf_begin = kPF0Right;
+        right_pf_end = kPF0Right + 16;
+        break;
+
+      case TIA::PF1:
+        right_pf_begin = kPF1Right;
+        right_pf_end = kPF1Right + 32;
+        break;
+
+      case TIA::PF2:
+        right_pf_begin = kPF2Right;
+        right_pf_end = kPF2Right + 32;
+        break;
+
+      default:
+        assert(false);
+        break;
+    }
+  }
+  Range pfx_right(last_scanline_start + right_pf_begin,
+      last_scanline_start + right_pf_end);
+  Range pfx_right_intersect(Range::IntersectRanges(range_, pfx_right));
+  if (!pfx_right_intersect.IsEmpty())
+    return pfx_right_intersect.end_time() - 1;
+
+  uint32 left_pf_begin = 0;
+  uint32 left_pf_end = 0;
+  switch (pf) {
+    case TIA::PF0:
+      left_pf_begin = kPF0Left;
+      left_pf_end = kPF0Left + 16;
+      break;
+
+    case TIA::PF1:
+      left_pf_begin = kPF1Left;
+      left_pf_end = kPF1Left + 32;
+      break;
+
+    case TIA::PF2:
+      left_pf_begin = kPF2Left;
+      left_pf_end = kPF2Left + 32;
+      break;
+
+    default:
+      assert(false);
+      break;
+  }
+  Range pfx_left(last_scanline_start + left_pf_begin,
+      last_scanline_start + left_pf_end);
+  Range pfx_left_intersect(Range::IntersectRanges(range_, pfx_left));
+  if (!pfx_left_intersect.IsEmpty())
+    return pfx_left_intersect.end_time() - 1;
 
   // It's possible that the range spans to the previous scanline, and could
-  // intersect with the right-side PF0 there.
-  if (range_.start_time() < last_scanline_start) {
+  // intersect with the right-side PFX there.
+  if (range_.start_time() < last_scanline_start && last_scanline_start > 0) {
     uint32 prev_scanline_start = last_scanline_start - kScanLineWidthClocks;
-    Range pf0_prev_right;
-    if (tia(TIA::CTRLPF) & 0x01) {
-      pf0_prev_right =
-          Range(prev_scanline_start + 212, prev_scanline_start + 212 + 16);
-    } else {
-      pf0_prev_right =
-          Range(prev_scanline_start + 148, prev_scanline_start + 148 + 16);
-    }
-    Range pf0_prev_right_intersect(
-        Range::IntersectRanges(range_, pf0_prev_right));
-    if (!pf0_prev_right_intersect.IsEmpty())
-      return pf0_prev_right_intersect.end_time() - 1;
+    Range pfx_prev_right(prev_scanline_start + right_pf_begin,
+        prev_scanline_start + right_pf_end);
+    Range pfx_prev_right_intersect(
+        Range::IntersectRanges(range_, pfx_prev_right));
+    if (!pfx_prev_right_intersect.IsEmpty())
+      return pfx_prev_right_intersect.end_time() - 1;
   }
-
-  return 0;
-}
-
-const uint32 State::EarliestPF1CouldPaint() const {
-  uint32 last_scanline_start =
-      (range_.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
-  Range pf1_right;
-  if (tia(TIA::CTRLPF) & 0x01) {
-    pf1_right =
-        Range(last_scanline_start + 180, last_scanline_start + 180 + 32);
-  } else {
-    pf1_right =
-        Range(last_scanline_start + 164, last_scanline_start + 164 + 32);
-  }
-  Range pf1_right_intersect(Range::IntersectRanges(range_, pf1_right));
-  if (!pf1_right_intersect.IsEmpty())
-    return pf1_right_intersect.end_time() - 1;
-
-  Range pf1_left(last_scanline_start + 84, last_scanline_start + 84 + 32);
-  Range pf1_left_intersect(Range::IntersectRanges(range_, pf1_left));
-  if (!pf1_left_intersect.IsEmpty())
-    return pf1_left_intersect.end_time() - 1;
-
-  // It's possible that the range spans to the previous scanline, and could
-  // intersect with the right-side PF0 there.
-  if (range_.start_time() < last_scanline_start) {
-    uint32 prev_scanline_start = last_scanline_start - kScanLineWidthClocks;
-    Range pf1_prev_right;
-    if (tia(TIA::CTRLPF) & 0x01) {
-      pf1_prev_right =
-          Range(prev_scanline_start + 180, prev_scanline_start + 180 + 32);
-    } else {
-      pf1_prev_right =
-          Range(prev_scanline_start + 164, prev_scanline_start + 164 + 32);
-    }
-    Range pf1_prev_right_intersect(
-        Range::IntersectRanges(range_, pf1_prev_right));
-    if (!pf1_prev_right_intersect.IsEmpty())
-      return pf1_prev_right_intersect.end_time() - 1;
-  }
-
-  return 0;
-}
-
-const uint32 State::EarliestPF2CouldPaint(const Range& within) const {
-  Range pf2_right_intersect(Range::IntersectRanges(within, Range(116, 148)));
-  if (!pf2_right_intersect.IsEmpty())
-    return pf2_right_intersect.end_time() - 1;
-
-  Range pf2_left_intersect(Range::IntersectRanges(within, Range(196, 228)));
-  if (!pf2_left_intersect.IsEmpty())
-    return pf2_left_intersect.end_time() - 1;
 
   return 0;
 }
 
 const bool State::PlayfieldPaints(uint32 local_clock) const {
-  assert(local_clock >= 68);
+  assert(local_clock >= kPF0Left);
 
-  if (local_clock < 148 || !(tia(TIA::CTRLPF) & 0x01)) {
-    if (local_clock < 84 || (local_clock >= 148 && local_clock < 164)) {
+  if (local_clock < kPFMidline || !(tia(TIA::CTRLPF) & 0x01)) {
+    if (local_clock < kPF1Left ||
+        (local_clock >= kPF0Right && local_clock < kPF1Right)) {
       // PF0 D4 through D7 left to right.
-      int pfbit = (local_clock - (local_clock < 84 ? 68 : 148)) >> 2;
+      int pfbit =
+          (local_clock - (local_clock < kPF1Left ? kPF0Left : kPF0Right)) >> 2;
       return tia(TIA::PF0) & (0x10 << pfbit);
-    } else if (local_clock < 116 || (local_clock >= 164 && local_clock < 196)) {
+    } else if (local_clock < kPF2Left ||
+        (local_clock >= kPF1Right && local_clock < kPF2Right)) {
       // PF1 D7 through D0 left to right.
-      int pfbit = (local_clock - (local_clock < 116 ? 84 : 164)) >> 2;
+      int pfbit =
+          (local_clock - (local_clock < kPF2Left ? kPF1Left : kPF1Right)) >> 2;
       return tia(TIA::PF1) & (0x80 >> pfbit);
     } else {
       // PF2 D0 through D7 left to right.
-      assert(local_clock < 148 || (local_clock >= 196 && local_clock < 228));
-      int pfbit = (local_clock - (local_clock < 148 ? 116 : 196)) >> 2;
+      assert(local_clock < kPF0Right ||
+          (local_clock >= kPF2Right && local_clock < 228));
+      int pfbit =
+          (local_clock - (local_clock < kPF0Right ? kPF2Left : kPF2Right)) >> 2;
       return tia(TIA::PF2) & (0x01 << pfbit);
     }
   } else {
     // We are on the right side of the screen and mirroring is turned on.
-    assert(local_clock >= 148);
+    assert(local_clock >= kPFMidline);
     assert(tia(TIA::CTRLPF) & 0x01);
-    if (local_clock < 180) {
+    if (local_clock < kPF1RightM) {
       // PF2 D7 through D0 left to right.
-      int pfbit = (local_clock - 148) >> 2;
+      int pfbit = (local_clock - kPF2RightM) >> 2;
       return tia(TIA::PF2) & (0x80 >> pfbit);
-    } else if (local_clock < 212) {
+    } else if (local_clock < kPF0RightM) {
       // PF1 D0 through D7 left to right.
-      int pfbit = (local_clock - 180) >> 2;
+      int pfbit = (local_clock - kPF1RightM) >> 2;
       return tia(TIA::PF1) & (0x01 << pfbit);
     } else {
       // PF0 D7 through D4 left to right.
       assert(local_clock < 228);
-      int pfbit = (local_clock - 212) >> 2;
+      int pfbit = (local_clock - kPF0RightM) >> 2;
       return tia(TIA::PF0) & (0x80 >> pfbit);
     }
   }
@@ -551,7 +568,7 @@ const uint32 State::EarliestBackgroundPaints() const {
   return 0;
 }
 
-const uint32 State::EarliestTimeInHBlank(const Range& within) const {
+const uint32 State::EarliestTimeInHBlank() const {
   uint32 last_scanline_start =
       (range_.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
   Range last_scanline_hblank(last_scanline_start,
@@ -562,17 +579,9 @@ const uint32 State::EarliestTimeInHBlank(const Range& within) const {
   if (section.IsEmpty())
     return kInfinity;
 
-  // If the spec has no time within the HBlank of our last line return
-  // kInfinity.
-  if (Range::IntersectRanges(section, within).IsEmpty())
-    return kInfinity;
-
-  // If HBlank begins before we begin we can return 0.
-  if (last_scanline_start < range_.start_time())
-    return 0;
-
-  // Otherwise we begin earlier than HBlank we we return the start of the blank.
-  return last_scanline_start;
+  // If HBlank begins before we begin we can return 0, otherwise we return the
+  // start of the HBlank.
+  return last_scanline_start < range_.start_time() ? 0 : last_scanline_start;
 }
 
 }  // namespace vcsmc

@@ -59,7 +59,9 @@ class State {
   void PaintInto(ColuStrip* pixel_strip) const;
 
   // Returns a color clock value that is the earliest time after which this spec
-  // could be added. Returns 0 if it occurs before this State.
+  // could be added. Returns 0 if it occurs before this State. If this State
+  // cannot permit this spec to be scheduled even after the very last pixel that
+  // it covers it will return kInfinity.
   const uint32 EarliestTimeAfter(const Spec& spec) const;
 
   //====== Utility Methods
@@ -116,14 +118,13 @@ class State {
   const bool PlayerCouldPaint(bool p1, uint32 local_clock) const;
 
   const uint32 EarliestPlayfieldPaints() const;
-  const uint32 EarliestPF0CouldPaint() const;
-  const uint32 EarliestPF1CouldPaint() const;
-  const uint32 EarliestPF2CouldPaint(const Range& within) const;
+  // |pf| should be one of TIA::PF0, TIA::PF1, or TIA::PF2.
+  const uint32 EarliestPFXCouldPaint(TIA pf) const;
   const bool PlayfieldPaints(uint32 local_clock) const;
 
   const uint32 EarliestBackgroundPaints() const;
 
-  const uint32 EarliestTimeInHBlank(const Range& within) const;
+  const uint32 EarliestTimeInHBlank() const;
 
   uint8 tia_[TIA::TIA_COUNT];
   uint64 tia_known_;
