@@ -27,10 +27,11 @@ class Block {
   // advanced end time of the range supplied in |state|.
   explicit Block(State* state, uint32 delta);
 
-  // Returns 0 if this |spec| can be scheduled before this Block. Returns the
-  // time within the block (currently always the end) if this spec should be
-  // appended to this block. Returns kInfinity on error.
-  uint32 EarliestTimeAfter(const Spec& spec) const;
+  // Returns 0 if this |spec| can be scheduled before this Block. Returns a time
+  // within the block if this spec should be appended to this block. Returns a
+  // time greater than the end of the block if the block suggests creation of a
+  // new block at that time. Returns kInfinity on error.
+  uint32 EarliestTimeAfter(const Spec& spec, uint32 end_time) const;
 
   // Returns the number of clock cycles that would be consumed by appending
   // |spec| to the end of this Block.

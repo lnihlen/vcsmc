@@ -62,7 +62,9 @@ class State {
   // could be added. Returns 0 if it occurs before this State. If this State
   // cannot permit this spec to be scheduled even after the very last pixel that
   // it covers it will return kInfinity.
-  const uint32 EarliestTimeAfter(const Spec& spec) const;
+  uint32 EarliestTimeAfter(const Spec& spec) const;
+
+  uint32 EarliestTimeAfterWithEndTime(const Spec& spec, uint32 end_time) const;
 
   //====== Utility Methods
   // TODO: move to assembler.cc
@@ -107,24 +109,15 @@ class State {
  private:
   State(const State& state);
 
-  // lcoal_clock is [0.. 228)
-  // Returns the earliest time the player actually renders a pixel.
-  const uint32 EarliestPlayerPaints(bool p1, const Range& within) const;
-  // Returns the earliest time the player _could_ render a pixel, meaning the
-  // earliest time that the player bitfield is actually be considered for
-  // render.
-  const uint32 EarliestPlayerCouldPaint(bool p1, const Range& within) const;
-  const bool PlayerPaints(bool p1, uint32 local_clock) const;
-  const bool PlayerCouldPaint(bool p1, uint32 local_clock) const;
-
-  const uint32 EarliestPlayfieldPaints() const;
-  // |pf| should be one of TIA::PF0, TIA::PF1, or TIA::PF2.
-  const uint32 EarliestPFXCouldPaint(TIA pf) const;
   const bool PlayfieldPaints(uint32 local_clock) const;
 
-  const uint32 EarliestBackgroundPaints() const;
+  const uint32 EarliestPlayfieldPaints(const Range& range) const;
 
-  const uint32 EarliestTimeInHBlank() const;
+  // |pf| should be one of TIA::PF0, TIA::PF1, or TIA::PF2.
+  const uint32 EarliestPFXCouldPaint(TIA pf, const Range& range) const;
+
+  const uint32 EarliestBackgroundPaints(const Range& range) const;
+  const uint32 EarliestTimeInHBlank(const Range& range) const;
 
   uint8 tia_[TIA::TIA_COUNT];
   uint64 tia_known_;

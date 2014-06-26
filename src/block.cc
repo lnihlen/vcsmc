@@ -22,7 +22,7 @@ Block::Block(State* state, uint32 delta) : total_bytes_(0) {
     register_usage_times_[i] = kInfinity;
 }
 
-uint32 Block::EarliestTimeAfter(const Spec& spec) const {
+uint32 Block::EarliestTimeAfter(const Spec& spec, uint32 end_time) const {
   return kInfinity;
 }
 
@@ -32,7 +32,6 @@ uint32 Block::ClocksToAppend(const Spec& spec) const {
   if (final_state()->tia_known(spec.tia()) &&
       final_state()->tia(spec.tia()) == spec.value())
     return 0;
-
 
   Register reg = Register::REGISTER_COUNT;
   // Search for register possibly already storing value.

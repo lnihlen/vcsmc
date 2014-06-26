@@ -59,13 +59,27 @@ TEST(BlockTest, EarliestTimeAfterScheduleBefore) {
 }
 
 // A Block with one state returning nonzero scheduling needs to indicate it can
-// support an append of the Spec by returning its current end_time() - 1.
+// support an append of the Spec by returning a time less than the
+// block.range().end_time()
 TEST(BlockTest, EarliestTimeAfterScheduleAppend) {
+  std::unique_ptr<State> state(new State);
+  Block block(state.get(), kHBlankWidthClocks - 15);
+  block.Append(Spec(TIA::CTRLPF, 0x00, Range(0, kFrameSizeClocks)));
+  block.Append(Spec(TIA::COLUBK, 0x00, Range(0, kFrameSizeClocks)));
+  block.Append(Spec(TIA::PF0, 0xff, Range(0, kFrameSizeClocks)));
+  block.Append(Spec(TIA::PF1, 0xff, Range(0, kFrameSizeClocks)));
+  block.Append(Spec(TIA::PF2, 0xff, Range(0, kFrameSizeClocks)));
+  block.Append(Spec(TIA::COLUPF, 0xfe, Range(0, kFrameSizeClocks)));
+  // Block range should encompass PF0.
+  ASSERT_GT(kHBlankWidthClocks, block.range().start_time());
+  ASSERT_LT(kHBlankWidthClocks + 16, block.range().end_time());
 
+  EXPECT_GT(block.range().end_time(), block.EarliestTimeAfter(
+      Spec(TIA::PF0, 0x02, Range(0, kFrameSizeClocks))));
 }
 
 // Blocks could suggest the creation of a new Block if they return a time
-// greater than their range().end_time().
+// greater than or equal to its range().end_time().
 TEST(BlockTest, EarliestTimeAfterNewBlock) {
   std::unique_ptr<State> state(new State);
   state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x00);
@@ -103,7 +117,14 @@ TEST(BlockTest, EarliestTimeAfterNewBlock) {
 }
 
 TEST(BlockTest, EarliestTimeAfterScheduleError) {
-  // TODO
+  std::unique_ptr<State> state(new State);
+  Block block(state.get(), kHBlankWidthClocks - 15);
+  block.Append(Spec(TIA::CTRLPF, 0x00, Range(0, kFrameSizeClocks)));
+  // Block should end within PF0.
+  ASSERT_LT(kHBlankWidthClocks, block.range().end_time());
+  ASSERT_GT(kHBlankWidthClocks + 16, block.range().end_time());
+  EXPECT_EQ(kInfinity, block.EarliestTimeAfter(
+      Spec(TIA::PF0, 0x00, Range(0, kFrameSizeClocks))));
 }
 
 TEST(BlockTest, ClocksToAppendRegsUnknown) {

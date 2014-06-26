@@ -703,22 +703,6 @@ TEST_F(StateTest, EarliestTimeAfterWithSpecAfterState) {
   EXPECT_EQ(kInfinity, state->EarliestTimeAfter(after));
 }
 
-// TODO: big confusion surrounding EarliestTimeAfter() when the change can not
-// be scheduled during the State. Three possible cases for spec.range().end_time:
-// a) spec.range().end_time() < state->range().end_time():
-//    obvious case to return kInfinity
-// b) spec.range().end_time() == state->range().end_time():
-//    since spec.range().end_time() is not within the actual range of the spec,
-//    it makes sense to return kInfinity. This means that there could be a state
-//    after this one that returned 0, so the Block will see the 0 followed by
-//    an Infinity.  TODO: refactor _all_ tests to account for this change.
-// c) spec.range().end_time() > state->range().end_time():
-//    return state->range().end_time() - 1
-
-// Another TODO: consider test helpers for more consistent coverage. Something
-// like ExpectCanScheduleBefore, ExpectCannotScheduleBefore, and
-// ExpectCanScheduleWithin.
-
 TEST_F(StateTest, EarliestTimeAfterCOLUPF) {
   // COLUPF can be set any time the TIA is not rendering the playfield color,
   // i.e. any time the TIA is not rendering a 1 in the playfield.
@@ -869,16 +853,18 @@ TEST_F(StateTest, EarliestTimeAfterCOLUBK) {
 // TODO: remaining bits?
 TEST_F(StateTest, EarliestTimeAfterCTRLPF) {
   std::unique_ptr<State> hblank_state(new State);
-  std::unique_ptr<State> line_state =
-      hblank_state->AdvanceTime(kHBlankWidthClocks);
+  std::unique_ptr<State> edge_state =
+      hblank_state->AdvanceTime(kHBlankWidthClocks - 5);
   ExpectCanScheduleBefore(hblank_state.get(), TIA::CTRLPF);
 
+  std::unique_ptr<State> line_state = edge_state->AdvanceTime(10);
+  ExpectCannotScheduleBefore(edge_state.get(), TIA::CTRLPF);
+
   std::unique_ptr<State> straddle_state =
-      line_state->AdvanceTime(kFrameWidthPixels - 10);
+      line_state->AdvanceTime(kFrameWidthPixels - 15);
   ExpectCannotScheduleBefore(line_state.get(), TIA::CTRLPF);
 
-  std::unique_ptr<State> state =
-      straddle_state->AdvanceTime(kScanLineWidthClocks);
+  straddle_state->AdvanceTime(kHBlankWidthClocks);
   ExpectCanScheduleWithin(straddle_state.get(), TIA::CTRLPF,
       straddle_state->range().start_time() + 10);
 }
@@ -1134,6 +1120,54 @@ TEST_F(StateTest, EarliestTimeAfterPF2) {
   // mirrored right-side PF0.
   line_after_mirrored_pf2->AdvanceTime(20 + 4);
   ExpectCanScheduleBefore(line_after_mirrored_pf2.get(), TIA::PF2);
+}
+
+TEST_F(StateTest, EarliestTimeAfterWithEndTime) {
+  std::unique_ptr<State> state(new State);
+
+  // Default Range for a new State is [0, kFrameSizeClocks). It should therefore
+  // not be possible to schedule something dependent on HBlank any time before
+  // the last HBlank in the frame.
+  EXPECT_EQ(kInfinity, state->EarliestTimeAfter(Spec(TIA::CTRLPF, 0x00,
+      Range(0, kHBlankWidthClocks + 25))));
+
+  // If we set the |end_time| to something containing only the first HBlank this
+  // should allow scheduling before.
+  EXPECT_EQ(0, state->EarliestTimeAfterWithEndTime(
+      Spec(TIA::CTRLPF, 0x00, Range(0, kScanLineWidthClocks)),
+          kHBlankWidthClocks));
+  EXPECT_EQ(0, state->EarliestTimeAfterWithEndTime(
+      Spec(TIA::CTRLPF, 0x00, Range(0, kScanLineWidthClocks)), 2));
+
+  // Setting the |end_time| to end outside of the first HBlank should result in
+  // an error again.
+  EXPECT_EQ(kInfinity, state->EarliestTimeAfterWithEndTime(
+      Spec(TIA::CTRLPF, 0x00, Range(0, kHBlankWidthClocks + 25)),
+          kHBlankWidthClocks + 1));
+  EXPECT_EQ(kInfinity, state->EarliestTimeAfterWithEndTime(
+      Spec(TIA::CTRLPF, 0x00, Range(0, kHBlankWidthClocks + 25)),
+          kScanLineWidthClocks));
+
+  state = state->AdvanceTimeAndSetRegister(1, Register::X, 0x00);
+  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::X, TIA::CTRLPF);
+
+  // Default range() for |state| should not let us set PF0 on anything but the
+  // last line.
+  EXPECT_EQ(kInfinity, state->EarliestTimeAfter(
+      Spec(TIA::PF0, 0x00, Range(0, kScanLineWidthClocks))));
+  EXPECT_EQ(kFrameSizeClocks - 32 - 32 - 1, state->EarliestTimeAfter(
+      Spec(TIA::PF0, 0x00, Range(0, kFrameSizeClocks))));
+
+  // Setting the |end_time| to beyond left-side PF0 should allow us to schedule
+  // PF0 changes any time after PF0 finishes rendering on the first scanline.
+  EXPECT_EQ(kHBlankWidthClocks + 15, state->EarliestTimeAfterWithEndTime(
+      Spec(TIA::PF0, 0x00, Range(0, kScanLineWidthClocks)),
+          kHBlankWidthClocks + 16 + 32));
+
+  // Setting the |end_time| back to the HBlank should permit changes to PF0 to
+  // be scheduled before.
+  EXPECT_EQ(0, state->EarliestTimeAfterWithEndTime(
+      Spec(TIA::PF0, 0x00, Range(0, kScanLineWidthClocks)), 25));
 }
 
 TEST(StateDeathTest, AdvanceTimeZero) {

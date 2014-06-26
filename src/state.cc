@@ -120,8 +120,15 @@ void State::PaintInto(ColuStrip* colu_strip) const {
   }
 }
 
-const uint32 State::EarliestTimeAfter(const Spec& spec) const {
-  Range within(Range::IntersectRanges(range_, spec.range()));
+uint32 State::EarliestTimeAfter(const Spec& spec) const {
+  return EarliestTimeAfterWithEndTime(spec, range_.end_time());
+}
+
+uint32 State::EarliestTimeAfterWithEndTime(
+    const Spec& spec, uint32 end_time) const {
+  assert(end_time >= range_.start_time());
+  Range range(range_.start_time(), end_time);
+  Range within(Range::IntersectRanges(range, spec.range()));
   if (within.IsEmpty())
     return kInfinity;
 
@@ -141,11 +148,7 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
       break;
 
     case TIA::COLUP0:
-      state_earliest = EarliestPlayerPaints(false, within);
-      break;
-
     case TIA::COLUP1:
-      state_earliest = EarliestPlayerPaints(true, within);
       break;
 
     case TIA::COLUPF:
@@ -153,29 +156,25 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
       if (tia(TIA::CTRLPF) & 0x02)
          state_earliest = 0;
       else
-        state_earliest = EarliestPlayfieldPaints();
+        state_earliest = EarliestPlayfieldPaints(range);
       break;
 
     case TIA::COLUBK:
-      state_earliest = EarliestBackgroundPaints();
+      state_earliest = EarliestBackgroundPaints(range);
       break;
 
     case TIA::CTRLPF:
-      state_earliest = EarliestTimeInHBlank();
+      state_earliest = EarliestTimeInHBlank(range);
       break;
 
     case TIA::REFP0:
-      state_earliest = EarliestPlayerCouldPaint(false, within);
-      break;
-
     case TIA::REFP1:
-      state_earliest = EarliestPlayerCouldPaint(true, within);
       break;
 
     case TIA::PF0:
     case TIA::PF1:
     case TIA::PF2:
-      state_earliest = EarliestPFXCouldPaint(spec.tia());
+      state_earliest = EarliestPFXCouldPaint(spec.tia(), range);
       break;
 
     // These are strobe registers and need to happen right when they need to
@@ -199,11 +198,7 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
       break;
 
     case TIA::GRP0:
-      state_earliest = EarliestPlayerCouldPaint(false, within);
-      break;
-
     case TIA::GRP1:
-      state_earliest = EarliestPlayerCouldPaint(true, within);
       break;
 
     // Ball and missile support coming later.
@@ -259,7 +254,7 @@ const uint32 State::EarliestTimeAfter(const Spec& spec) const {
       (state_earliest >= within.end_time() - 1))
     return kInfinity;
 
-  if (state_earliest == 0 && (spec.range().start_time() < range_.start_time()))
+  if (state_earliest == 0 && (spec.range().start_time() < range.start_time()))
     return 0;
 
   return std::max(state_earliest, within.start_time());
@@ -348,54 +343,55 @@ State::State(const State& state) {
   range_ = state.range_;
 }
 
-const uint32 State::EarliestPlayerPaints(bool p1, const Range& within) const {
-  // If player graphics are zero then they will never paint.
-  TIA grp = p1 ? TIA::GRP1 : TIA::GRP0;
-  if (tia(grp) == 0)
-    return 0;
+const bool State::PlayfieldPaints(uint32 local_clock) const {
+  assert(local_clock >= kPF0Left);
 
-  // Start from the end of our |range_| and work our way back in time, stopping
-  // whenever we encounter a pixel that is actually painted by the player. If
-  // no such pixel is encountered then we return 0 to indicate that the spec
-  // can be scheduled before our |range_| time.
-  uint32 duration = within.Duration();
-  assert(within.end_time() >= duration);
-  for (uint32 i = 0; i < duration; ++i) {
-    uint32 color_clock = within.end_time() - i - 1;
-    uint32 local_clock = color_clock % kScanLineWidthClocks;
-    if (PlayerPaints(p1, local_clock))
-      return color_clock;
+  if (local_clock < kPFMidline || !(tia(TIA::CTRLPF) & 0x01)) {
+    if (local_clock < kPF1Left ||
+        (local_clock >= kPF0Right && local_clock < kPF1Right)) {
+      // PF0 D4 through D7 left to right.
+      int pfbit =
+          (local_clock - (local_clock < kPF1Left ? kPF0Left : kPF0Right)) >> 2;
+      return tia(TIA::PF0) & (0x10 << pfbit);
+    } else if (local_clock < kPF2Left ||
+        (local_clock >= kPF1Right && local_clock < kPF2Right)) {
+      // PF1 D7 through D0 left to right.
+      int pfbit =
+          (local_clock - (local_clock < kPF2Left ? kPF1Left : kPF1Right)) >> 2;
+      return tia(TIA::PF1) & (0x80 >> pfbit);
+    } else {
+      // PF2 D0 through D7 left to right.
+      assert(local_clock < kPF0Right ||
+          (local_clock >= kPF2Right && local_clock < 228));
+      int pfbit =
+          (local_clock - (local_clock < kPF0Right ? kPF2Left : kPF2Right)) >> 2;
+      return tia(TIA::PF2) & (0x01 << pfbit);
+    }
+  } else {
+    // We are on the right side of the screen and mirroring is turned on.
+    assert(local_clock >= kPFMidline);
+    assert(tia(TIA::CTRLPF) & 0x01);
+    if (local_clock < kPF1RightM) {
+      // PF2 D7 through D0 left to right.
+      int pfbit = (local_clock - kPF2RightM) >> 2;
+      return tia(TIA::PF2) & (0x80 >> pfbit);
+    } else if (local_clock < kPF0RightM) {
+      // PF1 D0 through D7 left to right.
+      int pfbit = (local_clock - kPF1RightM) >> 2;
+      return tia(TIA::PF1) & (0x01 << pfbit);
+    } else {
+      // PF0 D7 through D4 left to right.
+      assert(local_clock < 228);
+      int pfbit = (local_clock - kPF0RightM) >> 2;
+      return tia(TIA::PF0) & (0x80 >> pfbit);
+    }
   }
-  return 0;
 }
 
-const uint32 State::EarliestPlayerCouldPaint(
-    bool p1, const Range& within) const {
-  uint32 duration = within.Duration();
-  assert(within.end_time() >= duration);
-  for (uint32 i = 0; i < duration; ++i) {
-    uint32 color_clock = within.end_time() - i - 1;
-    uint32 local_clock = color_clock % kScanLineWidthClocks;
-    if (PlayerCouldPaint(p1, local_clock))
-      return color_clock;
-  }
-  return 0;
-}
-
-const bool State::PlayerPaints(bool p1, uint32 local_clock) const {
-  // TODO: write me
-  return false;
-}
-
-const bool State::PlayerCouldPaint(bool p1, uint32 local_clock) const {
-  // TODO: write me
-  return false;
-}
-
-const uint32 State::EarliestPlayfieldPaints() const {
-  uint32 duration = range_.Duration();
+const uint32 State::EarliestPlayfieldPaints(const Range& range) const {
+  uint32 duration = range.Duration();
   for (uint32 i = 1; i <= duration; ++i) {
-    uint32 color_clock = range_.end_time() - i;
+    uint32 color_clock = range.end_time() - i;
     uint32 local_clock = color_clock % kScanLineWidthClocks;
     if (local_clock < kHBlankWidthClocks)
       continue;
@@ -406,10 +402,9 @@ const uint32 State::EarliestPlayfieldPaints() const {
   return 0;
 }
 
-
-const uint32 State::EarliestPFXCouldPaint(TIA pf) const {
+const uint32 State::EarliestPFXCouldPaint(TIA pf, const Range& range) const {
   uint32 last_scanline_start =
-      (range_.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
+      (range.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
   uint32 right_pf_begin = 0;
   uint32 right_pf_end = 0;
   if (tia(TIA::CTRLPF) & 0x01) {
@@ -457,7 +452,7 @@ const uint32 State::EarliestPFXCouldPaint(TIA pf) const {
   }
   Range pfx_right(last_scanline_start + right_pf_begin,
       last_scanline_start + right_pf_end);
-  Range pfx_right_intersect(Range::IntersectRanges(range_, pfx_right));
+  Range pfx_right_intersect(Range::IntersectRanges(range, pfx_right));
   if (!pfx_right_intersect.IsEmpty())
     return pfx_right_intersect.end_time() - 1;
 
@@ -485,18 +480,18 @@ const uint32 State::EarliestPFXCouldPaint(TIA pf) const {
   }
   Range pfx_left(last_scanline_start + left_pf_begin,
       last_scanline_start + left_pf_end);
-  Range pfx_left_intersect(Range::IntersectRanges(range_, pfx_left));
+  Range pfx_left_intersect(Range::IntersectRanges(range, pfx_left));
   if (!pfx_left_intersect.IsEmpty())
     return pfx_left_intersect.end_time() - 1;
 
   // It's possible that the range spans to the previous scanline, and could
   // intersect with the right-side PFX there.
-  if (range_.start_time() < last_scanline_start && last_scanline_start > 0) {
+  if (range.start_time() < last_scanline_start && last_scanline_start > 0) {
     uint32 prev_scanline_start = last_scanline_start - kScanLineWidthClocks;
     Range pfx_prev_right(prev_scanline_start + right_pf_begin,
         prev_scanline_start + right_pf_end);
     Range pfx_prev_right_intersect(
-        Range::IntersectRanges(range_, pfx_prev_right));
+        Range::IntersectRanges(range, pfx_prev_right));
     if (!pfx_prev_right_intersect.IsEmpty())
       return pfx_prev_right_intersect.end_time() - 1;
   }
@@ -504,61 +499,12 @@ const uint32 State::EarliestPFXCouldPaint(TIA pf) const {
   return 0;
 }
 
-const bool State::PlayfieldPaints(uint32 local_clock) const {
-  assert(local_clock >= kPF0Left);
-
-  if (local_clock < kPFMidline || !(tia(TIA::CTRLPF) & 0x01)) {
-    if (local_clock < kPF1Left ||
-        (local_clock >= kPF0Right && local_clock < kPF1Right)) {
-      // PF0 D4 through D7 left to right.
-      int pfbit =
-          (local_clock - (local_clock < kPF1Left ? kPF0Left : kPF0Right)) >> 2;
-      return tia(TIA::PF0) & (0x10 << pfbit);
-    } else if (local_clock < kPF2Left ||
-        (local_clock >= kPF1Right && local_clock < kPF2Right)) {
-      // PF1 D7 through D0 left to right.
-      int pfbit =
-          (local_clock - (local_clock < kPF2Left ? kPF1Left : kPF1Right)) >> 2;
-      return tia(TIA::PF1) & (0x80 >> pfbit);
-    } else {
-      // PF2 D0 through D7 left to right.
-      assert(local_clock < kPF0Right ||
-          (local_clock >= kPF2Right && local_clock < 228));
-      int pfbit =
-          (local_clock - (local_clock < kPF0Right ? kPF2Left : kPF2Right)) >> 2;
-      return tia(TIA::PF2) & (0x01 << pfbit);
-    }
-  } else {
-    // We are on the right side of the screen and mirroring is turned on.
-    assert(local_clock >= kPFMidline);
-    assert(tia(TIA::CTRLPF) & 0x01);
-    if (local_clock < kPF1RightM) {
-      // PF2 D7 through D0 left to right.
-      int pfbit = (local_clock - kPF2RightM) >> 2;
-      return tia(TIA::PF2) & (0x80 >> pfbit);
-    } else if (local_clock < kPF0RightM) {
-      // PF1 D0 through D7 left to right.
-      int pfbit = (local_clock - kPF1RightM) >> 2;
-      return tia(TIA::PF1) & (0x01 << pfbit);
-    } else {
-      // PF0 D7 through D4 left to right.
-      assert(local_clock < 228);
-      int pfbit = (local_clock - kPF0RightM) >> 2;
-      return tia(TIA::PF0) & (0x80 >> pfbit);
-    }
-  }
-}
-
-const uint32 State::EarliestBackgroundPaints() const {
-  uint32 duration = range_.Duration();
+const uint32 State::EarliestBackgroundPaints(const Range& range) const {
+  uint32 duration = range.Duration();
   for (uint32 i = 1; i <= duration; ++i) {
-    uint32 color_clock = range_.end_time() - i;
+    uint32 color_clock = range.end_time() - i;
     uint32 local_clock = color_clock % kScanLineWidthClocks;
     if (local_clock < kHBlankWidthClocks)
-      continue;
-    if (PlayerPaints(false, local_clock))
-      continue;
-    if (PlayerPaints(true, local_clock))
       continue;
     if (PlayfieldPaints(local_clock))
       continue;
@@ -568,20 +514,24 @@ const uint32 State::EarliestBackgroundPaints() const {
   return 0;
 }
 
-const uint32 State::EarliestTimeInHBlank() const {
+const uint32 State::EarliestTimeInHBlank(const Range& range) const {
   uint32 last_scanline_start =
-      (range_.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
+      (range.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
   Range last_scanline_hblank(last_scanline_start,
       last_scanline_start + kHBlankWidthClocks);
-  Range section(Range::IntersectRanges(range_, last_scanline_hblank));
+  Range section(Range::IntersectRanges(range, last_scanline_hblank));
 
   // If we have no time within the HBlank of our last line return kInfinity.
   if (section.IsEmpty())
     return kInfinity;
 
+  // If we have time after the HBlank ends we cannot schedule before.
+  if (last_scanline_hblank.end_time() < range.end_time())
+    return kInfinity;
+
   // If HBlank begins before we begin we can return 0, otherwise we return the
   // start of the HBlank.
-  return last_scanline_start < range_.start_time() ? 0 : last_scanline_start;
+  return last_scanline_start < range.start_time() ? 0 : last_scanline_start;
 }
 
 }  // namespace vcsmc
