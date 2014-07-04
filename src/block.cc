@@ -23,7 +23,17 @@ Block::Block(State* state, uint32 delta) : total_bytes_(0) {
 }
 
 uint32 Block::EarliestTimeAfter(const Spec& spec, uint32 end_time) const {
-  return kInfinity;
+  // Check our final_state() first as this this may determine if we should
+  // consider the |spec| internally at all.
+  uint32 final_state_time = final_state()->EarliestTimeAfterWithEndTime(
+      spec, end_time);
+  if (final_state_time > 0)
+    return final_state_time;
+
+  // TODO: states within need to have a say before we can return 0. And testing
+  // should reflect this lack of support.
+
+  return 0;
 }
 
 uint32 Block::ClocksToAppend(const Spec& spec) const {

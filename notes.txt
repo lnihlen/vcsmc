@@ -870,3 +870,58 @@ ETA can return 0. If any of them return a nonzero value than Block returns the
 last state end_time() - 1, to indicate that the Spec could be appended to the
 Block. If any return kInfinity then the Block returns kInfinity. Block can
 append Specs, and can also give a cost estimate of appending a Spec.
+
+===============================================================================
+
+Another attempt at Scheduling. Idea is to move EarliestTimeAfter() out of State
+and in to Schedule. This is to avoid the temptation on building EarliestTimeAfter
+functions that depend on actual state values instead of the safer invariant stuff.
+Like you can never set PF0 while it is being rendered, but can any other time
+regardless of value. Otherwise it seems that you have to repack a Schedule every
+time a Spec is scheduled before another one - which actually has to happen
+(at least in part) anyway in the sense that once an OpCode has been laid down
+the Schedule must regenerate State from that point forward. In any event for
+first iteration Scheduling needs to be present State invariant and only depend
+on timing.
+
+EarliestTimeAfter changes to get a row_id, [0, kFrameHeightPixels), and a
+deadline, conceptually similar to the old Range::end_time(). It is now a method
+on Schedule instead of State. Blocks therefore also don't need to implement it,
+and can become more pure container data structures, and might be worth
+considering deprecation. But no. They are still doing register packing and seem
+to represent a useful distinction between scheduled and unscheduled periods.
+Also by tracking known/unknown register values, and assuming all register values
+unknown at block entry, they allow us to schedule stuff before them without
+breaking any register assumptions internally to that block.
+
+How to schedule a Spec:
+
+Pull row_id and deadline out from spec.range().end_time(). Call
+eta = EarliestTimeAfter() on it. Iterate backwards through Blocks to find the
+earliest block that begins before eta. If it ends before eta we start a new
+Block, but new Block must be at least 2 cpu cycles from end of old block. Then,
+moving through Blocks iteratively forward we either try to append to an existing
+block if there's room or create a new Block. If we can do neither then the code
+cannot Schedule that spec. After either finding an existing block to append to,
+or creating a new Block, state must be re-propagated from that block forward.
+or - since Scheduling is now invariant to State, perhaps we only need to
+re-propagate state when simulating the scanline output, since we won't really
+care about it until simulation? No, we need it, because of things like being
+able to omit Specs if they are re-setting a value in the TIA that is already set.
+
+Reversible scheduling is the other desirable thing - how to undo last N changes,
+or lazy copy of Schedule for modification and then destruction. Perhaps an
+internal Operation object, which is polymorphic and has two methods, like do()
+and undo()? Then perhaps CostToAddSpec(s) could return a list of them with
+associated total cost? So then actually adding them is just a matter of resupplying
+the already-schedule stack of Operations to the Schedule. If we can manage
+dependencies between stacks of Operations, so that they can all be undone in a
+single call if needed (or never applied), then we also can support Strategies as
+they will ultimately output a list of lists of Operations, each list dependent on
+the previous list, and the Kernel can compare costs and qualities dependent on
+each to make final determination.
+
+OK, so Scheduler determines when the earliest time a Spec could happen. It can
+then ask a given Schedule to produce a Change object which represents the
+addition of that Spec to that Schedule. If the Schedule cannot accommodate the
+Spec then it will not produce a Change.

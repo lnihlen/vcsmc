@@ -41,6 +41,13 @@ State::State()
   // can skip initialization of their memory areas.
 }
 
+State::State(const uint8* tia_values)
+    : tia_known_(0xffffffffffffffff),
+      registers_known_(0),
+      range_(0, kFrameSizeClocks) {
+  std::memcpy(tia_, tia_values, sizeof(tia_));
+}
+
 std::unique_ptr<State> State::Clone() const {
   std::unique_ptr<State> state(new State(*this));
   return state;

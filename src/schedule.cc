@@ -11,22 +11,46 @@
 namespace vcsmc {
 
 Schedule::Schedule() {
-  states_.push_back(std::unique_ptr<State>(new State));
-}
-
-Schedule::Schedule(const Schedule& schedule) {
-  *this = schedule;
-}
-
-const Schedule& Schedule::operator=(const Schedule& schedule) {
-  // TODO: copy vectors
-  return *this;
+  std::memset(initial_tia_values_, 0, sizeof(initial_tia_values_));
+  states_.push_back(std::unique_ptr<State>(new State(initial_tia_values_)));
 }
 
 Schedule::~Schedule() {
 }
 
+// Revisit idea of just keeping Specs, and "scheduling" consists of the act of
+// sorting the Specs, first time by end_times(). Then possibly sort by
+// earliest_time_after?
+
+// BLOCK WELDING/REPACKING
+// Key idea: Blocks start out with all 3 Registers unknown.
+// Block should keep a list of Specs as they are appended to the Block.
+
+// Plans for AddSpec:
+// a) Iterate backwards through |states_| looking for a state with range that
+// intersects the |spec|. One such state should always exist, because the
+// schedule states always cover the entire range of the program. For each state
+// that occurs before intersection it must return 0 for EarliestTimeAfter() or
+// this |spec| cannot be scheduled?  May require a modification to our state
+// logic to temporarily extend the end_time of the |spec| to the end time of
+// the state in question or some other fix to allow determination of if
+// scheduling is permitted before? Or is it better to require that the end_times
+// of the |spec| being added must always increase monotonically?
+//
+// BLOCK FINDING
+//
+// b) Now that we have a state in range of the Spec, or we are always using
+// the final state, we call EarliestTimeAfter() on it to see if we can schedule
+// it before the final state. We use the end_time() of the Spec for the
+// EarliestTimeAfter call. Several possiblities exist:
+// b.1) final_state returns 0. This means we can schedule before. We iterate
+// back through blocks and states to determine what Block, if any, we can append
+// to.
+// b.2) final_state returns non-zero value.
 uint32 Schedule::AddSpec(const Spec& spec) {
+  // Iterate backwards through states looking for a state with range that
+  // intersects the |spec|.
+  int state_index = states_.size() - 1;
   return kInfinity;
 }
 
@@ -130,7 +154,7 @@ std::unique_ptr<ColuStrip> Schedule::Simulate(uint32 row) {
   return std::unique_ptr<ColuStrip>();
 }
 
-std::string Schedule::Assemble() {
+std::string Schedule::Assemble() const {
   return std::string();
 }
 

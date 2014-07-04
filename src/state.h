@@ -19,10 +19,15 @@ class Spec;
 // active.
 class State {
  public:
-  // Constructs a default initial state, with all values set to unknown.
+  //====== State Creation Methods
+
+  // Constructs a default initial State, with all values set to unknown.
   State();
 
-  //====== State Creation Methods
+  // Constructs a State with all TIA values known and set to a copy of the
+  // provided byte pointer, all registers set to unknown, and all over values
+  // at defaults.
+  State(const uint8* tia_values);
 
   // Produces an exact copy of this State.
   std::unique_ptr<State> Clone() const;

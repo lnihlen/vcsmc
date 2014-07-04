@@ -77,6 +77,10 @@ TEST_F(StateTest, InitialStateHasFullProgramRange) {
   State state;
   EXPECT_EQ(0, state.range().start_time());
   EXPECT_EQ(kFrameSizeClocks, state.range().end_time());
+  uint8 tia_values[TIA::TIA_COUNT];
+  State state_value(tia_values);
+  EXPECT_EQ(0, state_value.range().start_time());
+  EXPECT_EQ(kFrameSizeClocks, state_value.range().end_time());
 }
 
 TEST_F(StateTest, InitialStateHasAllRegistersUnknown) {
@@ -84,6 +88,12 @@ TEST_F(StateTest, InitialStateHasAllRegistersUnknown) {
   EXPECT_FALSE(state.register_known(Register::A));
   EXPECT_FALSE(state.register_known(Register::X));
   EXPECT_FALSE(state.register_known(Register::Y));
+  uint8 tia_values[TIA::TIA_COUNT];
+  std::memset(tia_values, 0, sizeof(tia_values));
+  State state_value(tia_values);
+  EXPECT_FALSE(state_value.register_known(Register::A));
+  EXPECT_FALSE(state_value.register_known(Register::X));
+  EXPECT_FALSE(state_value.register_known(Register::Y));
 }
 
 TEST_F(StateTest, InitialStateHasOnlyStrobeTIAValuesKnown) {
@@ -133,6 +143,17 @@ TEST_F(StateTest, InitialStateHasOnlyStrobeTIAValuesKnown) {
   EXPECT_TRUE(state.tia_known(TIA::HMOVE));
   EXPECT_TRUE(state.tia_known(TIA::HMCLR));
   EXPECT_TRUE(state.tia_known(TIA::CXCLR));
+}
+
+TEST_F(StateTest, InitialStateWithValuesHasAllTIAValuesKnown) {
+  uint8 tia_values[TIA::TIA_COUNT];
+  for (uint8 i = 0; i < TIA::TIA_COUNT; ++i)
+    tia_values[i] = i;
+  State state_value(tia_values);
+  for (uint8 i = 0; i < TIA::TIA_COUNT; ++i) {
+    EXPECT_TRUE(state_value.tia_known(static_cast<TIA>(i)));
+    EXPECT_EQ(tia_values[i], state_value.tia(static_cast<TIA>(i)));
+  }
 }
 
 TEST_F(StateTest, CloneCopiesInitialState) {
