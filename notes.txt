@@ -925,3 +925,29 @@ OK, so Scheduler determines when the earliest time a Spec could happen. It can
 then ask a given Schedule to produce a Change object which represents the
 addition of that Spec to that Schedule. If the Schedule cannot accommodate the
 Spec then it will not produce a Change.
+
+===============================================================================
+
+So looked at sound a little bit today and it seems like doing PCM is very
+expensive on the CPU. I'm going to research that a bit further but it looks like
+a Scheduler may be WAY overkill to manage what will really be just enough state
+changes on a scanline to render an asymmetric playfield. Seriously!
+
+The thinking goes that you set the audio sound control to just supply ones
+and then you use the volume control to modulate that. You get 4 bits of volume
+control so 4-bit PCM. The way to get any kind of audio quality is to of course
+crank up the sample rate. 262 scanlines at 60 Hz means if you update once per
+scanline you get 15720 Hz 4-bit PCM. So not so great. Twice gets you to 31440,
+and three times per scanline gets you to 47160 Hz. The thing to do is to measure
+perceived quality in the different sample rates. There are two audio circuits and
+although they aren't actually in stereo (AFIAK) I could modulate each one to
+represent a different audio channel, hopefully increasing audio fidelity at bit
+as well. Each load/store is 5 clocks and 4 bytes of code. So at 15720 Hz we could
+cram 120 ms of sound into 16K, which is just absolutely ridiculous! :)
+
+Very high data rates. With updating playfield only on the screen, assuming
+asymmetric playfield and new colors per line that's 6 state changes for the
+playfield and 2 for the colors, 40 cycles, leaving 36 for audio updates, we can
+try 3 stereo updates at 10 cycles per update (AUDV0 and AUDV1). Use DPC+ style
+fast lookup of byte tables. 6 + 2 + 6 bytes is 14 bytes/scanline, approximate
+as 16 bytes/scanline or 251520 bytes/second, 256 kBps or 2 Mbps. 
