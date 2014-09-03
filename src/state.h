@@ -71,18 +71,6 @@ class State {
 
   uint32 EarliestTimeAfterWithEndTime(const Spec& spec, uint32 end_time) const;
 
-  //====== Utility Methods
-  // TODO: move to assembler.cc
-
-  // Given a value like Register::A returns "a";
-  static std::string RegisterToString(const Register reg);
-  // Given a ZeroPage address returns either a human-readable name, if within
-  // the TIA realm, or a hexadecimal number for the address.
-  static std::string AddressToString(const uint8 address);
-  // Really only here because the other things are here. Given 0xfe will return
-  // the string "$fe".
-  static std::string ByteToHexString(const uint8 value);
-
   const bool register_known(Register axy) const {
     return registers_known_ & (1 << static_cast<int>(axy));
   }

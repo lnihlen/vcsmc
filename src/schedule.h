@@ -46,6 +46,7 @@ class TimeSpan;
 class Schedule {
  public:
   Schedule();
+  Schedule(const Schedule& schedule);
   ~Schedule();
 
   // Makes a copy-on-write copy of this schedule.

@@ -950,4 +950,32 @@ asymmetric playfield and new colors per line that's 6 state changes for the
 playfield and 2 for the colors, 40 cycles, leaving 36 for audio updates, we can
 try 3 stereo updates at 10 cycles per update (AUDV0 and AUDV1). Use DPC+ style
 fast lookup of byte tables. 6 + 2 + 6 bytes is 14 bytes/scanline, approximate
-as 16 bytes/scanline or 251520 bytes/second, 256 kBps or 2 Mbps. 
+as 16 bytes/scanline or 251520 bytes/second, 256 kBps or 2 Mbps.
+
+===============================================================================
+
+Going to use sox to try and encode some 4-bit samples of sample audio at the
+different bitrates, just to get an initial approximation of what they might be
+like.
+
+sox in.wav -b 4 -c 1 --rate xxx out.wav (or out.raw)
+-b 4 = 4 bit
+-c 1 = mono
+--rate = sample rate
+
+split into two mono tracks:
+
+sox sintel-master-st.flac sintel.left.wav remix 1
+sox sintel-master-st.flac sintel.right.wav remix 2
+
+
+resample to xxx Hz, drop to 8 bit, unsigned bytes, then switch nybbles (so that
+high-order nybble shows up aligned to lower nybble of Atari AUDX registers)
+and this file is ready to go:
+
+sox in.wav --rate xxx -b 8 -e unsigned-integer -N out.raw
+
+downmix to mono:
+sox input.wav output.wav remix −
+
+

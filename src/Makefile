@@ -21,7 +21,8 @@ LIBS+=-framework OpenCL
 endif
 
 DEPS=constants.h image_file.h strategy.h types.h
-OBJ=$(OUT)/background_color_strategy.o                                         \
+OBJ=$(OUT)/assembler.o                                                         \
+    $(OUT)/background_color_strategy.o                                         \
     $(OUT)/block.o                                                             \
     $(OUT)/cl_buffer_impl.o                                                    \
     $(OUT)/cl_command_queue_impl.o                                             \
@@ -45,7 +46,8 @@ OBJ=$(OUT)/background_color_strategy.o                                         \
     $(OUT)/state.o                                                             \
     $(OUT)/tiff_image_file.o
 
-TEST_OBJ=$(OUTTESTS)/block_unittests.o                                         \
+TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
+         $(OUTTESTS)/block_unittests.o                                         \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/state_unittests.o                                         \
 
@@ -54,6 +56,9 @@ $(OUT)/%.o: %.cc $(DEPS)
 
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CC) -c -g -o $@ $< $(CFLAGS) -I$(GTEST_INCLUDE)
+
+$(OUT)/asm: $(OBJ) $(OUT)/asm.o
+	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/picc: $(OBJ) $(OUT)/picc.o
 	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)

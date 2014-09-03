@@ -15,6 +15,10 @@ Schedule::Schedule() {
   states_.push_back(std::unique_ptr<State>(new State(initial_tia_values_)));
 }
 
+Schedule::Schedule(const Schedule& schedule) {
+  // TODO: copy ctor
+}
+
 Schedule::~Schedule() {
 }
 
@@ -50,7 +54,7 @@ Schedule::~Schedule() {
 uint32 Schedule::AddSpec(const Spec& spec) {
   // Iterate backwards through states looking for a state with range that
   // intersects the |spec|.
-  int state_index = states_.size() - 1;
+  // int state_index = states_.size() - 1;
   return kInfinity;
 }
 

@@ -1,5 +1,8 @@
 #include "opcode.h"
 
+#include "assembler.h"
+#include "state.h"
+
 namespace vcsmc {
 
 namespace op {
@@ -13,20 +16,42 @@ std::unique_ptr<State> LoadImmediate::Transform(State* state) const {
       cycles() * kColorClocksPerCPUCycle, register_, value_);
 }
 
-const uint32 LoadImmediate::cycles() const { return kLoadImmediateCPUCycles; }
+uint32 LoadImmediate::cycles() const { return kLoadImmediateCPUCycles; }
 
-const uint32 LoadImmediate::bytes() const { return 2u; }
+uint32 LoadImmediate::bytes() const { return 2u; }
 
 const std::string LoadImmediate::assembler() const {
   std::string asm_string("ld");
 
   // Add register string name to instruction.
-  asm_string += State::RegisterToString(register_);
+  asm_string += Assembler::RegisterToString(register_);
 
   // Pad some space and add the immediate signifier followed by the number.
   asm_string += " #";
-  asm_string += State::ByteToHexString(value_);
+  asm_string += Assembler::ByteToHexString(value_);
   return asm_string;
+}
+
+uint32 LoadImmediate::bytecode(uint8* output) const {
+  switch (register_) {
+    case Register::A:
+      *output = 0xa9;
+      break;
+
+    case Register::X:
+      *output = 0xa2;
+      break;
+
+    case Register::Y:
+      *output = 0xa0;
+      break;
+
+    default:
+      assert(false);
+      break;
+  }
+  *(output + 1) = value_;
+  return bytes();
 }
 
 StoreZeroPage::StoreZeroPage(TIA address, Register reg)
@@ -38,27 +63,54 @@ std::unique_ptr<State> StoreZeroPage::Transform(State* state) const {
       cycles() * kColorClocksPerCPUCycle, register_, address_);
 }
 
-const uint32 StoreZeroPage::cycles() const { return kStoreZeroPageCPUCycles; }
+uint32 StoreZeroPage::cycles() const { return kStoreZeroPageCPUCycles; }
 
-const uint32 StoreZeroPage::bytes() const { return 2u; }
+uint32 StoreZeroPage::bytes() const { return 2u; }
 
 const std::string StoreZeroPage::assembler() const {
   std::string asm_string("st");
-  asm_string += State::RegisterToString(register_);
+  asm_string += Assembler::RegisterToString(register_);
   asm_string += " ";
-  asm_string += State::AddressToString(address_);
+  asm_string += Assembler::AddressToString(address_);
   return asm_string;
+}
+
+uint32 StoreZeroPage::bytecode(uint8* output) const {
+  switch (register_) {
+    case Register::A:
+      *output = 0x85;
+      break;
+
+    case Register::X:
+      *output = 0x86;
+      break;
+
+    case Register::Y:
+      *output = 0x84;
+      break;
+
+    default:
+      assert(false);
+      break;
+  }
+  *(output + 1) = static_cast<uint8>(address_);
+  return bytes();
 }
 
 std::unique_ptr<State> NOP::Transform(State* state) const {
   return state->AdvanceTime(cycles() * kColorClocksPerCPUCycle);
 }
 
-const uint32 NOP::cycles() const { return kNoOpCPUCycles; }
+uint32 NOP::cycles() const { return kNoOpCPUCycles; }
 
-const uint32 NOP::bytes() const { return 1u; }
+uint32 NOP::bytes() const { return 1u; }
 
 const std::string NOP::assembler() const { return std::string("nop"); }
+
+uint32 NOP::bytecode(uint8* output) const {
+  *output = 0xea;
+  return bytes();
+}
 
 }  // namespace op
 

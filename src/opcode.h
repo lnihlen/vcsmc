@@ -6,10 +6,11 @@
 #include <string>
 
 #include "constants.h"
-#include "state.h"
 #include "types.h"
 
 namespace vcsmc {
+
+class State;
 
 // Keep OpCodes in their own sub namespace, to avoid muddying up the main one.
 namespace op {
@@ -22,22 +23,27 @@ class OpCode {
   virtual std::unique_ptr<State> Transform(State* state) const = 0;
 
   // Returns the number of CPU cycles this opcode takes.
-  virtual const uint32 cycles() const = 0;
+  virtual uint32 cycles() const = 0;
 
   // Returns number of bytes this opcode takes as bytecode.
-  virtual const uint32 bytes() const = 0;
+  virtual uint32 bytes() const = 0;
 
   // Returns the assembler version of this OpCode.
   virtual const std::string assembler() const = 0;
+
+  // Fills |output| with bytecode for this instruction, returns the number of
+  // bytes added past output.
+  virtual uint32 bytecode(uint8* output) const = 0;
 };
 
 class LoadImmediate : public OpCode {
  public:
   LoadImmediate(uint8 value, Register reg);
   virtual std::unique_ptr<State> Transform(State* state) const override;
-  virtual const uint32 cycles() const override;
-  virtual const uint32 bytes() const override;
+  virtual uint32 cycles() const override;
+  virtual uint32 bytes() const override;
   virtual const std::string assembler() const override;
+  virtual uint32 bytecode(uint8* output) const override;
 
  protected:
   uint8 value_;
@@ -66,9 +72,10 @@ class StoreZeroPage : public OpCode {
  public:
   StoreZeroPage(TIA address, Register reg);
   virtual std::unique_ptr<State> Transform(State* state) const override;
-  virtual const uint32 cycles() const override;
-  virtual const uint32 bytes() const override;
+  virtual uint32 cycles() const override;
+  virtual uint32 bytes() const override;
   virtual const std::string assembler() const override;
+  virtual uint32 bytecode(uint8* output) const override;
 
  protected:
   TIA address_;
@@ -97,9 +104,10 @@ class NOP : public OpCode {
  public:
   NOP() {}
   virtual std::unique_ptr<State> Transform(State* state) const override;
-  virtual const uint32 cycles() const override;
-  virtual const uint32 bytes() const override;
+  virtual uint32 cycles() const override;
+  virtual uint32 bytes() const override;
   virtual const std::string assembler() const override;
+  virtual uint32 bytecode(uint8* output) const override;
 };
 
 }  // namespace op

@@ -6,9 +6,9 @@
 namespace vcsmc {
 
 // Terminology:
-// a Pixel is an actual renderable element, on screen.
-// a Clock is a color clock, or the time required to render one pixel
-// a Cycle is a CPU cycle, on the VCS is 3 Clocks.
+// A pixel is an actual renderable element, on screen.
+// A clock is a color clock, or the time required to render one pixel.
+// A cycle is a CPU cycle, on the VCS is 3 color clocks.
 const uint32 kFrameWidthPixels = 160;
 const uint32 kFrameHeightPixels = 180;
 const uint32 kFrameSizeBytes = kFrameWidthPixels * kFrameHeightPixels;
