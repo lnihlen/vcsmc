@@ -5,13 +5,15 @@
 #include <string>
 
 #include "types.h"
+#include "cl_program.h"
 
 namespace vcsmc {
 
+class CLBuffer;
 class CLCommandQueue;
 class CLImage;
 class CLKernel;
-class CLBuffer;
+class CLProgram;
 class Image;
 class PixelStrip;
 
@@ -23,17 +25,11 @@ class CLDeviceContext {
   static bool Setup();
   static void Teardown();
 
-  enum Kernels : size_t {
-    kCiede2k = 0,
-    kRGBToLab = 1,
-    kKernelsCount = 2
-  };
-
   static std::unique_ptr<CLBuffer> MakeBuffer(size_t size);
   static std::unique_ptr<CLCommandQueue> MakeCommandQueue();
   static std::unique_ptr<CLImage> MakeImage(const Image* image);
   static std::unique_ptr<CLImage> MakeImageFromStrip(const PixelStrip* strip);
-  static std::unique_ptr<CLKernel> MakeKernel(Kernels kernel);
+  static std::unique_ptr<CLKernel> MakeKernel(CLProgram::Programs program);
 
  private:
   static CLDeviceContext* instance_;
@@ -42,13 +38,12 @@ class CLDeviceContext {
   ~CLDeviceContext();
 
   bool DoSetup();
-  bool LoadAndBuildProgram(Kernels kernel);
-  const char* KernelName(Kernels kernel);
+  bool BuildProgram(CLProgram::Programs program);
   std::unique_ptr<CLBuffer> DoMakeBuffer(size_t size);
   std::unique_ptr<CLCommandQueue> DoMakeCommandQueue();
   std::unique_ptr<CLImage> DoMakeImage(const Image* image);
   std::unique_ptr<CLImage> DoMakeImageFromStrip(const PixelStrip* strip);
-  std::unique_ptr<CLKernel> DoMakeKernel(Kernels kernel);
+  std::unique_ptr<CLKernel> DoMakeKernel(CLProgram::Programs program);
 
   struct Impl;
   std::unique_ptr<Impl> impl_;

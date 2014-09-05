@@ -9,6 +9,7 @@
 #include "cl_device_context.h"
 #include "cl_image.h"
 #include "cl_kernel.h"
+#include "cl_program.h"
 #include "color.h"
 #include "colu_strip.h"
 #include "constants.h"
@@ -36,7 +37,7 @@ void PixelStrip::BuildDistances(CLCommandQueue* queue) {
   assert(lab_strip);
 
   std::unique_ptr<CLKernel> kernel(
-      CLDeviceContext::MakeKernel(CLDeviceContext::kRGBToLab));
+      CLDeviceContext::MakeKernel(CLProgram::Programs::kRGBToLab));
   assert(kernel);
 
   int inverse_row = image_->height() - row_id_ - 1;
@@ -65,7 +66,7 @@ void PixelStrip::BuildDistances(CLCommandQueue* queue) {
         width_ * sizeof(float)));
 
     std::unique_ptr<CLKernel> kernel(
-        CLDeviceContext::MakeKernel(CLDeviceContext::kCiede2k));
+        CLDeviceContext::MakeKernel(CLProgram::Programs::kCiede2k));
     kernel->SetBufferArgument(0, lab_strip.get());
     kernel->SetBufferArgument(1, colu_lab_buffer.get());
     kernel->SetBufferArgument(2, out_buffer.get());

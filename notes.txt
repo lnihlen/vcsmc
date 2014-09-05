@@ -978,4 +978,13 @@ sox in.wav --rate xxx -b 8 -e unsigned-integer -N out.raw
 downmix to mono:
 sox input.wav output.wav remix −
 
+===============================================================================
+
+TODO:
+
+a) Move .cl files into compiled-in
+b) Refactor cl tests into unit tests
+c) Finish first cut of schedule.cc
+d) Use asm to assemble output from picc into binary blob
+e) Modify stella to support big blob binary
 

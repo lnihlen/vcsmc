@@ -13,6 +13,7 @@
 #include "cl_image_impl.h"
 #include "cl_include.h"
 #include "cl_kernel_impl.h"
+#include "cl_program.h"
 #include "image.h"
 #include "pixel_strip.h"
 
@@ -25,7 +26,7 @@ struct CLDeviceContext::Impl {
   cl_context context;
 
   // Our cache of previously loaded and compiled programs.
-  cl_program programs[Kernels::kKernelsCount];
+  cl_program programs[CLProgram::Programs::kProgramsCount];
 };
 
 // static
@@ -62,15 +63,16 @@ std::unique_ptr<CLImage> CLDeviceContext::MakeImageFromStrip(
 }
 
 // static
-std::unique_ptr<CLKernel> CLDeviceContext::MakeKernel(Kernels kernel) {
-  return instance_->DoMakeKernel(kernel);
+std::unique_ptr<CLKernel> CLDeviceContext::MakeKernel(
+    CLProgram::Programs program) {
+  return instance_->DoMakeKernel(program);
 }
 
 CLDeviceContext::CLDeviceContext() : impl_(new Impl) {
 }
 
 CLDeviceContext::~CLDeviceContext() {
-  for (size_t i = 0; i < Kernels::kKernelsCount; ++i) {
+  for (size_t i = 0; i < CLProgram::Programs::kProgramsCount; ++i) {
     clReleaseProgram(impl_->programs[i]);
   }
   clReleaseContext(impl_->context);
@@ -92,73 +94,41 @@ bool CLDeviceContext::DoSetup() {
   // design additional async thread-safe program compilation, and spares me from
   // having to protect program_map with a lock. And for a project likely to have
   // only a dozen or so cl programs at most should be just fine.
-  if (!LoadAndBuildProgram(kCiede2k))
+  if (!BuildProgram(CLProgram::Programs::kCiede2k))
     return false;
-  if (!LoadAndBuildProgram(kRGBToLab))
+  if (!BuildProgram(CLProgram::Programs::kRGBToLab))
     return false;
 
   return true;
 }
 
-bool CLDeviceContext::LoadAndBuildProgram(Kernels kernel) {
-  std::string filename = std::string("cl/") + KernelName(kernel) + ".cl";
-  int program_fd = open(filename.c_str(), O_RDONLY);
-  if (program_fd < 0)
-    return false;
-
-  // figure out size to pre-allocate buffer of correct size
-  struct stat program_stat;
-  if (fstat(program_fd, &program_stat)) {
-    close(program_fd);
-    return false;
-  }
-
-  std::unique_ptr<char[]> program_bytes(new char[program_stat.st_size + 1]);
-  int read_size = read(program_fd, program_bytes.get(), program_stat.st_size);
-  close(program_fd);
-  if (read_size != program_stat.st_size)
-    return false;
-  program_bytes[program_stat.st_size] = '\0';
-
-  const char* source_ptr = program_bytes.get();
+bool CLDeviceContext::BuildProgram(CLProgram::Programs program) {
+  std::string source = CLProgram::GetProgramString(program);
+  const char* source_cstr = source.c_str();
   int result = 0;
-  cl_program program = clCreateProgramWithSource(
-      impl_->context, 1, &source_ptr, NULL, &result);
-  if (!program || result != CL_SUCCESS)
+  cl_program prog = clCreateProgramWithSource(
+      impl_->context, 1, &source_cstr, NULL, &result);
+  if (!prog || result != CL_SUCCESS)
     return false;
 
-  result = clBuildProgram(program, 0, NULL, "-Werror", NULL, NULL);
+  result = clBuildProgram(prog, 0, NULL, "-Werror", NULL, NULL);
   if (result != CL_SUCCESS) {
     std::unique_ptr<char[]> log_char(new char[16384]);
     size_t log_length;
-    clGetProgramBuildInfo(program,
+    clGetProgramBuildInfo(prog,
                           impl_->device_id,
                           CL_PROGRAM_BUILD_LOG,
                           16384,
                           log_char.get(),
                           &log_length);
     // this should really go in the logs but dump to stdio for now.
-    std::cerr << "** failed to build " << KernelName(kernel) << std::endl
-              << log_char.get();
+    std::cerr << "** failed to build " << CLProgram::GetProgramName(program)
+              << std::endl << log_char.get();
     return false;
   }
 
-  impl_->programs[kernel] = program;
+  impl_->programs[program] = prog;
   return true;
-}
-
-const char* CLDeviceContext::KernelName(Kernels kernel) {
-  switch (kernel) {
-    case kCiede2k:
-      return "ciede2k";
-    case kRGBToLab:
-      return "rgb_to_lab";
-    default:
-      assert(false);
-      return "";
-  }
-  assert(false);
-  return "";
 }
 
 std::unique_ptr<CLBuffer> CLDeviceContext::DoMakeBuffer(size_t size) {
@@ -194,10 +164,11 @@ std::unique_ptr<CLImage> CLDeviceContext::DoMakeImageFromStrip(
   return std::unique_ptr<CLImage>(iimpl.release());
 }
 
-std::unique_ptr<CLKernel> CLDeviceContext::DoMakeKernel(Kernels kernel) {
+std::unique_ptr<CLKernel> CLDeviceContext::DoMakeKernel(
+    CLProgram::Programs program) {
   std::unique_ptr<CLKernelImpl> kimpl(new CLKernelImpl);
-  if (!kimpl->Setup(impl_->programs[kernel],
-                    KernelName(kernel),
+  if (!kimpl->Setup(impl_->programs[program],
+                    CLProgram::GetProgramName(program).c_str(),
                     impl_->context,
                     impl_->device_id))
     return std::unique_ptr<CLKernel>();

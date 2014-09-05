@@ -29,6 +29,7 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/cl_device_context.o                                                 \
     $(OUT)/cl_image_impl.o                                                     \
     $(OUT)/cl_kernel_impl.o                                                    \
+    $(OUT)/cl_program.o                                                        \
     $(OUT)/color.o                                                             \
     $(OUT)/colu_strip.o                                                        \
     $(OUT)/do_nothing_strategy.o                                               \
@@ -51,16 +52,18 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/state_unittests.o                                         \
 
+all: $(OUT)/picc $(OUT)/asm tests
+
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -g -o $@ $< $(CFLAGS)
 
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CC) -c -g -o $@ $< $(CFLAGS) -I$(GTEST_INCLUDE)
 
-$(OUT)/asm: $(OBJ) $(OUT)/asm.o
+$(OUT)/picc: $(OBJ) $(OUT)/picc.o
 	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-$(OUT)/picc: $(OBJ) $(OUT)/picc.o
+$(OUT)/asm: $(OBJ) $(OUT)/asm.o
 	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 tests: $(OUT)/run_unittests | $(OUTTESTS)/
@@ -73,5 +76,4 @@ $(OUTTESTS)/:
 
 .PHONY: clean
 clean:
-	rm -f $(OBJ) $(OUT)/picc $(TEST_OBJ) $(OUT)/run_unittests
-
+	rm -rf $(OUT)
