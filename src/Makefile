@@ -49,7 +49,9 @@ OBJ=$(OUT)/assembler.o                                                         \
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/block_unittests.o                                         \
+         $(OUTTESTS)/ciede2k_unittests.o                                       \
          $(OUTTESTS)/range_unittests.o                                         \
+         $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
          $(OUTTESTS)/state_unittests.o                                         \
 
 all: $(OUT)/picc $(OUT)/asm tests
@@ -66,9 +68,9 @@ $(OUT)/picc: $(OBJ) $(OUT)/picc.o
 $(OUT)/asm: $(OBJ) $(OUT)/asm.o
 	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-tests: $(OUT)/run_unittests | $(OUTTESTS)/
+tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 
-$(OUT)/run_unittests: $(OBJ) $(TEST_OBJ) | $(OUTTESTS)/
+$(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o | $(OUTTESTS)/
 	$(CC) -g -o $@ $^ $(GTEST_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUTTESTS)/:

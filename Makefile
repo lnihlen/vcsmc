@@ -6,7 +6,7 @@ export LDFLAGS=
 export LIBS=-lstdc++
 export OUT=$(CURDIR)/out
 export GTEST_INCLUDE=$(CURDIR)/third_party/gtest-1.7.0/include
-export GTEST_LIB=$(OUT)/gtest/gtest_main.a
+export GTEST_LIB=$(OUT)/gtest/gtest.a
 
 all: picc asm gtest tests
 

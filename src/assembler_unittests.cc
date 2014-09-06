@@ -4,49 +4,41 @@
 
 namespace vcsmc {
 
-class AssemblerTest : public ::testing::Test {
- protected:
-  AssemblerTest() {
-    // Ensure Init gets called before any test code executes.
-    Assembler::InitAssemblerTables();
-  }
-};
-
 // An empty string should assemble successfully to no opcodes.
-TEST_F(AssemblerTest, AssembleEmptyString) {
+TEST(AssemblerTest, AssembleEmptyString) {
   std::vector<std::unique_ptr<op::OpCode>> opcodes;
   EXPECT_TRUE(Assembler::AssembleString("", &opcodes));
   EXPECT_EQ(0U, opcodes.size());
 }
 
 // A string consisting only of a newline should assemble to no opcodes.
-TEST_F(AssemblerTest, AssembleNewLine) {
+TEST(AssemblerTest, AssembleNewLine) {
   std::vector<std::unique_ptr<op::OpCode>> opcodes;
   EXPECT_TRUE(Assembler::AssembleString("\n", &opcodes));
   EXPECT_EQ(0U, opcodes.size());
 }
 
 // Tabs are valid whitespace as well and should be ignored.
-TEST_F(AssemblerTest, AssembleTab) {
+TEST(AssemblerTest, AssembleTab) {
   std::vector<std::unique_ptr<op::OpCode>> opcodes;
   EXPECT_TRUE(Assembler::AssembleString("\t", &opcodes));
   EXPECT_EQ(0U, opcodes.size());
 }
 
-TEST_F(AssemblerTest, AssembleCommentOnStartOfLine) {
+TEST(AssemblerTest, AssembleCommentOnStartOfLine) {
   std::vector<std::unique_ptr<op::OpCode>> opcodes;
   EXPECT_TRUE(Assembler::AssembleString("; Comment on this line\n", &opcodes));
   EXPECT_EQ(0U, opcodes.size());
 }
 
-TEST_F(AssemblerTest, AssembleCommentLaterOnLine) {
+TEST(AssemblerTest, AssembleCommentLaterOnLine) {
   std::vector<std::unique_ptr<op::OpCode>> opcodes;
   EXPECT_TRUE(Assembler::AssembleString("  ; Late-line comment", &opcodes));
   EXPECT_EQ(0U, opcodes.size());
 }
 
 // A single-line load immediate instruction.
-TEST_F(AssemblerTest, AssembleSingleLineLDAImmediateHex) {
+TEST(AssemblerTest, AssembleSingleLineLDAImmediateHex) {
   std::vector<std::unique_ptr<op::OpCode>> opcodes;
   EXPECT_TRUE(Assembler::AssembleString("  lda #$f0", &opcodes));
   ASSERT_EQ(1U, opcodes.size());
@@ -56,7 +48,7 @@ TEST_F(AssemblerTest, AssembleSingleLineLDAImmediateHex) {
   EXPECT_EQ(0xf0, bytes[1]);
 }
 
-TEST_F(AssemblerTest, AssembleSingleLineSTXZeroPageTIA) {
+TEST(AssemblerTest, AssembleSingleLineSTXZeroPageTIA) {
   std::vector<std::unique_ptr<op::OpCode>> opcodes;
   EXPECT_TRUE(Assembler::AssembleString(
       "  ; single-line store\n  stx AUDC0  ; update AUDC0\n", &opcodes));
