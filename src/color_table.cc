@@ -1,7 +1,10 @@
 // generated file, do not edit. edit make_color_tables.py instead!
+#include "color_table.h"
+
+namespace vcsmc {
 
 // Index is atari_color / 2, 0xAABBGGRR
-static const uint32 kAtariNTSCABGRColorTable[128] = {
+const uint32 kAtariNTSCABGRColorTable[128] = {
   0xff000000,
   0xff404040,
   0xff6c6c6c,
@@ -132,7 +135,7 @@ static const uint32 kAtariNTSCABGRColorTable[128] = {
   0xff8ce0fc
 };
 
-static const float kAtariNTSCLabColorTable[128 * 4] = {
+const float kAtariNTSCLabColorTable[128 * 4] = {
   0.000000, 0.000000, 0.000000, 1.0,
   27.093408, -0.000171, -0.003181, 1.0,
   45.628681, -0.000244, -0.004549, 1.0,
@@ -262,3 +265,5 @@ static const float kAtariNTSCLabColorTable[128 * 4] = {
   82.806129, -0.551712, 43.302629, 1.0,
   89.813890, -1.286436, 44.536822, 1.0
 };
+
+}  // namespace vcsmc

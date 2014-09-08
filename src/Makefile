@@ -31,6 +31,7 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/cl_kernel_impl.o                                                    \
     $(OUT)/cl_program.o                                                        \
     $(OUT)/color.o                                                             \
+    $(OUT)/color_table.o                                                       \
     $(OUT)/colu_strip.o                                                        \
     $(OUT)/do_nothing_strategy.o                                               \
     $(OUT)/image.o                                                             \

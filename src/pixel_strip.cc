@@ -40,6 +40,7 @@ void PixelStrip::BuildDistances(CLCommandQueue* queue) {
       CLDeviceContext::MakeKernel(CLProgram::Programs::kRGBToLab));
   assert(kernel);
 
+  // OpenCL images count bottom-up, but we count top-down.
   int inverse_row = image_->height() - row_id_ - 1;
   kernel->SetImageArgument(0, source_image);
   kernel->SetByteArgument(1, sizeof(int), &inverse_row);

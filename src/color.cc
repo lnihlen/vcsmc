@@ -3,10 +3,8 @@
 #include "cl_buffer.h"
 #include "cl_command_queue.h"
 #include "cl_device_context.h"
+#include "color_table.h"
 #include "constants.h"
-
-// include generated color table file
-#include "auto/color_table.cc"
 
 namespace vcsmc {
 
