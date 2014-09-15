@@ -2,6 +2,9 @@
 
 #include <cstdio>
 #include <string>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "cl_device_context.h"
 #include "cl_image.h"
@@ -29,12 +32,27 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  // Load input image file.
-  vcsmc::TiffImageFile image_file(input_file);
-  std::unique_ptr<vcsmc::Image> image(image_file.Load());
-  if (!image) {
-    fprintf(stderr, "error loading image file: %s\n", input_file.c_str());
-    return -1;
+  const size_t kFileNameBufferSize = 2048;
+  struct stat file_stat;
+  int file_counter = 1;
+  std::unique_ptr<char[]> file_name(new char[kFileNameBufferSize]);
+  snprintf(file_name.get(), kFileNameBufferSize, input_file_spec.c_str(),
+      file_counter);
+  while (stat(file_name.get(), &file_stat) == 0) {
+    // TODO: Multi-threaded fun!
+    printf("processing %s\n", file_name.get());
+
+    // Load input image file.
+    vcsmc::TiffImageFile image_file(file_name.get());
+    std::unique_ptr<vcsmc::Image> image(image_file.Load());
+    if (!image) {
+      fprintf(stderr, "error loading image file: %s\n", file_name.get());
+      return -1;
+    }
+
+    ++file_counter;
+    snprintf(file_name.get(), kFileNameBufferSize, input_file_spec.c_str(),
+        file_counter);
   }
 
   vcsmc::CLDeviceContext::Teardown();

@@ -20,9 +20,8 @@ LDFLAGS+=-L/opt/local/lib
 LIBS+=-framework OpenCL
 endif
 
-DEPS=constants.h image_file.h strategy.h types.h
+DEPS=constants.h image_file.h types.h
 OBJ=$(OUT)/assembler.o                                                         \
-    $(OUT)/background_color_strategy.o                                         \
     $(OUT)/block.o                                                             \
     $(OUT)/cl_buffer_impl.o                                                    \
     $(OUT)/cl_command_queue_impl.o                                             \
@@ -33,14 +32,10 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/color.o                                                             \
     $(OUT)/color_table.o                                                       \
     $(OUT)/colu_strip.o                                                        \
-    $(OUT)/do_nothing_strategy.o                                               \
     $(OUT)/image.o                                                             \
-    $(OUT)/kernel.o                                                            \
-    $(OUT)/log.o                                                               \
     $(OUT)/opcode.o                                                            \
     $(OUT)/pallette.o                                                          \
     $(OUT)/pixel_strip.o                                                       \
-    $(OUT)/playfield_strategy.o                                                \
     $(OUT)/random.o                                                            \
     $(OUT)/range.o                                                             \
     $(OUT)/schedule.o                                                          \
