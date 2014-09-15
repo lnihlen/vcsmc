@@ -1,3 +1,4 @@
+#include "constants.h"
 #include "gtest/gtest.h"
 #include "range.h"
 
@@ -153,6 +154,40 @@ TEST(RangeTest, IntersectRangeEmptyRange) {
   Range range(42, 1336);
   Range intersect = Range::IntersectRanges(empty_range, range);
   EXPECT_TRUE(intersect.IsEmpty());
+}
+
+TEST(RangeTest, SerializeToBufferEmptyRange) {
+  uint8 buffer[16];
+  Range range;
+  EXPECT_EQ(16, range.Serialize(buffer));
+  for (int i = 0; i < 16; ++i)
+    EXPECT_EQ(0, buffer[i]);
+}
+
+TEST(RangeTest, SerializeToBufferInfiniteRange) {
+  uint8 buffer[16];
+  Range range(0, kInfinity);
+  EXPECT_EQ(16, range.Serialize(buffer));
+  for (int i = 0; i < 8; ++i)
+    EXPECT_EQ(0, buffer[i]);
+  for (int i = 8; i < 16; ++i)
+    EXPECT_EQ(0xff, buffer[i]);
+}
+
+TEST(RangeTest, SeralizeToBufferNonZeroLittleEndian) {
+  uint8 buffer[16];
+  Range range(0x0011223344556677, 0x8899aabbccddeeff);
+  EXPECT_EQ(16, range.Serialize(buffer));
+  uint8 counter = 0x77;
+  for (int i = 0; i < 8; ++i) {
+    EXPECT_EQ(counter, buffer[i]);
+    counter -= 0x11;
+  }
+  counter = 0xff;
+  for (int i = 8; i < 16; ++i) {
+    EXPECT_EQ(counter, buffer[i]);
+    counter -= 0x11;
+  }
 }
 
 TEST(RangeTest, IntersectRangeZero) {

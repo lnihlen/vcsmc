@@ -14,7 +14,7 @@ Block::Block() : total_bytes_(0) {
     register_usage_times_[i] = kInfinity;
 }
 
-Block::Block(State* state, uint32 delta) : total_bytes_(0) {
+Block::Block(State* state, uint64 delta) : total_bytes_(0) {
   std::unique_ptr<State> entry_state = state->MakeEntryState(delta);
   range_ = entry_state->range();
   states_.push_back(std::move(entry_state));
@@ -22,10 +22,10 @@ Block::Block(State* state, uint32 delta) : total_bytes_(0) {
     register_usage_times_[i] = kInfinity;
 }
 
-uint32 Block::EarliestTimeAfter(const Spec& spec, uint32 end_time) const {
+uint64 Block::EarliestTimeAfter(const Spec& spec, uint64 end_time) const {
   // Check our final_state() first as this this may determine if we should
   // consider the |spec| internally at all.
-  uint32 final_state_time = final_state()->EarliestTimeAfterWithEndTime(
+  uint64 final_state_time = final_state()->EarliestTimeAfterWithEndTime(
       spec, end_time);
   if (final_state_time > 0)
     return final_state_time;
@@ -36,7 +36,7 @@ uint32 Block::EarliestTimeAfter(const Spec& spec, uint32 end_time) const {
   return 0;
 }
 
-uint32 Block::ClocksToAppend(const Spec& spec) const {
+uint64 Block::ClocksToAppend(const Spec& spec) const {
   // First check is maybe this |spec| is already the way things are, which is
   // great because we get this append for free.
   if (final_state()->tia_known(spec.tia()) &&
@@ -81,7 +81,7 @@ void Block::Append(const Spec& spec) {
   // recently used.
   if (reg == Register::REGISTER_COUNT) {
     for (uint8 i = 0; i < Register::REGISTER_COUNT; ++i) {
-      uint32 oldest_usage_time = kInfinity;
+      uint64 oldest_usage_time = kInfinity;
       if (!final_state()->register_known(static_cast<Register>(i))) {
         reg = static_cast<Register>(i);
         break;
@@ -102,7 +102,7 @@ void Block::Append(const Spec& spec) {
     opcodes_.push_back(std::move(load));
   }
 
-  assert(reg != Register::REGISTER_COUNT);
+  assert(reg < Register::REGISTER_COUNT);
   assert(final_state()->register_known(reg));
   assert(final_state()->reg(reg) == spec.value());
   register_usage_times_[reg] = range_.end_time();

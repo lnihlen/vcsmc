@@ -10,7 +10,7 @@ Range::Range()
     end_time_(0) {
 }
 
-Range::Range(uint32 start_time, uint32 end_time)
+Range::Range(uint64 start_time, uint64 end_time)
   : start_time_(start_time),
     end_time_(end_time) {
   assert(end_time_ >= start_time_);
@@ -39,19 +39,26 @@ const bool Range::operator!=(const Range& range) const {
 
 // static
 Range Range::IntersectRanges(const Range& r1, const Range& r2) {
-  uint32 start_time = std::max(r1.start_time(), r2.start_time());
-  uint32 end_time = std::min(r1.end_time(), r2.end_time());
+  uint64 start_time = std::max(r1.start_time(), r2.start_time());
+  uint64 end_time = std::min(r1.end_time(), r2.end_time());
   if (start_time > end_time)
     return Range();
   return Range(start_time, end_time);
 }
 
-void Range::set_start_time(uint32 start_time) {
+size_t Range::Serialize(uint8* buffer) {
+  uint64* buffer_long = reinterpret_cast<uint64*>(buffer);
+  buffer_long[0] = start_time_;
+  buffer_long[1] = end_time_;
+  return 2 * sizeof(uint64);
+}
+
+void Range::set_start_time(uint64 start_time) {
   assert(end_time_ >= start_time);
   start_time_ = start_time;
 }
 
-void Range::set_end_time(uint32 end_time) {
+void Range::set_end_time(uint64 end_time) {
   assert(end_time >= start_time_);
   end_time_ = end_time;
 }

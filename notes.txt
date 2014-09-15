@@ -988,3 +988,33 @@ c) Finish first cut of schedule.cc
 d) Use asm to assemble output from picc into binary blob
 e) Modify stella to support big blob binary
 
+===============================================================================
+
+The Spec binary format. Serialize Range to a pair of absolute time of color
+clocks for origin of entire file. This means Range and Spec get an offset time
+for serializing relative to. Little-endian format:
+
+// 18 bytes/spec
+//
+// +--------+------------+------+--------+
+// | type   | name       | size | offset |
+// +--------+------------+------+--------+
+// | uint64 | start_time |   8  |   0    |
+// | uint64 | end_time   |   8  |   8    |
+// | uint8  | TIA        |   1  |  16    |
+// | uint8  | value      |   1  |  17    |
+// +--------+------------+------+--------+
+
+===============================================================================
+
+picc redesign.
+
+New job of picc is to output a Spec stream for each frame that was supplied to
+the input, along with a frame rate. Aggressive picture fitting, add every thing
+that can fit will be added to the output.
+
+sndc/aucc Audio does the same.
+
+Linker schedules frame necessities first (like turning on and off VBLANK), then
+typically audio, then visual. Just greedy scheduler for now. Schedule every spec
+and then drop the ones that don't fit. See how that works for now.

@@ -1,36 +1,31 @@
 // picc - VCS picture compiler.
 
-#include <iostream>
+#include <cstdio>
 #include <string>
 
 #include "cl_device_context.h"
 #include "cl_image.h"
 #include "color.h"
 #include "image.h"
-#include "kernel.h"
-#include "log.h"
 #include "opcode.h"
 #include "schedule.h"
 #include "state.h"
 #include "tiff_image_file.h"
 
 int main(int argc, char* argv[]) {
-  // Keep singleton instances here in main so they will be deconstructed when
-  // the program exits.
-  vcsmc::Log log;
-
   // Parse command line.
-  if (argc != 2) {
-    std::cerr << "picc usage:" << std::endl
-              << "picc <input_file.tiff>" << std::endl;
+  if (argc != 3) {
+    printf("picc usage:\n"
+           "  picc <input_file_spec.tiff> <frame_rate_in_Hz>\n\n"
+           "picc example:\n"
+           "  picc test_%%05d.tiff 60\n");
     return -1;
   }
-  std::string input_file(argv[1]);
+  std::string input_file_spec(argv[1]);
+  std::string frame_rate_hz(argv[2]);
 
-  // Assumes switches have already been parsed, or sadness will occur.
-  vcsmc::Log::Setup();
   if (!vcsmc::CLDeviceContext::Setup()) {
-    std::cerr << "OpenCL setup failed, exiting." << std::endl;
+    printf("OpenCL setup failed, exiting.\n");
     return -1;
   }
 
@@ -38,22 +33,9 @@ int main(int argc, char* argv[]) {
   vcsmc::TiffImageFile image_file(input_file);
   std::unique_ptr<vcsmc::Image> image(image_file.Load());
   if (!image) {
-    std::cerr << "error loading image file: " << input_file << std::endl;
+    fprintf(stderr, "error loading image file: %s\n", input_file.c_str());
     return -1;
   }
-
-  // Kernel takes ownership of frame.
-  vcsmc::Kernel kernel(std::move(image));
-
-  std::cout << "fitting " << input_file << std::endl;
-
-  // Fit the frame.
-  kernel.Fit();
-
-  std::cout << "saving fit for " << input_file << "." << std::endl;
-
-  // Write the output.
-  kernel.Save();
 
   vcsmc::CLDeviceContext::Teardown();
   return 0;

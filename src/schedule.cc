@@ -51,18 +51,18 @@ Schedule::~Schedule() {
 // back through blocks and states to determine what Block, if any, we can append
 // to.
 // b.2) final_state returns non-zero value.
-uint32 Schedule::AddSpec(const Spec& spec) {
+uint64 Schedule::AddSpec(const Spec& spec) {
   // Iterate backwards through states looking for a state with range that
   // intersects the |spec|.
   // int state_index = states_.size() - 1;
   return kInfinity;
 }
 
-uint32 Schedule::AddSpecs(const std::vector<Spec>* specs) {
+uint64 Schedule::AddSpecs(const std::vector<Spec>* specs) {
   return kInfinity;
 }
 
-uint32 Schedule::CostToAddSpec(const Spec& spec) {
+uint64 Schedule::CostToAddSpec(const Spec& spec) {
   assert(states_.size() > 0);
 
   // Iterate backward through states, looking for a State that returns nonzero
@@ -88,7 +88,7 @@ uint32 Schedule::CostToAddSpec(const Spec& spec) {
     if (state->range().start_time() < spec.range().start_time())
       break;
 
-    uint32 state_clock = state->EarliestTimeAfter(spec);
+    uint64 state_clock = state->EarliestTimeAfter(spec);
     if (state_clock == kInfinity)
       return kInfinity;
 
@@ -150,11 +150,11 @@ uint32 Schedule::CostToAddSpec(const Spec& spec) {
   return kInfinity;
 }
 
-uint32 Schedule::CostToAddSpecs(const std::vector<Spec>* specs) {
+uint64 Schedule::CostToAddSpecs(const std::vector<Spec>* specs) {
   return kInfinity;
 }
 
-std::unique_ptr<ColuStrip> Schedule::Simulate(uint32 row) {
+std::unique_ptr<ColuStrip> Schedule::Simulate(uint64 row) {
   return std::unique_ptr<ColuStrip>();
 }
 

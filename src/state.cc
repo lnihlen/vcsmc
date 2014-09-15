@@ -17,16 +17,16 @@ namespace {
 // |    PF1    |  84  |        164          |        180         |
 // |    PF2    | 116  |        196          |        148         |
 // +-----------+------+---------------------+--------------------+
-const uint32 kPF0Left = 68;
-const uint32 kPF1Left = 84;
-const uint32 kPF2Left = 116;
-const uint32 kPF0Right = 148;
-const uint32 kPF1Right = 164;
-const uint32 kPF2Right = 196;
-const uint32 kPF0RightM = 212;
-const uint32 kPF1RightM = 180;
-const uint32 kPF2RightM = 148;
-const uint32 kPFMidline = 148;
+const uint64 kPF0Left = 68;
+const uint64 kPF1Left = 84;
+const uint64 kPF2Left = 116;
+const uint64 kPF0Right = 148;
+const uint64 kPF1Right = 164;
+const uint64 kPF2Right = 196;
+const uint64 kPF0RightM = 212;
+const uint64 kPF1RightM = 180;
+const uint64 kPF2RightM = 148;
+const uint64 kPFMidline = 148;
 
 }
 
@@ -53,10 +53,10 @@ std::unique_ptr<State> State::Clone() const {
   return state;
 }
 
-std::unique_ptr<State> State::AdvanceTime(uint32 delta) {
+std::unique_ptr<State> State::AdvanceTime(uint64 delta) {
   assert(delta > 0);
   std::unique_ptr<State> state(Clone());
-  uint32 new_start_time = range_.start_time() + delta;
+  uint64 new_start_time = range_.start_time() + delta;
   range_.set_end_time(new_start_time);
   // The new |state| has a copy of our |range_|, which may have had an end
   // time less than the new start time. If so, we reset the new |state| to
@@ -68,7 +68,7 @@ std::unique_ptr<State> State::AdvanceTime(uint32 delta) {
 }
 
 std::unique_ptr<State> State::AdvanceTimeAndSetRegister(
-    uint32 delta, Register axy, uint8 value) {
+    uint64 delta, Register axy, uint8 value) {
   std::unique_ptr<State> state(AdvanceTime(delta));
   state->registers_known_ |= (1 << static_cast<int>(axy));
   state->registers_[axy] = value;
@@ -76,7 +76,7 @@ std::unique_ptr<State> State::AdvanceTimeAndSetRegister(
 }
 
 std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
-    uint32 delta, Register axy, TIA address) {
+    uint64 delta, Register axy, TIA address) {
   std::unique_ptr<State> state(AdvanceTime(delta));
   uint8 reg_value = state->reg(axy);
   switch (address) {
@@ -93,7 +93,7 @@ std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
   return state;
 }
 
-std::unique_ptr<State> State::MakeEntryState(uint32 delta) {
+std::unique_ptr<State> State::MakeEntryState(uint64 delta) {
   std::unique_ptr<State> state;
   if (delta > 0) {
     state = AdvanceTime(delta);
@@ -108,11 +108,11 @@ std::unique_ptr<State> State::MakeEntryState(uint32 delta) {
 
 void State::PaintInto(ColuStrip* colu_strip) const {
   Range strip_range(Range::IntersectRanges(colu_strip->range(), range_));
-  uint32 local_clock = strip_range.start_time() % kScanLineWidthClocks;
-  uint32 local_until = local_clock + strip_range.Duration();
-  uint32 starting_clock = std::max(local_clock, kHBlankWidthClocks);
-  uint32 starting_column = starting_clock - kHBlankWidthClocks;
-  for (uint32 clock = starting_clock; clock < local_until; ++clock) {
+  uint64 local_clock = strip_range.start_time() % kScanLineWidthClocks;
+  uint64 local_until = local_clock + strip_range.Duration();
+  uint64 starting_clock = std::max(local_clock, kHBlankWidthClocks);
+  uint64 starting_column = starting_clock - kHBlankWidthClocks;
+  for (uint64 clock = starting_clock; clock < local_until; ++clock) {
     uint8 colu = tia(TIA::COLUBK);
     if (PlayfieldPaints(clock)) {
       // If D1 of CTRLPF is set the playfield paints with COLUP0 on the left
@@ -127,19 +127,19 @@ void State::PaintInto(ColuStrip* colu_strip) const {
   }
 }
 
-uint32 State::EarliestTimeAfter(const Spec& spec) const {
+uint64 State::EarliestTimeAfter(const Spec& spec) const {
   return EarliestTimeAfterWithEndTime(spec, range_.end_time());
 }
 
-uint32 State::EarliestTimeAfterWithEndTime(
-    const Spec& spec, uint32 end_time) const {
+uint64 State::EarliestTimeAfterWithEndTime(
+    const Spec& spec, uint64 end_time) const {
   assert(end_time >= range_.start_time());
   Range range(range_.start_time(), end_time);
   Range within(Range::IntersectRanges(range, spec.range()));
   if (within.IsEmpty())
     return kInfinity;
 
-  uint32 state_earliest = kInfinity;
+  uint64 state_earliest = kInfinity;
 
   switch(spec.tia()) {
     // Not supported currently.
@@ -275,7 +275,7 @@ State::State(const State& state) {
   range_ = state.range_;
 }
 
-const bool State::PlayfieldPaints(uint32 local_clock) const {
+const bool State::PlayfieldPaints(uint64 local_clock) const {
   assert(local_clock >= kPF0Left);
 
   if (local_clock < kPFMidline || !(tia(TIA::CTRLPF) & 0x01)) {
@@ -320,11 +320,11 @@ const bool State::PlayfieldPaints(uint32 local_clock) const {
   }
 }
 
-const uint32 State::EarliestPlayfieldPaints(const Range& range) const {
-  uint32 duration = range.Duration();
+const uint64 State::EarliestPlayfieldPaints(const Range& range) const {
+  uint64 duration = range.Duration();
   for (uint32 i = 1; i <= duration; ++i) {
-    uint32 color_clock = range.end_time() - i;
-    uint32 local_clock = color_clock % kScanLineWidthClocks;
+    uint64 color_clock = range.end_time() - i;
+    uint64 local_clock = color_clock % kScanLineWidthClocks;
     if (local_clock < kHBlankWidthClocks)
       continue;
 
@@ -334,11 +334,11 @@ const uint32 State::EarliestPlayfieldPaints(const Range& range) const {
   return 0;
 }
 
-const uint32 State::EarliestPFXCouldPaint(TIA pf, const Range& range) const {
-  uint32 last_scanline_start =
+const uint64 State::EarliestPFXCouldPaint(TIA pf, const Range& range) const {
+  uint64 last_scanline_start =
       (range.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
-  uint32 right_pf_begin = 0;
-  uint32 right_pf_end = 0;
+  uint64 right_pf_begin = 0;
+  uint64 right_pf_end = 0;
   if (tia(TIA::CTRLPF) & 0x01) {
     switch (pf) {
       case TIA::PF0:
@@ -388,8 +388,8 @@ const uint32 State::EarliestPFXCouldPaint(TIA pf, const Range& range) const {
   if (!pfx_right_intersect.IsEmpty())
     return pfx_right_intersect.end_time() - 1;
 
-  uint32 left_pf_begin = 0;
-  uint32 left_pf_end = 0;
+  uint64 left_pf_begin = 0;
+  uint64 left_pf_end = 0;
   switch (pf) {
     case TIA::PF0:
       left_pf_begin = kPF0Left;
@@ -419,7 +419,7 @@ const uint32 State::EarliestPFXCouldPaint(TIA pf, const Range& range) const {
   // It's possible that the range spans to the previous scanline, and could
   // intersect with the right-side PFX there.
   if (range.start_time() < last_scanline_start && last_scanline_start > 0) {
-    uint32 prev_scanline_start = last_scanline_start - kScanLineWidthClocks;
+    uint64 prev_scanline_start = last_scanline_start - kScanLineWidthClocks;
     Range pfx_prev_right(prev_scanline_start + right_pf_begin,
         prev_scanline_start + right_pf_end);
     Range pfx_prev_right_intersect(
@@ -431,11 +431,11 @@ const uint32 State::EarliestPFXCouldPaint(TIA pf, const Range& range) const {
   return 0;
 }
 
-const uint32 State::EarliestBackgroundPaints(const Range& range) const {
-  uint32 duration = range.Duration();
-  for (uint32 i = 1; i <= duration; ++i) {
-    uint32 color_clock = range.end_time() - i;
-    uint32 local_clock = color_clock % kScanLineWidthClocks;
+const uint64 State::EarliestBackgroundPaints(const Range& range) const {
+  uint64 duration = range.Duration();
+  for (uint64 i = 1; i <= duration; ++i) {
+    uint64 color_clock = range.end_time() - i;
+    uint64 local_clock = color_clock % kScanLineWidthClocks;
     if (local_clock < kHBlankWidthClocks)
       continue;
     if (PlayfieldPaints(local_clock))
@@ -446,8 +446,8 @@ const uint32 State::EarliestBackgroundPaints(const Range& range) const {
   return 0;
 }
 
-const uint32 State::EarliestTimeInHBlank(const Range& range) const {
-  uint32 last_scanline_start =
+const uint64 State::EarliestTimeInHBlank(const Range& range) const {
+  uint64 last_scanline_start =
       (range.end_time() / kScanLineWidthClocks) * kScanLineWidthClocks;
   Range last_scanline_hblank(last_scanline_start,
       last_scanline_start + kHBlankWidthClocks);

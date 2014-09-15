@@ -13,8 +13,12 @@ class Spec {
  public:
   Spec(TIA tia, uint8 value, const Range& range);
 
-  const TIA tia() const { return tia_; }
-  const uint8 value() const { return value_; }
+  // Saves the Spec into the provided buffer. Returns the number of bytes stored
+  // in the buffer, currently 18 bytes.
+  size_t Serialize(uint8* buffer);
+
+  TIA tia() const { return tia_; }
+  uint8 value() const { return value_; }
   const Range& range() const { return range_; }
 
  private:
