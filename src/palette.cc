@@ -1,9 +1,8 @@
-#include "pallette.h"
+#include "palette.h"
 
 #include <algorithm>
 #include <cassert>
 #include <cstring>
-#include <iostream>
 #include <limits>
 #include <unordered_set>
 
@@ -15,14 +14,14 @@
 
 namespace vcsmc {
 
-Pallette::Pallette(uint32 num_colus)
+Palette::Palette(uint32 num_colus)
     : num_colus_(num_colus),
       error_(0.0f) {
-  // A Pallette of zero colors is nonsensical.
+  // A Palette of zero colors is nonsensical.
   assert(num_colus_ > 0);
 }
 
-void Pallette::Compute(const PixelStrip* pixel_strip, Random* random) {
+void Palette::Compute(const PixelStrip* pixel_strip, Random* random) {
   // Pick K colors at random
   colus_.reserve(num_colus_);
   for (size_t i = 0; i < num_colus_; ++i)
@@ -52,12 +51,13 @@ void Pallette::Compute(const PixelStrip* pixel_strip, Random* random) {
   // the same time build histogram.
   std::unique_ptr<uint8[]> colu_counts(new uint8[num_colus_]);
   std::memset(colu_counts.get(), 0, num_colus_);
-  for (size_t i = 0; i < pixel_strip->width(); ++i) {
+  for (size_t i = 0; i < kFrameWidthPixels; ++i) {
     uint8 colu_class = classes_[i];
     ++colu_counts[colu_class];
     classes_[i] = colus_[colu_class];
   }
 
+  // Sort colus by their counts.
   std::vector<std::pair<uint8, uint8>> colu_sorted;
   colu_sorted.reserve(num_colus_);
   for (size_t i = 0; i < num_colus_; ++i)
@@ -66,22 +66,17 @@ void Pallette::Compute(const PixelStrip* pixel_strip, Random* random) {
 
   for (size_t i = 0; i < num_colus_; ++i)
     colus_[i] = colu_sorted[i].second;
-
-  std::cout << std::dec << num_iters << " iterations, final pallette: ";
-  for (size_t i = 0; i < num_colus_; ++i)
-    std::cout << std::hex << static_cast<uint32>(colus_[i]) << " ";
-  std::cout << std::dec << std::endl;
 }
 
-float Pallette::Classify(const PixelStrip* pixel_strip) {
+float Palette::Classify(const PixelStrip* pixel_strip) {
   classes_.clear();
-  classes_.reserve(pixel_strip->width());
+  classes_.reserve(kFrameWidthPixels);
   float total_error = 0.0f;
-  for (size_t i = 0; i < pixel_strip->width(); ++i) {
+  for (size_t i = 0; i < kFrameWidthPixels; ++i) {
     uint8 colu_class = 0;
-    float minimum_error = pixel_strip->distance(i, colus_[0] * 2);
+    float minimum_error = pixel_strip->Distance(i, colus_[0] * 2);
     for (size_t j = 1; j < num_colus_; ++j) {
-      float class_error = pixel_strip->distance(i, colus_[j] * 2);
+      float class_error = pixel_strip->Distance(i, colus_[j] * 2);
       if (class_error < minimum_error) {
         colu_class = j;
         minimum_error = class_error;
@@ -95,7 +90,7 @@ float Pallette::Classify(const PixelStrip* pixel_strip) {
   return total_error;
 }
 
-void Pallette::Color(const PixelStrip* pixel_strip) {
+void Palette::Color(const PixelStrip* pixel_strip) {
   std::vector<std::unique_ptr<float[]>> colu_errors;
   colu_errors.reserve(num_colus_);
   for (size_t i = 0; i < num_colus_; ++i) {
@@ -104,10 +99,10 @@ void Pallette::Color(const PixelStrip* pixel_strip) {
     colu_errors.push_back(std::move(errors));
   }
 
-  for (size_t i = 0; i < pixel_strip->width(); ++i) {
+  for (size_t i = 0; i < kFrameWidthPixels; ++i) {
     uint8 pixel_class = classes_[i];
     for (size_t j = 0; j < kNTSCColors; ++j) {
-      colu_errors[pixel_class][j] += pixel_strip->distance(i, j * 2);
+      colu_errors[pixel_class][j] += pixel_strip->Distance(i, j * 2);
     }
   }
 

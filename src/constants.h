@@ -10,7 +10,7 @@ namespace vcsmc {
 // A clock is a color clock, or the time required to render one pixel.
 // A cycle is a CPU cycle, on the VCS is 3 color clocks.
 const uint32 kFrameWidthPixels = 160;
-const uint32 kFrameHeightPixels = 180;
+const uint32 kFrameHeightPixels = 192;
 const uint32 kFrameSizeBytes = kFrameWidthPixels * kFrameHeightPixels;
 const uint64 kHBlankWidthClocks = 68;
 const uint32 kScanLineWidthClocks = kFrameWidthPixels + kHBlankWidthClocks;
@@ -20,6 +20,12 @@ const uint32 kScanLineWidthCycles =
     kScanLineWidthClocks / kColorClocksPerCPUCycle;
 const uint32 kNTSCColors = 128;
 const uint64 kInfinity = 0xffffffffffffffff;
+
+// Screen vertical dimensions/timing constants.
+const uint32 kVSyncScanLines = 3;
+const uint32 kVBlankScanLines = 37;
+const uint32 kOverscanScanLines = 30;
+const uint32 kScreenHeight = 262;
 
 const uint8 kColuUnpainted = 0xff;
 // The ith most significant bit in this field represents the ith address in the

@@ -11,7 +11,7 @@
 #include "color.h"
 #include "colu_strip.h"
 #include "constants.h"
-#include "pallette.h"
+#include "palette.h"
 #include "pixel_strip.h"
 
 namespace vcsmc {

@@ -14,7 +14,7 @@ std::string CLProgram::GetProgramString(Programs program) {
 // Given input colors in L*a*b* color space returns the CIEDE2000 delta E value,
 // a nonlinear color distance based on the human vision response.
 
-// This is by no means an offical implementation of this algorithm.
+// This is by no means an official implementation of this algorithm.
 
 // This implementation is with thanks to:
 //
@@ -105,7 +105,49 @@ __kernel void ciede2k(__global __read_only float4* lab_1_row,
                           pow(del_H / S_H, 2.0f) +
                           R_T * (del_C / S_C) * (del_H / S_H));
 }
-      );
+      );  // end of kCiede2K
+
+    case kDownsampleErrors:
+      return CL_PROGRAM(
+// Given an input float array of error distances |input_errors| of |input_width|
+// fills an output array at |output_width| with interpolated distances.
+__kernel void downsample_errors(__global __read_only float* input_errors,
+                                __read_only int input_width,
+                                __read_only int output_width,
+                                __global __write_only float* output_errors) {
+  int output_pixel = get_global_id(0);
+  // It is possible the work group is of size related to the |input_width| not
+  // the |output_width|, if so we exit.
+  if (output_pixel >= input_width)
+    return;
+  float start_pixel = ((float)output_pixel * (float)output_width) /
+      (float)input_width;
+  float end_pixel = (((float)output_pixel + 1.0f) * (float)output_width) /
+      (float)input_width;
+  float first_whole_pixel = ceil(start_pixel);
+  int first_whole_pixel_int = (int)first_whole_pixel;
+  float last_fractional_pixel = floor(end_pixel);
+  int last_fractional_pixel_int = (int)last_fractional_pixel;
+  float total_error = 0.0f;
+
+  // Calculate whole pixel error
+  for (int i = first_whole_pixel_int; i < last_fractional_pixel_int; ++i)
+    total_error += input_errors[i];
+
+  // Include left-side fractional error
+  total_error += input_errors[(int)floor(start_pixel)] *
+    (first_whole_pixel - start_pixel);
+
+  // Right-side fractional error. It's possible that due to roundoff error the
+  // last_fractional_pixel may equal output_width, if so we ignore.
+  if (last_fractional_pixel_int < output_width) {
+    total_error += input_errors[last_fractional_pixel_int] *
+        (end_pixel - last_fractional_pixel);
+  }
+
+  output_errors[output_pixel] = total_error;
+}
+      );  // end of kDownsampleErrors
 
     case kRGBToLab:
       return CL_PROGRAM(
@@ -153,7 +195,7 @@ __kernel void rgb_to_lab(__read_only image2d_t input_image,
                         rgba.w);
   lab_out[col] = Lab;
 }
-      );
+      );  // end of kRGBToLab
 
     default:
       assert(false);
@@ -166,6 +208,9 @@ std::string CLProgram::GetProgramName(Programs program) {
   switch (program) {
     case kCiede2k:
       return "ciede2k";
+
+    case kDownsampleErrors:
+      return "downsample_errors";
 
     case kRGBToLab:
       return "rgb_to_lab";

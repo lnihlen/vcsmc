@@ -33,8 +33,9 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/color_table.o                                                       \
     $(OUT)/colu_strip.o                                                        \
     $(OUT)/image.o                                                             \
+    $(OUT)/image_fitter.o                                                      \
     $(OUT)/opcode.o                                                            \
-    $(OUT)/pallette.o                                                          \
+    $(OUT)/palette.o                                                           \
     $(OUT)/pixel_strip.o                                                       \
     $(OUT)/random.o                                                            \
     $(OUT)/range.o                                                             \

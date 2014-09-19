@@ -26,7 +26,7 @@ struct CLDeviceContext::Impl {
   cl_context context;
 
   // Our cache of previously loaded and compiled programs.
-  cl_program programs[CLProgram::Programs::kProgramsCount];
+  cl_program programs[CLProgram::Programs::PROGRAM_COUNT];
 };
 
 // static
@@ -72,7 +72,7 @@ CLDeviceContext::CLDeviceContext() : impl_(new Impl) {
 }
 
 CLDeviceContext::~CLDeviceContext() {
-  for (size_t i = 0; i < CLProgram::Programs::kProgramsCount; ++i) {
+  for (size_t i = 0; i < CLProgram::Programs::PROGRAM_COUNT; ++i) {
     clReleaseProgram(impl_->programs[i]);
   }
   clReleaseContext(impl_->context);
@@ -89,15 +89,10 @@ bool CLDeviceContext::DoSetup() {
   if (!impl_->context)
     return false;
 
-  // Load all program by hand, during the setup function. This allows easy error
-  // reporting and program termination if there are problems, saves me having to
-  // design additional async thread-safe program compilation, and spares me from
-  // having to protect program_map with a lock. And for a project likely to have
-  // only a dozen or so cl programs at most should be just fine.
-  if (!BuildProgram(CLProgram::Programs::kCiede2k))
-    return false;
-  if (!BuildProgram(CLProgram::Programs::kRGBToLab))
-    return false;
+  for (uint32 i = 0; i < CLProgram::Programs::PROGRAM_COUNT; ++i) {
+    if (!BuildProgram(static_cast<CLProgram::Programs>(i)))
+      return false;
+  }
 
   return true;
 }
