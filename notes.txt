@@ -1018,3 +1018,30 @@ sndc/aucc Audio does the same.
 Linker schedules frame necessities first (like turning on and off VBLANK), then
 typically audio, then visual. Just greedy scheduler for now. Schedule every spec
 and then drop the ones that don't fit. See how that works for now.
+
+===============================================================================
+
+Image Fitting.
+
+First step processes colors into class categories. So input is 180 bytes of
+minimum-error color classes. Start to build an output buffer of 180 bytes which
+indicates what color class each of the output pixels will be. Fill with
+background color class first. Then try each remaining color, counting the number
+of pixels that would be filled by that playfield fit. Score is total number of
+pixels that are rendered in the correct class. So playfield fit over BG color
+fit alone may actually reduce the number of correctly fit pixels. Playfield
+doesn't try to fit background color. Players do. P0 and P1 both try and fit all
+colors, including the playfield color. One possibility is that, say for 4 color
+fitting, that the best fit actually is using fewer colors than 4. Like P0 and P1
+double up on a color, or help refine a Playfield fit by painting background
+color over some misfit pixels. IF we arrive at a situation where the optimum fit
+uses fewer colors than in the palette try to re-fit at the few color number
+palette, then use the minimum total error of the two fits. If that happens again
+we repeat until colors and shape are in agreement. Then take minimum total error
+of those fits and call it a day.
+
+Player Fitting. Needs to have an awareness of current player render state.
+Strategies for moving player to the left are much easier, as we can just reset
+the clock earlier with a strobe where we want the player to render. For moving
+to the right either we can zero out the player graphics after it renders on
+the previous scanline, then reset the player graphics and strobe?
