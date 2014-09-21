@@ -18,6 +18,9 @@ ImageFitter::ImageFitter(std::unique_ptr<Image> image)
     : image_(std::move(image)) {
 }
 
+// TODO: Go back to 32-bit spec, make them frame-relative only. Linker can do
+// the work of repeating frames, etc.
+
 std::unique_ptr<std::vector<Spec>> ImageFitter::Fit(uint64 base_frame_time) {
   Random random;
 

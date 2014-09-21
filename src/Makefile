@@ -40,6 +40,7 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/random.o                                                            \
     $(OUT)/range.o                                                             \
     $(OUT)/schedule.o                                                          \
+    $(OUT)/shape_fit.o                                                         \
     $(OUT)/spec.o                                                              \
     $(OUT)/state.o                                                             \
     $(OUT)/tiff_image_file.o

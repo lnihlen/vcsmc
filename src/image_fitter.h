@@ -9,6 +9,7 @@
 namespace vcsmc {
 
 class Image;
+class Palette;
 class Spec;
 
 class ImageFitter {
@@ -17,7 +18,6 @@ class ImageFitter {
   std::unique_ptr<std::vector<Spec>> Fit(uint64 base_frame_time);
 
  private:
-
   std::unique_ptr<Image> image_;
 };
 
