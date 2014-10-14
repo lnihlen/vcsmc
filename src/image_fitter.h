@@ -15,7 +15,7 @@ class Spec;
 class ImageFitter {
  public:
   ImageFitter(std::unique_ptr<Image> image);
-  std::unique_ptr<std::vector<Spec>> Fit(uint64 base_frame_time);
+  std::unique_ptr<std::vector<Spec>> Fit();
 
  private:
   std::unique_ptr<Image> image_;

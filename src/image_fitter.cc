@@ -10,6 +10,7 @@
 #include "pixel_strip.h"
 #include "random.h"
 #include "range.h"
+#include "shape_fit.h"
 #include "spec.h"
 
 namespace vcsmc {
@@ -18,10 +19,7 @@ ImageFitter::ImageFitter(std::unique_ptr<Image> image)
     : image_(std::move(image)) {
 }
 
-// TODO: Go back to 32-bit spec, make them frame-relative only. Linker can do
-// the work of repeating frames, etc.
-
-std::unique_ptr<std::vector<Spec>> ImageFitter::Fit(uint64 base_frame_time) {
+std::unique_ptr<std::vector<Spec>> ImageFitter::Fit() {
   Random random;
 
   std::unique_ptr<CLCommandQueue> queue(CLDeviceContext::MakeCommandQueue());
@@ -32,9 +30,22 @@ std::unique_ptr<std::vector<Spec>> ImageFitter::Fit(uint64 base_frame_time) {
     return NULL;
 
   std::unique_ptr<std::vector<Spec>> specs(new std::vector<Spec>);
-  uint64 row_time = base_frame_time;
+
+  // Might make sense to make a Player object to hold state. Also might make
+  // sense to give each player in a frame a unique player ID and let the backend
+  // decide which of two players will be less work to use.
+
+
+  // We start both players at the left edge of the screen, worth consideration
+  // about maybe a more optimal placement. Or maybe first line determines
+  // placement? This all ties back to startup state calculation. Maybe time
+  // to re-use State object which adds a method Apply() which just modifies
+  // itself in place, for use as a player state container?
+  uint32 p0_position = 0;
+  uint32 p1_position = 0;
 
   for (uint32 row = 0; row < kFrameHeightPixels; ++row) {
+    uint32 row_time = row * kScanLineWidthClocks;
     // First we fit colors. We can paint at most 4 colors per line, although it
     // is possible to paint more colors we limit it to 4 per now. So we build
     // palettes of each color and then use the minimum-error palette of the 4
@@ -61,11 +72,28 @@ std::unique_ptr<std::vector<Spec>> ImageFitter::Fit(uint64 base_frame_time) {
         Range(row_time + kHBlankWidthClocks,
             row_time + kHBlankWidthClocks + kFrameWidthPixels)));
 
-    // If our last-error palette contains more than the background color we
+    // If our least-error palette contains more than the background color we
     // proceed with further shape fitting, otherwise we just turn all other
     // graphics objects off.
     if (palette->num_colus() > 1) {
+      // Our initial fit is just the background color fill, which is always
+      // color class 0.
+      uint8 current_fit[kFrameWidthPixels];
+      std::memset(current_fit, 0, kFrameWidthPixels);
 
+      // Examine each remaining color to find the minimum error playfield fit.
+      std::unique_ptr<ShapeFit> best_playfield_fit(new PlayfieldShapeFit(
+          current_fit, 1));
+      uint32 best_playfield_fit_score = best_playfield_fit->DoFit(palette);
+      for (uint32 i = 2; i < palette->num_colus(); ++i) {
+        std::unique_ptr<ShapeFit> playfield_fit(new PlayfieldShapeFit(
+            current_fit, i));
+        uint32 fit_score = playfield_fit->DoFit(palette);
+        if (fit_score > best_playfield_fit_score) {
+          best_playfield_fit = std::move(playfield_fit);
+          best_playfield_fit_score = fit_score;
+        }
+      }
     } else {
       // Simply require all other elements to draw in the same color as the
       // background.

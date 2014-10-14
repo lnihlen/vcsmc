@@ -157,36 +157,36 @@ TEST(RangeTest, IntersectRangeEmptyRange) {
 }
 
 TEST(RangeTest, SerializeToBufferEmptyRange) {
-  uint8 buffer[16];
+  uint8 buffer[8];
   Range range;
-  EXPECT_EQ(16, range.Serialize(buffer));
-  for (int i = 0; i < 16; ++i)
+  EXPECT_EQ(8, range.Serialize(buffer));
+  for (int i = 0; i < 8; ++i)
     EXPECT_EQ(0, buffer[i]);
 }
 
 TEST(RangeTest, SerializeToBufferInfiniteRange) {
-  uint8 buffer[16];
+  uint8 buffer[8];
   Range range(0, kInfinity);
-  EXPECT_EQ(16, range.Serialize(buffer));
-  for (int i = 0; i < 8; ++i)
+  EXPECT_EQ(8, range.Serialize(buffer));
+  for (int i = 0; i < 4; ++i)
     EXPECT_EQ(0, buffer[i]);
-  for (int i = 8; i < 16; ++i)
+  for (int i = 4; i < 8; ++i)
     EXPECT_EQ(0xff, buffer[i]);
 }
 
-TEST(RangeTest, SeralizeToBufferNonZeroLittleEndian) {
-  uint8 buffer[16];
-  Range range(0x0011223344556677, 0x8899aabbccddeeff);
-  EXPECT_EQ(16, range.Serialize(buffer));
-  uint8 counter = 0x77;
-  for (int i = 0; i < 8; ++i) {
+TEST(RangeTest, SerializeToBufferNonZeroLittleEndian) {
+  uint8 buffer[8];
+  Range range(0x01234567, 0x89abcdef);
+  EXPECT_EQ(8, range.Serialize(buffer));
+  uint8 counter = 0x67;
+  for (int i = 0; i < 4; ++i) {
     EXPECT_EQ(counter, buffer[i]);
-    counter -= 0x11;
+    counter -= 0x22;
   }
-  counter = 0xff;
-  for (int i = 8; i < 16; ++i) {
+  counter = 0xef;
+  for (int i = 4; i < 8; ++i) {
     EXPECT_EQ(counter, buffer[i]);
-    counter -= 0x11;
+    counter -= 0x22;
   }
 }
 

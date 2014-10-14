@@ -35,10 +35,10 @@ class State {
   // Given this state at |color_clock_| = t, produce a new State which is an
   // exact copy of this one but at color_clock_ = t + delta time. ALSO HAS THE
   // SIDE EFFECT OF MODIFYING OUR OWN TIME RANGE. |delta| must be > 0.
-  std::unique_ptr<State> AdvanceTime(uint64 delta);
+  std::unique_ptr<State> AdvanceTime(uint32 delta);
 
   // Same as above, but the returned state also has new value stored in reg.
-  std::unique_ptr<State> AdvanceTimeAndSetRegister(uint64 delta,
+  std::unique_ptr<State> AdvanceTimeAndSetRegister(uint32 delta,
                                                    Register axy,
                                                    uint8 value);
 
@@ -46,7 +46,7 @@ class State {
   // the value in reg to the supplied tia address. Note that for some of the
   // strobe values this can have substantial impact on other states within the
   // new state.
-  std::unique_ptr<State> AdvanceTimeAndCopyRegisterToTIA(uint64 delta,
+  std::unique_ptr<State> AdvanceTimeAndCopyRegisterToTIA(uint32 delta,
                                                          Register axy,
                                                          TIA address);
 
@@ -56,7 +56,7 @@ class State {
   // may also be zero. If Delta is zero the entry state will have an empty
   // range starting at our start_time(), otherwise it will have an empty range
   // starting at this State's end_time().
-  std::unique_ptr<State> MakeEntryState(uint64 delta);
+  std::unique_ptr<State> MakeEntryState(uint32 delta);
 
   //====== Simulation and Scheduling
 
@@ -67,9 +67,9 @@ class State {
   // could be added. Returns 0 if it occurs before this State. If this State
   // cannot permit this spec to be scheduled even after the very last pixel that
   // it covers it will return kInfinity.
-  uint64 EarliestTimeAfter(const Spec& spec) const;
+  uint32 EarliestTimeAfter(const Spec& spec) const;
 
-  uint64 EarliestTimeAfterWithEndTime(const Spec& spec, uint64 end_time) const;
+  uint32 EarliestTimeAfterWithEndTime(const Spec& spec, uint32 end_time) const;
 
   const bool register_known(Register axy) const {
     return registers_known_ & (1 << static_cast<int>(axy));
@@ -102,15 +102,15 @@ class State {
  private:
   State(const State& state);
 
-  const bool PlayfieldPaints(uint64 local_clock) const;
+  const bool PlayfieldPaints(uint32 local_clock) const;
 
-  const uint64 EarliestPlayfieldPaints(const Range& range) const;
+  const uint32 EarliestPlayfieldPaints(const Range& range) const;
 
   // |pf| should be one of TIA::PF0, TIA::PF1, or TIA::PF2.
-  const uint64 EarliestPFXCouldPaint(TIA pf, const Range& range) const;
+  const uint32 EarliestPFXCouldPaint(TIA pf, const Range& range) const;
 
-  const uint64 EarliestBackgroundPaints(const Range& range) const;
-  const uint64 EarliestTimeInHBlank(const Range& range) const;
+  const uint32 EarliestBackgroundPaints(const Range& range) const;
+  const uint32 EarliestTimeInHBlank(const Range& range) const;
 
   uint8 tia_[TIA::TIA_COUNT];
   uint64 tia_known_;

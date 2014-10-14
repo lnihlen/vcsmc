@@ -17,7 +17,7 @@
 #include "state.h"
 #include "tiff_image_file.h"
 
-bool ProcessSingleImage(const char* file_name, uint64 base_frame_time) {
+bool ProcessSingleImage(const char* file_name) {
   // Load input image file.
   vcsmc::TiffImageFile image_file(file_name);
   std::unique_ptr<vcsmc::Image> image(image_file.Load());
@@ -30,7 +30,7 @@ bool ProcessSingleImage(const char* file_name, uint64 base_frame_time) {
   std::unique_ptr<vcsmc::ImageFitter> fitter(
       new vcsmc::ImageFitter(std::move(image)));
   std::unique_ptr<std::vector<vcsmc::Spec>> specs =
-      fitter->Fit(base_frame_time);
+      fitter->Fit();
 
   // Save Specs to file.
 
@@ -59,7 +59,7 @@ int main(int argc, char* argv[]) {
   // If the input file spec is not a spec we treat it like a single file,
   // process and return.
   if (input_file_spec.find_first_of('%') == std::string::npos) {
-    if (!ProcessSingleImage(input_file_spec.c_str(), 0))
+    if (!ProcessSingleImage(input_file_spec.c_str()))
       return -1;
   } else {
     const size_t kFileNameBufferSize = 2048;
@@ -68,13 +68,11 @@ int main(int argc, char* argv[]) {
     std::unique_ptr<char[]> file_name(new char[kFileNameBufferSize]);
     snprintf(file_name.get(), kFileNameBufferSize, input_file_spec.c_str(),
         file_counter);
-    // start of each frame in color clocks.
-    uint64 base_frame_time = 0;
     while (stat(file_name.get(), &file_stat) == 0) {
       // TODO: Multi-threaded fun!
       printf("processing %s\n", file_name.get());
 
-      if (!ProcessSingleImage(file_name.get(), base_frame_time))
+      if (!ProcessSingleImage(file_name.get()))
         return -1;
 
       ++file_counter;

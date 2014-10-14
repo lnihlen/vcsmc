@@ -12,14 +12,14 @@ namespace vcsmc {
 const uint32 kFrameWidthPixels = 160;
 const uint32 kFrameHeightPixels = 192;
 const uint32 kFrameSizeBytes = kFrameWidthPixels * kFrameHeightPixels;
-const uint64 kHBlankWidthClocks = 68;
+const uint32 kHBlankWidthClocks = 68;
 const uint32 kScanLineWidthClocks = kFrameWidthPixels + kHBlankWidthClocks;
 const uint32 kFrameSizeClocks = kScanLineWidthClocks * kFrameHeightPixels;
 const uint32 kColorClocksPerCPUCycle = 3;
 const uint32 kScanLineWidthCycles =
     kScanLineWidthClocks / kColorClocksPerCPUCycle;
 const uint32 kNTSCColors = 128;
-const uint64 kInfinity = 0xffffffffffffffff;
+const uint32 kInfinity = 0xffffffff;
 
 // Screen vertical dimensions/timing constants.
 const uint32 kVSyncScanLines = 3;
