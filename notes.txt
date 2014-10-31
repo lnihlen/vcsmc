@@ -1045,3 +1045,103 @@ Strategies for moving player to the left are much easier, as we can just reset
 the clock earlier with a strobe where we want the player to render. For moving
 to the right either we can zero out the player graphics after it renders on
 the previous scanline, then reset the player graphics and strobe?
+
+===============================================================================
+
+Shape Fitting.
+
+For each color other than BG create an array of number of contiguous pixels
+to the right:
+
+OOOXXOOXOOOOXXXX000XXXXXXXXXO
+00021001000043210009876543210
+
+Playfield fitting is just look at groups of 4 pixels, 3 or 4 pixels is a 1, 0-2
+pixels is a no.
+
+Question - could we build a neural network or some other architecture amenable
+to shape fitting work on the GPU using OpenCL?
+
+Shape Histogramming:
+
+Build bitfield where each bit represents a match to the color class in that
+pixel position. 20 bytes total. Then histogram each of the 20 bytes. Q- is it
+even possible to fire a sprite, using both players, to render 16 bytes of data
+on a scan line? Seems very very tricky.
+
+X0X0X
+then time release of other player to fall in the first player's 0, so like:
+X X X
+ X X X  - this covers 6 * 8 or 48 pixels, so to cover will repeat 3 times + some:
+
+X X X |X X X |X X X |X
+ X X X |X X X |X X X |X
+
+00000000001111111111222222222233333333334444444444555555555566666666667777777777
+01234567890123456789012345678901234567890123456789012345678901234567890123456789
+<-p0---><-p1---><-p0---><-p1---><-p0---><-p1---><-p0---><-p1---><-p0---><-p1--->
+|-------||-------||-------||-------||-------||-------||-------||-------||-------|
+
+00000000001111111111222222222233333333334444444444555555555566666666667777777777
+01234567890123456789012345678901234567890123456789012345678901234567890123456789
+<-p0--->        <-p0--->        <-p0--->
+        <-p1--->        <-p1--->        <-p1--->
+|-------||-------||-------||-------||-------||-------||-------||-------||-------|
+
+
+ugh.
+
+===============================================================================
+
+Neural Network Player Shape Fitting:
+
+Drawing order adds a "don't care" input, so -1 is something we can't draw
+because it will clobber lower-priority color, 0 is "don't care" because it
+will perhaps be clobbered by higher-priority color, and 1 is a draw in that
+color.
+
+There may be additional weighting on a given pixel for nonlinear color
+difference reasons or possibly an additional error image map or some other
+source.
+
+Neural Nets get the previous input as an input too, because the cost of state
+change is higher and will be evaluated in the output??
+
+** NUSIZ networks - one for each input pixel, fanout 8 into 1 but 1 for each
+possible grouping of 8, so the ith input neuron has pixels [i, i+7] as input.
+This neuron is duplicated many times, meaning that the weights gained during
+training are shared across all of the input layer.
+
+<-- 80 pixels, one half of image -->
+<-- 80ish input neurons, each seeing 8 continguous pixels -->
+<-- hidden layer gets nonoverlapping groups of pixels, like first neuron gets
+input neurons 0, 8, 16, 24, 32, 40, 48, 56,.. .80, second neuron gets 1, 9, 17,
+25, 33, 41, etc.., so 8 groups of 10 neurons each, still 80 goddamn neurons -->
+<--  8 neurons each taking the 10 inputs from above, shared weights -->
+<-- output neuron taking 8 neurons, summing to one score -->
+
+8 of the above networks, one for each value of NUSIZ, take the highest score.
+
+** How to design player graphics values? - if you determine TIMING and NUSIZ
+then perhaps the rest is just averaging the bits that will be rendered by the
+output and going with 1 or zero in a practical way.
+
+for i in [0, 7]:
+<-- 80 pixels, one half of the image -->
+<-- input neuron sees every ith pixel, so pixel 0, 8, 16, 24
+
+
+===============================================================================
+
+keyframe info extraction from ffmpeg:
+
+ffprobe -show_frames -count_frames -select_streams v -print_format csv testVideo.mp4 > data.txt
+
+also adjust ffmpeg to extract only encoded frames, not interpolated frames:
+
+ffmpeg -i sintel-1024-stereo.ogv -vsync passthrough -pix_fmt rgba -f image2 -s 451x192 stills/frame-%7d.tiff
+
+extract yuv format for fft work, format is YUV 4:2:0 uncompressed
+(note size is rounded up to keep even-numbered, to avoid format depression)
+
+ffmpeg -i sintel-1024-stereo.ogv -vsync passthrough -s 452x192 stills_y41p/frame-%7d.y41p

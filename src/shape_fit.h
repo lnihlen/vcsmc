@@ -25,7 +25,7 @@ class ShapeFit {
   // in the constructor. Returns the number of pixels with matching color
   // classes as a result of this fit. A return value of kFrameWidthPixels would
   // mean a perfect score.
-  virtual uint32 DoFit(const Palette* palette) = 0;
+  virtual uint32 DoFit(const Palette* palette, uint32 row_time) = 0;
 
   // Return the total error distance, including the cost of mis-painted pixels,
   // for using this ShapeFit.
@@ -39,6 +39,10 @@ class ShapeFit {
   const uint8* final_fit() { return fit_; }
 
  protected:
+  // Call after updating |fit_|, recomputes the |pixels_matched_| value and
+  // returns it.
+  uint32 UpdatePixelsMatched(const Palette* palette);
+
   uint8 colu_class_;
   uint8 fit_[kFrameWidthPixels];
   uint32 pixels_matched_;
@@ -48,7 +52,7 @@ class ShapeFit {
 class PlayfieldShapeFit : public ShapeFit {
  public:
   PlayfieldShapeFit(const uint8* initial_fit, uint8 colu_class);
-  virtual uint32 DoFit(const Palette* palette) override;
+  virtual uint32 DoFit(const Palette* palette, uint32 row_time) override;
 };
 
 class PlayerShapeFit : public ShapeFit {
@@ -64,7 +68,7 @@ class PlayerShapeFit : public ShapeFit {
                  uint8 player_number,
                  uint32 last_player_position,
                  uint8 last_player_pattern);
-  virtual uint32 DoFit(const Palette* palette) override;
+  virtual uint32 DoFit(const Palette* palette, uint32 row_time) override;
 };
 
 }  // namespace vcsmc

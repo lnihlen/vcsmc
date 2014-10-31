@@ -32,10 +32,9 @@ class PixelStrip {
 
   // Returns total error distance from a provided ColuStrip.
   float DistanceFrom(ColuStrip* colu_strip);
+
   // Returns the error distance for |pixel| from the provided Atari |color|.
-  // Note that pixel is within [0, kFrameWidthPixels] and the error will
-  // potentially be mapped to multiple input colors if
-  // |width_| > kFrameWidthPixels.
+  // |pixel| is within [0, kFrameWidthPixels].
   float Distance(uint32 pixel, uint8 color) const;
 
   uint32 pixel(uint32 i) const { return pixels_[i]; }
