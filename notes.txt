@@ -1130,7 +1130,6 @@ for i in [0, 7]:
 <-- 80 pixels, one half of the image -->
 <-- input neuron sees every ith pixel, so pixel 0, 8, 16, 24
 
-
 ===============================================================================
 
 keyframe info extraction from ffmpeg:
@@ -1144,4 +1143,13 @@ ffmpeg -i sintel-1024-stereo.ogv -vsync passthrough -pix_fmt rgba -f image2 -s 4
 extract yuv format for fft work, format is YUV 4:2:0 uncompressed
 (note size is rounded up to keep even-numbered, to avoid format depression)
 
-ffmpeg -i sintel-1024-stereo.ogv -vsync passthrough -s 452x192 stills_y41p/frame-%7d.y41p
+ffmpeg -i sintel-1024-stereo.ogv -vsync passthrough -s 452x192 -pix_fmt yuv420p stills.yuv
+
+creates one big blob file, which then needs slicing out to grayscale pngs:
+
+xluma width height input_file.yuv stills_yuv/frame-%7d.png
+
+Define a GrayMap object, can be 8 or 16 bits when saving to/reading from PNG
+but is normally defined as a float.
+
+

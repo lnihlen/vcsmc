@@ -1,8 +1,8 @@
 # VCSMC src/ Makefile.
-# Dependencies: libtiff, clang, OpenCL
+# Dependencies: libtiff, libpng, clang, OpenCL
 # tools dependencies: python colormath, Wand, ImageMagick
 CFLAGS+=-I.
-LIBS+=-lm -ltiff
+LIBS+=-lm -ltiff -lpng
 OUTTESTS=$(OUT)/tests
 
 UNAME:=$(shell uname)
@@ -32,6 +32,7 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/color.o                                                             \
     $(OUT)/color_table.o                                                       \
     $(OUT)/colu_strip.o                                                        \
+    $(OUT)/gray_map.o                                                          \
     $(OUT)/image.o                                                             \
     $(OUT)/image_fitter.o                                                      \
     $(OUT)/opcode.o                                                            \
@@ -53,7 +54,7 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/shape_fit_unittests.o                                     \
          $(OUTTESTS)/state_unittests.o                                         \
 
-all: $(OUT)/picc $(OUT)/asm tests
+all: $(OUT)/picc $(OUT)/asm $(OUT)/exty tests
 
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -g -o $@ $< $(CFLAGS)
@@ -65,6 +66,9 @@ $(OUT)/picc: $(OBJ) $(OUT)/picc.o
 	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/asm: $(OBJ) $(OUT)/asm.o
+	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/exty: $(OBJ) $(OUT)/exty.o
 	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/

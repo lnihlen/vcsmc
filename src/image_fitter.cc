@@ -84,11 +84,12 @@ std::unique_ptr<std::vector<Spec>> ImageFitter::Fit() {
       // Examine each remaining color to find the minimum error playfield fit.
       std::unique_ptr<ShapeFit> best_playfield_fit(new PlayfieldShapeFit(
           current_fit, 1));
-      uint32 best_playfield_fit_score = best_playfield_fit->DoFit(palette);
+      uint32 best_playfield_fit_score = best_playfield_fit->DoFit(palette,
+          row_time);
       for (uint32 i = 2; i < palette->num_colus(); ++i) {
         std::unique_ptr<ShapeFit> playfield_fit(new PlayfieldShapeFit(
             current_fit, i));
-        uint32 fit_score = playfield_fit->DoFit(palette);
+        uint32 fit_score = playfield_fit->DoFit(palette, row_time);
         if (fit_score > best_playfield_fit_score) {
           best_playfield_fit = std::move(playfield_fit);
           best_playfield_fit_score = fit_score;
