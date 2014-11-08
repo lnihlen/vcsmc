@@ -19,4 +19,8 @@ void CLCommandQueueImpl::Finish() {
   clFinish(command_queue_);
 }
 
+void CLCommandQueueImpl::EnqueueBarrier() {
+  clEnqueueBarrierWithWaitList(command_queue_, 0, NULL, NULL);
+}
+
 }  // namespace vcsmc

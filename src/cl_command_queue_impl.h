@@ -16,6 +16,7 @@ class CLCommandQueueImpl : public CLCommandQueue {
 
   // CLCommandQueue
   virtual void Finish() override;
+  virtual void EnqueueBarrier() override;
 
  private:
   cl_command_queue command_queue_;

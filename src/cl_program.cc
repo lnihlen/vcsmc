@@ -149,6 +149,63 @@ __kernel void downsample_errors(__global __read_only float* input_errors,
 }
       );  // end of kDownsampleErrors
 
+    case kFFTRadix2:
+      return CL_PROGRAM(
+// Computes a Fast Fourier Transform of the supplied complex data. |input_data|
+// is packed as float2s (real, complex), and should be pointing at |input_size|
+// many of them. Furthermore |input_size| must be a power of two. Since the
+// radix-2 FFT combines k subsequences of length m to k/2 subsequences of 2m
+// each iteration |subsequence_size| should count like 1, 2, 4, 8, .. N/2 on
+// successive calls to this kernel, for N == |input_size|.
+
+// Code largely cribbed from Eric Bainville's excellent article on OpenCL FFT
+// at http://www.bealto.com/gpu-fft2_opencl-1.html.
+
+__kernel void fft_radix_2(__global __read_only float2* input_data,
+                          __read_only int subsequence_size,
+                          __global __write_only float2* output_data) {
+  // |i| is our thread index, should range in [0, N/2).
+  int i = get_global_id(0);
+  int t = get_global_size(0); // must be equal to N/2
+  // |k| is the index within the input subsequence, in [0, subsequence_size).
+  int k = i & (subsequence_size - 1);
+
+  float2 i0 = input_data[i];
+  float2 i1 = input_data[i + t];
+
+  // Twiddle second input.
+  float cs;
+  float sn = sincos(-3.1415926979f * (float)k / (float)subsequence_size, &cs);
+  i1 = (float2)((i1.x * cs) - (i1.y * sn), (i1.x * sn) + (i1.y * cs));
+
+  // Perform radix-2 DFT.
+  float2 temp = i0 - i1;
+  i0 += i1;
+  i1 = temp;
+
+  // Write output, |j| is our output index.
+  int j = ((i - k) << 1) + k;
+  output_data[j] = i0;
+  output_data[j + subsequence_size] = i1;
+}
+      );  // end of kFFTRadix2
+
+    case kInverseFFTNormalize:
+      return CL_PROGRAM(
+// An inverse FFT can be performed by conjugating each input complex number,
+// then doing a forward FFT on the conjugated data, then conjugating again and
+// scaling the data by 1/N. This shader can be applied before and after a
+// series of forward FFTs to perform the before and after conjugation.
+__kernel void inverse_fft_normalize(__global __read_only float4* input_data,
+                                    __read_only float norm,
+                                    __global __write_only float4* output_data) {
+  int i = get_global_id(0);
+  float4 ic = input_data[i];
+  float4 oc = float4(ic.x, -ic.y, ic.z, -ic.w);
+  output_data[i] = oc / norm;
+}
+      );  // end of kInverseFFTNormalize
+
     case kRGBToLab:
       return CL_PROGRAM(
 // Converts input RGB to CIE L*a*b* color. The fourth input and output column
@@ -211,6 +268,12 @@ std::string CLProgram::GetProgramName(Programs program) {
 
     case kDownsampleErrors:
       return "downsample_errors";
+
+    case kFFTRadix2:
+      return "fft_radix_2";
+
+    case kInverseFFTNormalize:
+      return "inverse_fft_normalize";
 
     case kRGBToLab:
       return "rgb_to_lab";

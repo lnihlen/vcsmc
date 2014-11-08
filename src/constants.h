@@ -43,6 +43,8 @@ const uint32 kNoOpCPUCycles = 2u;
 const uint32 kNoOpColorClocks = kNoOpCPUCycles * kColorClocksPerCPUCycle;
 const uint32 kMinimumIdleTime = 2 * kColorClocksPerCPUCycle;
 
+const double kPi = 3.1415926535897932384626433832795028841971693993751;
+
 // Defines the address and name of every register on the TIA. The ones marked
 // as (strobe) are write-only and writing to them will cause new changes in
 // state.

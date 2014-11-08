@@ -49,6 +49,8 @@ OBJ=$(OUT)/assembler.o                                                         \
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/block_unittests.o                                         \
          $(OUTTESTS)/ciede2k_unittests.o                                       \
+         $(OUTTESTS)/fft_radix_2_unittests.o                                   \
+         $(OUTTESTS)/inverse_fft_norm_unittests.o                              \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
          $(OUTTESTS)/shape_fit_unittests.o                                     \

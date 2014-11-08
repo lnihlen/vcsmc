@@ -36,12 +36,12 @@ TEST(RgbToLabTest, TestAtariColorConversion) {
   queue->Finish();
 
   for (int i = 0; i < 128; ++i) {
-    EXPECT_NEAR(kAtariNTSCLabColorTable[(i * 4) + 0], lab_results[(i * 4) + 0],
-        0.01);
-    EXPECT_NEAR(kAtariNTSCLabColorTable[(i * 4) + 1], lab_results[(i * 4) + 1],
-        0.01);
-    EXPECT_NEAR(kAtariNTSCLabColorTable[(i * 4) + 2], lab_results[(i * 4) + 2],
-        0.01);
+    EXPECT_NEAR(
+        kAtariNTSCLabColorTable[(i * 4) + 0], lab_results[(i * 4) + 0], 0.01);
+    EXPECT_NEAR(
+        kAtariNTSCLabColorTable[(i * 4) + 1], lab_results[(i * 4) + 1], 0.01);
+    EXPECT_NEAR(
+        kAtariNTSCLabColorTable[(i * 4) + 2], lab_results[(i * 4) + 2], 0.01);
   }
 }
 

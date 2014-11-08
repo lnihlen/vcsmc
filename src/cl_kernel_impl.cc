@@ -77,4 +77,25 @@ bool CLKernelImpl::Enqueue(CLCommandQueue* queue) {
   return (result == CL_SUCCESS);
 }
 
+bool CLKernelImpl::EnqueueWithGroupSize(CLCommandQueue* queue,
+    size_t group_size) {
+  // Could break this out into local work groups versus global work groups but
+  // for now it just is a failure.
+  assert(group_size < work_group_size_);
+  CLCommandQueueImpl* queue_impl = static_cast<CLCommandQueueImpl*>(queue);
+  assert(queue_impl);
+  size_t global_size = group_size;
+  size_t work_group_size = group_size;
+  int result = clEnqueueNDRangeKernel(queue_impl->get(),
+                                      kernel_,
+                                      1,
+                                      NULL,
+                                      &global_size,
+                                      &work_group_size,
+                                      0,
+                                      NULL,
+                                      NULL);
+  return (result == CL_SUCCESS);
+}
+
 }  // namespace vcsmc

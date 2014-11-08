@@ -28,6 +28,8 @@ class CLKernelImpl : public CLKernel {
   virtual bool SetBufferArgument(uint32 index, const CLBuffer* buffer) override;
   virtual bool SetImageArgument(uint32 index, const CLImage* image) override;
   virtual bool Enqueue(CLCommandQueue* queue) override;
+  virtual bool EnqueueWithGroupSize(CLCommandQueue* queue,
+      size_t group_size) override;
 
  private:
   size_t work_group_size_;

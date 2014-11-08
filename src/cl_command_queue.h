@@ -9,6 +9,10 @@ class CLCommandQueue {
  public:
   // Blocks thread until queue is empty of all work items.
   virtual void Finish() = 0;
+
+  // Enqueues a barrier which won't allow the queue to proceed until all
+  // previous commands have completed.
+  virtual void EnqueueBarrier() = 0;
 };
 
 }  // namespace vcsmc

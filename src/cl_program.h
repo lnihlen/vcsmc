@@ -10,8 +10,10 @@ class CLProgram {
   enum Programs : size_t {
     kCiede2k = 0,
     kDownsampleErrors = 1,
-    kRGBToLab = 2,
-    PROGRAM_COUNT = 3
+    kFFTRadix2 = 2,
+    kInverseFFTNormalize = 3,
+    kRGBToLab = 4,
+    PROGRAM_COUNT = 5
   };
 
   static std::string GetProgramString(Programs program);
