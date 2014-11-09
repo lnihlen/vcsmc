@@ -201,7 +201,7 @@ __kernel void inverse_fft_normalize(__global __read_only float4* input_data,
                                     __global __write_only float4* output_data) {
   int i = get_global_id(0);
   float4 ic = input_data[i];
-  float4 oc = float4(ic.x, -ic.y, ic.z, -ic.w);
+  float4 oc = (float4)(ic.x, -ic.y, ic.z, -ic.w);
   output_data[i] = oc / norm;
 }
       );  // end of kInverseFFTNormalize

@@ -59,9 +59,6 @@ TEST_F(InverseFFTNormTest, ConjugateWithScale) {
   std::unique_ptr<float[]> output_data(new float[kN * 2]);
   DoInverseNorm(input_data.get(), kN, (float)kN, output_data.get());
   for (uint32 i = 0; i < kN; ++i) {
-    printf("input: %f, %f, output: %f, %f\n", input_data[(i * 2) + 0],
-        input_data[(i * 2) + 1], output_data[(i * 2) + 0],
-        output_data[(i * 2) + 1]);
     EXPECT_EQ(input_data[(i * 2) + 0] / (float)kN, output_data[(i * 2) + 0]);
     EXPECT_EQ(-1.0f * input_data[(i * 2) + 1] / (float)kN,
         output_data[(i * 2) + 1]);
