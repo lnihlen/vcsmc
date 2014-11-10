@@ -47,7 +47,7 @@ void PixelStrip::BuildDistances(CLCommandQueue* queue) {
   kernel->SetByteArgument(1, sizeof(int), &inverse_row);
   kernel->SetBufferArgument(2, lab_strip.get());
 
-  kernel->Enqueue(queue);
+  kernel->Enqueue(queue, width_);
 
   std::unique_ptr<float[]> lab_strip_values(new float[width_ * 4]);
   lab_strip->EnqueueCopyFromDevice(queue, lab_strip_values.get());
@@ -72,7 +72,7 @@ void PixelStrip::BuildDistances(CLCommandQueue* queue) {
     ciede_kernel->SetBufferArgument(0, lab_strip.get());
     ciede_kernel->SetBufferArgument(1, colu_lab_buffer.get());
     ciede_kernel->SetBufferArgument(2, out_buffer.get());
-    ciede_kernel->Enqueue(queue);
+    ciede_kernel->Enqueue(queue, width_);
 
     std::unique_ptr<CLBuffer> error_buffer(CLDeviceContext::MakeBuffer(
         kFrameWidthPixels * sizeof(float)));
@@ -85,7 +85,7 @@ void PixelStrip::BuildDistances(CLCommandQueue* queue) {
     const int atari_width_int = static_cast<int>(kFrameWidthPixels);
     downsample_kernel->SetByteArgument(2, sizeof(int), &atari_width_int);
     downsample_kernel->SetBufferArgument(3, error_buffer.get());
-    downsample_kernel->Enqueue(queue);
+    downsample_kernel->Enqueue(queue, width_);
 
     std::unique_ptr<float[]> errors(new float[kFrameWidthPixels]);
     error_buffer->EnqueueCopyFromDevice(queue, errors.get());

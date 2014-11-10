@@ -1152,4 +1152,22 @@ xluma width height input_file.yuv stills_yuv/frame-%7d.png
 Define a GrayMap object, can be 8 or 16 bits when saving to/reading from PNG
 but is normally defined as a float.
 
+===============================================================================
+
+Saliency Map.
+
+Read image in, unpack to zero-padded complex pairs in nearest power of two.
+upload buffer to card.
+
+Modify fft_radix_2 to support an input offset and output offset and stride.
+fft on each row with input offset = output offset and output stride = 1, until
+last round on each row where output offset and stride transpose matrix.
+Then repeat fft and transpose again to get final 2d fft.
+
+log remainder shader - takes the float2 blob, reads 9 values, takes their logs,
+calculates the mean, subtracts the mean from the log, exponentiates result and
+saves.
+
+reverse FFT process, then send data back to main memory, extract real values
+and save.
 

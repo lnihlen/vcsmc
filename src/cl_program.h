@@ -13,7 +13,8 @@ class CLProgram {
     kFFTRadix2 = 2,
     kInverseFFTNormalize = 3,
     kRGBToLab = 4,
-    PROGRAM_COUNT = 5
+    kSpectralResidual = 5,
+    PROGRAM_COUNT = 6
   };
 
   static std::string GetProgramString(Programs program);

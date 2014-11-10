@@ -30,7 +30,7 @@ TEST(RgbToLabTest, TestAtariColorConversion) {
   int first_row = 0;
   kernel->SetByteArgument(1, sizeof(int), &first_row);
   kernel->SetBufferArgument(2, lab_results_buffer.get());
-  kernel->Enqueue(queue.get());
+  kernel->Enqueue(queue.get(), 128);
   std::unique_ptr<float[]> lab_results(new float[128 * 4]);
   lab_results_buffer->EnqueueCopyFromDevice(queue.get(), lab_results.get());
   queue->Finish();

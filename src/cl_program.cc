@@ -152,26 +152,32 @@ __kernel void downsample_errors(__global __read_only float* input_errors,
     case kFFTRadix2:
       return CL_PROGRAM(
 // Computes a Fast Fourier Transform of the supplied complex data. |input_data|
-// is packed as float2s (real, complex), and should be pointing at |input_size|
-// many of them. Furthermore |input_size| must be a power of two. Since the
-// radix-2 FFT combines k subsequences of length m to k/2 subsequences of 2m
-// each iteration |subsequence_size| should count like 1, 2, 4, 8, .. N/2 on
-// successive calls to this kernel, for N == |input_size|.
+// is packed as float2s (real, complex). Since the radix-2 FFT combines k
+// subsequences of length m to k/2 subsequences of 2m each iteration
+// |subsequence_size| should count like 1, 2, 4, 8, .. N/2 on successive calls
+// to this kernel, for N points. N must be a power of two. This kernel must be
+// run with N/2 threads.
 
 // Code largely cribbed from Eric Bainville's excellent article on OpenCL FFT
 // at http://www.bealto.com/gpu-fft2_opencl-1.html.
 
 __kernel void fft_radix_2(__global __read_only float2* input_data,
                           __read_only int subsequence_size,
+                          __read_only int output_stride,
                           __global __write_only float2* output_data) {
   // |i| is our thread index, should range in [0, N/2).
   int i = get_global_id(0);
+  // |y| is vertical thread index, range in [0, image_height)
+  int y = get_global_id(1);
   int t = get_global_size(0); // must be equal to N/2
-  // |k| is the index within the input subsequence, in [0, subsequence_size).
-  int k = i & (subsequence_size - 1);
+  int input_offset = y * t * 2;
 
+  input_data += input_offset;
   float2 i0 = input_data[i];
   float2 i1 = input_data[i + t];
+
+  // |k| is the index within the input subsequence, in [0, subsequence_size).
+  int k = i & (subsequence_size - 1);
 
   // Twiddle second input.
   float cs;
@@ -185,8 +191,10 @@ __kernel void fft_radix_2(__global __read_only float2* input_data,
 
   // Write output, |j| is our output index.
   int j = ((i - k) << 1) + k;
-  output_data[j] = i0;
-  output_data[j + subsequence_size] = i1;
+  int output_offset = output_stride > 1 ? y : input_offset;
+  output_data += output_offset;
+  output_data[j * output_stride] = i0;
+  output_data[(j + subsequence_size) * output_stride] = i1;
 }
       );  // end of kFFTRadix2
 
@@ -200,9 +208,12 @@ __kernel void inverse_fft_normalize(__global __read_only float4* input_data,
                                     __read_only float norm,
                                     __global __write_only float4* output_data) {
   int i = get_global_id(0);
-  float4 ic = input_data[i];
+  int j = get_global_id(1);
+  int t = get_global_size(0);  // must be equal to width in units of float4s
+  int offset = j * t;
+  float4 ic = input_data[i + offset];
   float4 oc = (float4)(ic.x, -ic.y, ic.z, -ic.w);
-  output_data[i] = oc / norm;
+  output_data[i + offset] = oc / norm;
 }
       );  // end of kInverseFFTNormalize
 
@@ -254,6 +265,70 @@ __kernel void rgb_to_lab(__read_only image2d_t input_image,
 }
       );  // end of kRGBToLab
 
+    case kSpectralResidual:
+      return CL_PROGRAM(
+__kernel void spectral_residual(__global __read_only float2* input_data,
+                                __global __write_only float2* output_data) {
+  int col = get_global_id(0);
+  int row = get_global_id(1);
+  int width = get_global_size(0);
+  int height = get_global_size(1);
+  // center input data pointer around (col, row)
+  int c = (row * width) + col;
+  float2 center = input_data[c];
+  float log_center = log(length(center));
+  float2 log_avg = (float2)(log_center, 1.0f);
+
+  // Take average of logarithms of 9 pixels centered at pixel 4:
+  // 0 1 2
+  // 3 4 5
+  // 6 7 8
+  //
+  // 012 - upper row
+  if (row > 0) {
+    // 0 - upper right-hand corner
+    if (col > 0) {
+      log_avg += (float2)(log(length(input_data[c - width - 1])), 1.0f);
+    }
+    // 1 - upper center
+    log_avg += (float2)(log(length(input_data[c - width])), 1.0f);
+    // 2 - upper right-hand corner
+    if (col < width - 1) {
+      log_avg += (float2)(log(length(input_data[c - width + 1])), 1.0f);
+    }
+  }
+
+  // 3 - left center
+  if (col > 0) {
+    log_avg += (float2)(log(length(input_data[c - 1])), 1.0f);
+  }
+  // 5 - right center
+  if (col < width - 1) {
+    log_avg += (float2)(log(length(input_data[c + 1])), 1.0f);
+  }
+
+  // 678 - bottom row
+  if (row < height - 1) {
+    // 6 - lower left-hand corner
+    if (col > 0) {
+      log_avg += (float2)(log(length(input_data[c + width - 1])), 1.0f);
+    }
+    // 7 - bottom center
+    log_avg += (float2)(log(length(input_data[c + width])), 1.0f);
+    // 8 - bottom right-hand corner
+    if (col < width - 1) {
+      log_avg += (float2)(log(length(input_data[c + width + 1])), 1.0f);
+    }
+  }
+
+  float avg = log_avg.x / log_avg.y;
+  float residual = exp(log_center - avg);
+  float phi = atan2(center.y, center.x);
+  float2 out = (float2)(residual * cos(phi), residual * sin(phi));
+  output_data[c] = out;
+}
+      );  // end of kSpectralResidual
+
     default:
       assert(false);
       return "";
@@ -277,6 +352,9 @@ std::string CLProgram::GetProgramName(Programs program) {
 
     case kRGBToLab:
       return "rgb_to_lab";
+
+    case kSpectralResidual:
+      return "spectral_residual";
 
     default:
       assert(false);

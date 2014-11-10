@@ -26,9 +26,10 @@ class FFTRadix2Test : public ::testing::Test {
         CLProgram::Programs::kFFTRadix2));
     kernel->SetBufferArgument(0, forward ? first_buffer : second_buffer);
     kernel->SetByteArgument(1, sizeof(uint32), &p);
-    kernel->SetBufferArgument(2, forward ? second_buffer : first_buffer);
-    kernel->EnqueueWithGroupSize(queue, n / 2);
-    queue->EnqueueBarrier();
+    uint32 output_stride = 1;
+    kernel->SetByteArgument(2, sizeof(uint32), &output_stride);
+    kernel->SetBufferArgument(3, forward ? second_buffer : first_buffer);
+    kernel->Enqueue(queue, n / 2);
     kernels.push_back(std::move(kernel));
   }
 
@@ -38,13 +39,14 @@ class FFTRadix2Test : public ::testing::Test {
       CLBuffer* first_buffer,
       CLBuffer* second_buffer,
       float norm,
-      bool forward) {
+      bool forward,
+      int n) {
     std::unique_ptr<CLKernel> kernel(CLDeviceContext::MakeKernel(
         CLProgram::Programs::kInverseFFTNormalize));
     kernel->SetBufferArgument(0, forward ? first_buffer : second_buffer);
     kernel->SetByteArgument(1, sizeof(float), &norm);
     kernel->SetBufferArgument(2, forward ? second_buffer : first_buffer);
-    kernel->Enqueue(queue);
+    kernel->Enqueue(queue, n / 2);
     queue->EnqueueBarrier();
     kernels.push_back(std::move(kernel));
   }
@@ -67,7 +69,7 @@ class FFTRadix2Test : public ::testing::Test {
 
     if (!forward) {
       QueueInverseNorm(queue.get(), kernels, first_buffer.get(),
-          second_buffer.get(), 1.0f, copying_forward);
+          second_buffer.get(), 1.0f, copying_forward, n);
       copying_forward = !copying_forward;
     }
 
@@ -81,7 +83,7 @@ class FFTRadix2Test : public ::testing::Test {
 
     if (!forward) {
       QueueInverseNorm(queue.get(), kernels, first_buffer.get(),
-          second_buffer.get(), (float)(n), copying_forward);
+          second_buffer.get(), (float)(n), copying_forward, n);
       copying_forward = !copying_forward;
     }
 
@@ -89,11 +91,10 @@ class FFTRadix2Test : public ::testing::Test {
     // |first_buffer| to the |second_buffer| during processing. Therefore we
     // should copy the output data from the |first_buffer| if |copying_forward|
     // is true.
-    if (copying_forward) {
+    if (copying_forward)
       first_buffer->EnqueueCopyFromDevice(queue.get(), output_data);
-    } else {
+    else
       second_buffer->EnqueueCopyFromDevice(queue.get(), output_data);
-    }
 
     queue->Finish();
   }
@@ -101,7 +102,7 @@ class FFTRadix2Test : public ::testing::Test {
 
 // Test some fundamental FFT properties. A fundamental cos wave in the real
 // values should result in an impulse in the real values at sample 1.
-TEST_F(FFTRadix2Test, FFT2FundamentalCos) {
+TEST_F(FFTRadix2Test, FundamentalCos) {
   const uint32 kN = 64;
   std::unique_ptr<float[]> input_data(new float[kN * 2]);
   for (uint32 i = 0; i < kN; ++i) {
@@ -396,7 +397,7 @@ const float kRandomComplexFFT2FrequencyDomain[128 * 2] = {
 };
 
 // Compare FFT on random complex data to values calculated by numpy.
-TEST_F(FFTRadix2Test, FFT2RandomComplexData) {
+TEST_F(FFTRadix2Test, RandomComplexData) {
   const uint32 kN = 128;
   std::unique_ptr<float[]> output_data(new float[kN * 2]);
   // Check forward transform first.
@@ -411,11 +412,59 @@ TEST_F(FFTRadix2Test, FFT2RandomComplexData) {
   // Check inverse transform.
   DoRadix2FFT(kRandomComplexFFT2FrequencyDomain, kN, false, output_data.get());
   for (uint32 i = 0; i < kN; ++i) {
-    printf("%d\n", i);
     EXPECT_NEAR(kRandomComplexFFT2TimeDomain[(i * 2) + 0],
         output_data[(i * 2) + 0], 0.0001f);
     EXPECT_NEAR(kRandomComplexFFT2TimeDomain[(i * 2) + 1],
         output_data[(i * 2) + 1], 0.0001f);
+  }
+}
+
+TEST_F(FFTRadix2Test, Transpose) {
+  const uint32 kWidth = 128;
+  const uint32 kHeight = 4;
+  std::unique_ptr<float[]> values(new float[kWidth * kHeight * 2]);
+  std::memset(values.get(), 0, sizeof(float) * kWidth * kHeight * 2);
+  // Put our previous computed transform values into the third row of the
+  // matrix of zeros.
+  std::memcpy(values.get() + kWidth * 2 * 2, kRandomComplexFFT2TimeDomain,
+      kWidth * sizeof(float) * 2);
+  std::unique_ptr<CLCommandQueue> queue = CLDeviceContext::MakeCommandQueue();
+  std::unique_ptr<CLBuffer> first_buffer(CLDeviceContext::MakeBuffer(
+      kWidth * kHeight * 2 * sizeof(float)));
+  first_buffer->EnqueueCopyToDevice(queue.get(), values.get());
+  std::unique_ptr<CLBuffer> second_buffer(CLDeviceContext::MakeBuffer(
+      kWidth * kHeight * 2 * sizeof(float)));
+  std::list<std::unique_ptr<CLKernel>> kernels;
+  bool up = true;
+  uint32 p = 1;
+  while (p < kWidth) {
+    std::unique_ptr<CLKernel> kernel(CLDeviceContext::MakeKernel(
+        CLProgram::Programs::kFFTRadix2));
+    kernel->SetBufferArgument(0, up ? first_buffer.get() : second_buffer.get());
+    kernel->SetByteArgument(1, sizeof(uint32), &p);
+    uint32 output_stride = (p == kWidth / 2) ? kHeight : 1;
+    kernel->SetByteArgument(2, sizeof(uint32), &output_stride);
+    kernel->SetBufferArgument(3, up ? second_buffer.get() : first_buffer.get());
+    kernel->Enqueue2D(queue.get(), kWidth / 2, kHeight);
+    kernels.push_back(std::move(kernel));
+    up = !up;
+    p = p << 1;
+  }
+  if (up)
+    first_buffer->EnqueueCopyFromDevice(queue.get(), values.get());
+  else
+    second_buffer->EnqueueCopyFromDevice(queue.get(), values.get());
+  queue->Finish();
+
+  // Computed values should now be sitting in the third column of the matrix.
+  float* col_ptr = values.get() + (2 * 2);
+  for (uint32 i = 0; i < kWidth; ++i) {
+    EXPECT_NEAR(kRandomComplexFFT2FrequencyDomain[(i * 2) + 0],
+        *col_ptr, 0.0001f);
+    ++col_ptr;
+    EXPECT_NEAR(kRandomComplexFFT2FrequencyDomain[(i * 2) + 1],
+        *col_ptr, 0.0001f);
+    col_ptr += ((kHeight - 1) * 2) + 1;
   }
 }
 

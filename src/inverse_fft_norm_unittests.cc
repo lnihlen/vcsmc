@@ -25,7 +25,7 @@ class InverseFFTNormTest : public ::testing::Test {
     ASSERT_TRUE(kernel->SetBufferArgument(0, in_buffer.get()));
     ASSERT_TRUE(kernel->SetByteArgument(1, sizeof(float), &scalar));
     ASSERT_TRUE(kernel->SetBufferArgument(2, out_buffer.get()));
-    ASSERT_TRUE(kernel->Enqueue(queue.get()));
+    ASSERT_TRUE(kernel->Enqueue(queue.get(), n / 2));
     ASSERT_TRUE(out_buffer->EnqueueCopyFromDevice(queue.get(), output_data));
     queue->Finish();
   }
@@ -41,9 +41,6 @@ TEST_F(InverseFFTNormTest, ConjugateWithoutScale) {
   std::unique_ptr<float[]> output_data(new float[kN * 2]);
   DoInverseNorm(input_data.get(), kN, 1.0f, output_data.get());
   for (uint32 i = 0; i < kN; ++i) {
-    printf("input: %f, %f, output: %f, %f\n", input_data[(i * 2) + 0],
-        input_data[(i * 2) + 1], output_data[(i * 2) + 0],
-        output_data[(i * 2) + 1]);
     EXPECT_EQ(input_data[(i * 2) + 0], output_data[(i * 2) + 0]);
     EXPECT_EQ(-1.0f * input_data[(i * 2) + 1], output_data[(i * 2) + 1]);
   }

@@ -61,37 +61,32 @@ bool CLKernelImpl::SetImageArgument(uint32 index, const CLImage* image) {
   return result == CL_SUCCESS;
 }
 
-bool CLKernelImpl::Enqueue(CLCommandQueue* queue) {
+bool CLKernelImpl::Enqueue(CLCommandQueue* queue, size_t work_size) {
   CLCommandQueueImpl* queue_impl = static_cast<CLCommandQueueImpl*>(queue);
   assert(queue_impl);
-  size_t global_size = work_group_size_;
   int result = clEnqueueNDRangeKernel(queue_impl->get(),
                                       kernel_,
                                       1,
                                       NULL,
-                                      &global_size,
-                                      &work_group_size_,
+                                      &work_size,
+                                      NULL,
                                       0,
                                       NULL,
                                       NULL);
   return (result == CL_SUCCESS);
 }
 
-bool CLKernelImpl::EnqueueWithGroupSize(CLCommandQueue* queue,
-    size_t group_size) {
-  // Could break this out into local work groups versus global work groups but
-  // for now it just is a failure.
-  assert(group_size < work_group_size_);
+bool CLKernelImpl::Enqueue2D(CLCommandQueue* queue, size_t work_width,
+      size_t work_height) {
   CLCommandQueueImpl* queue_impl = static_cast<CLCommandQueueImpl*>(queue);
   assert(queue_impl);
-  size_t global_size = group_size;
-  size_t work_group_size = group_size;
+  size_t work_dim[2] = { work_width, work_height };
   int result = clEnqueueNDRangeKernel(queue_impl->get(),
                                       kernel_,
-                                      1,
+                                      2,
                                       NULL,
-                                      &global_size,
-                                      &work_group_size,
+                                      work_dim,
+                                      NULL,
                                       0,
                                       NULL,
                                       NULL);

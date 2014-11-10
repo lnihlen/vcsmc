@@ -56,7 +56,7 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/shape_fit_unittests.o                                     \
          $(OUTTESTS)/state_unittests.o                                         \
 
-all: $(OUT)/picc $(OUT)/asm $(OUT)/exty tests
+all: $(OUT)/picc $(OUT)/asm $(OUT)/exty $(OUT)/smap tests
 
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -g -o $@ $< $(CFLAGS)
@@ -71,6 +71,9 @@ $(OUT)/asm: $(OBJ) $(OUT)/asm.o
 	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/exty: $(OBJ) $(OUT)/exty.o
+	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/smap: $(OBJ) $(OUT)/smap.o
 	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/

@@ -111,7 +111,7 @@ TEST(Ciede2kTest, SharmaWuBalalTestData) {
   kernel->SetBufferArgument(0, lab_1_buffer.get());
   kernel->SetBufferArgument(1, lab_2_buffer.get());
   kernel->SetBufferArgument(2, out_buffer.get());
-  kernel->Enqueue(queue.get());
+  kernel->Enqueue(queue.get(), kSWBTestDataCount);
   std::unique_ptr<float[]> results(new float[kSWBTestDataCount]);
   out_buffer->EnqueueCopyFromDevice(queue.get(), results.get());
   queue->Finish();

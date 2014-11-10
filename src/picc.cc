@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
   std::string spec_output_file_path(argv[3]);
 
   if (!vcsmc::CLDeviceContext::Setup()) {
-    printf("OpenCL setup failed, exiting.\n");
+    printf("OpenCL setup failed!\n");
     return -1;
   }
 
