@@ -1171,3 +1171,21 @@ saves.
 reverse FFT process, then send data back to main memory, extract real values
 and save.
 
+
+REFACTOR:
+
+read image in, upload as blob of floats to card.
+make first FFT buffer, run expand + zero fill shader which copies input data
+and zero-fills into first FFT buffer.
+forward FFT
+spectral residual
+inverse FFT
+pack back into smaller image buffer, drop zero filling and imaginary part
+square
+can optionally pause here, copy back to main memory & save this image.
+reduce to sum for mean
+copy mean back to main memory
+shader to threshold against value and save byte ff or 00 output.
+copy bytemap back to main memory, save to bitmap file.
+
+bitmaps allow for very compact bit-per-pixel representation.

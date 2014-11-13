@@ -45,20 +45,15 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
+  uint32 width = input_map->width();
+  uint32 height = input_map->height();
   uint32 power_width = NextHighestPower(input_map->width());
   uint32 power_height = NextHighestPower(input_map->height());
-  std::unique_ptr<float[]> values(new float[power_width * power_height * 2]);
-  memset(values.get(), 0, power_width * power_height * 2 * sizeof(float));
-  // Pack input into real values of complex pairs with zero-padding.
-  for (uint32 i = 0; i < input_map->height(); ++i) {
-    const float* map = input_map->values() + (i * input_map->width());
-    float* in_complex = values.get() + (i * power_width * 2);
-    for (uint32 j = 0; j < input_map->width(); ++j) {
-      *in_complex = *map;
-      ++map;
-      in_complex += 2;
-    }
-  }
+
+  // Make containers for OpenCL outputs.
+  float mean = -1.0f;
+  std::unique_ptr<vcsmc::GrayMap> output_map(
+      new vcsmc::GrayMap(input_map->width(), input_map->height()));
 
   // Nested scope so that OpenCL wrapper objects get destructed before OpenCL
   // Teardown call at bottom of function.
@@ -68,7 +63,21 @@ int main(int argc, char* argv[]) {
     std::unique_ptr<vcsmc::CLBuffer> first_buffer(
         vcsmc::CLDeviceContext::MakeBuffer(
             power_width * power_height * 2 * sizeof(float)));
-    first_buffer->EnqueueCopyToDevice(queue.get(), values.get());
+
+    std::unique_ptr<vcsmc::CLBuffer> map_buffer(
+        vcsmc::CLDeviceContext::MakeBuffer(width * height * sizeof(float)));
+    map_buffer->EnqueueCopyToDevice(queue.get(), input_map->values());
+    std::unique_ptr<vcsmc::CLKernel> unpack_kernel(
+        vcsmc::CLDeviceContext::MakeKernel(
+            vcsmc::CLProgram::Programs::kUnpackRealToComplex));
+    unpack_kernel->SetBufferArgument(0, map_buffer.get());
+    unpack_kernel->SetByteArgument(1, sizeof(uint32), &width);
+    unpack_kernel->SetByteArgument(2, sizeof(uint32), &height);
+    unpack_kernel->SetByteArgument(3, sizeof(uint32), &power_width);
+    unpack_kernel->SetByteArgument(4, sizeof(uint32), &power_height);
+    unpack_kernel->SetBufferArgument(5, first_buffer.get());
+    unpack_kernel->Enqueue(queue.get(), unpack_kernel->WorkGroupSize());
+
     std::unique_ptr<vcsmc::CLBuffer> second_buffer(
         vcsmc::CLDeviceContext::MakeBuffer(
             power_width * power_height * 2 * sizeof(float)));
@@ -208,37 +217,54 @@ int main(int argc, char* argv[]) {
     kernel->Enqueue2D(queue.get(), power_width / 2, power_height);
     up = !up;
 
-    if (up)
-      first_buffer->EnqueueCopyFromDevice(queue.get(), values.get());
-    else
-      second_buffer->EnqueueCopyFromDevice(queue.get(), values.get());
+    // Drop imaginary values and zero padding.
+    std::unique_ptr<vcsmc::CLKernel> pack_kernel(
+        vcsmc::CLDeviceContext::MakeKernel(
+            vcsmc::CLProgram::Programs::kPackComplexToReal));
+    pack_kernel->SetBufferArgument(0,
+        up ? first_buffer.get() : second_buffer.get());
+    pack_kernel->SetByteArgument(1, sizeof(uint32), &power_width);
+    pack_kernel->SetByteArgument(2, sizeof(uint32), &power_height);
+    pack_kernel->SetByteArgument(3, sizeof(uint32), &width);
+    pack_kernel->SetByteArgument(4, sizeof(uint32), &height);
+    pack_kernel->SetBufferArgument(5, map_buffer.get());
+    pack_kernel->Enqueue(queue.get(), pack_kernel->WorkGroupSize());
 
-    // Wait for all OpenCL processing to finish.
+    // Square values to get spectral residual.
+    std::unique_ptr<vcsmc::CLBuffer> square_buffer(
+        vcsmc::CLDeviceContext::MakeBuffer(width * height * sizeof(float)));
+    std::unique_ptr<vcsmc::CLKernel> square_kernel(
+        vcsmc::CLDeviceContext::MakeKernel(
+            vcsmc::CLProgram::Programs::kSquare));
+    square_kernel->SetBufferArgument(0, map_buffer.get());
+    square_kernel->SetBufferArgument(1, square_buffer.get());
+    square_kernel->Enqueue(queue.get(), width * height);
+
+    // Copy back out to spectral residual picture buffer.
+    square_buffer->EnqueueCopyFromDevice(queue.get(),
+       output_map->values_writeable());
+
+    // Sum squared error to get mean.
+    std::unique_ptr<vcsmc::CLKernel> sum_kernel(
+        vcsmc::CLDeviceContext::MakeKernel(vcsmc::CLProgram::Programs::kSum));
+    std::unique_ptr<vcsmc::CLBuffer> sum_buffer(
+        vcsmc::CLDeviceContext::MakeBuffer(sizeof(float)));
+    sum_kernel->SetBufferArgument(0, square_buffer.get());
+    uint32 sum_length = width * height;
+    sum_kernel->SetByteArgument(1, sizeof(uint32), &sum_length);
+    sum_kernel->SetByteArgument(2,
+        sizeof(float) * sum_kernel->WorkGroupSize(), NULL);
+    sum_kernel->SetBufferArgument(3, sum_buffer.get());
+    sum_kernel->Enqueue(queue.get(), sum_kernel->WorkGroupSize());
+
+    sum_buffer->EnqueueCopyFromDevice(queue.get(), &mean);
     queue->Finish();
+
+    mean = mean / (float)sum_length;
   }
 
-  // Extract real values from completed transform into output image.
-  std::unique_ptr<vcsmc::GrayMap> output_map(
-      new vcsmc::GrayMap(input_map->width(), input_map->height()));
-  float min = 0.0f;
-  float max = 0.0f;
-  float sum = 0.0f;
-  for (uint32 i = 0; i < input_map->height(); ++i) {
-    float* out_complex = values.get() + (i * power_width * 2);
-    float* map = output_map->values_writeable() + (i * output_map->width());
-    for (uint32 j = 0; j < input_map->width(); ++j) {
-      float val = *out_complex;
-      val = val * val;
-      *map = val;
-      min = std::min(val, min);
-      max = std::max(val, max);
-      sum += val;
-      ++map;
-      out_complex += 2;
-    }
-  }
-  printf("min: %f, max: %f, sum: %f\n", min, max, sum);
   output_map->Save(output_file_path);
+  printf("mean: %f\n", mean);
 
   vcsmc::CLDeviceContext::Teardown();
   return 0;

@@ -265,6 +265,28 @@ __kernel void rgb_to_lab(__read_only image2d_t input_image,
 }
       );  // end of kRGBToLab
 
+    case kPackComplexToReal:
+      return CL_PROGRAM(
+__kernel void pack_complex_to_real(__global __read_only float2* in_complex,
+                                   __read_only int input_width,
+                                   __read_only int input_height,
+                                   __read_only int output_width,
+                                   __read_only int output_height,
+                                   __global __write_only float* out_real) {
+  int number_of_threads = get_global_size(0);
+  int output_index = get_global_id(0);
+  int output_length = output_width * output_height;
+
+  while (output_index < output_length) {
+    int input_row = output_index / output_width;
+    int input_col = output_index % output_width;
+    int input_index = (input_row * input_width) + input_col;
+    out_real[output_index] = in_complex[input_index].x;
+    output_index += number_of_threads;
+  }
+}
+      );  // end of kPackComplexToReal
+
     case kSpectralResidual:
       return CL_PROGRAM(
 __kernel void spectral_residual(__global __read_only float2* input_data,
@@ -329,6 +351,89 @@ __kernel void spectral_residual(__global __read_only float2* input_data,
 }
       );  // end of kSpectralResidual
 
+    case kSquare:
+      return CL_PROGRAM(
+__kernel void square(__global __read_only float* in,
+                     __global __write_only float* out) {
+  int i = get_global_id(0);
+  float inf = in[i];
+  out[i] = inf * inf;
+}
+      );  // end of kSquare
+
+    case kSum:
+      return CL_PROGRAM(
+// Parallel reduction code. |in| points to |length| floats which are to be
+// summed. |out| points to a single float for summation. Run this with global
+// work group size equal to the max allowed in a local work group. |local|
+// points to scratch storage sufficient to hold one float for each thread.
+__kernel void sum(__global __read_only float* in,
+                  __read_only int length,
+                  __local float* scratch,
+                  __global __write_only float* out) {
+  int number_of_threads = get_global_size(0);
+  int thread_index = get_global_id(0);
+  int input_index = thread_index;
+  float accum = 0.0f;
+
+  // Serial addition of input array to reduce to |number_of_threads| sums.
+  while (input_index < length) {
+    accum += in[input_index];
+    input_index += number_of_threads;
+  }
+
+  scratch[thread_index] = accum;
+  barrier(CLK_LOCAL_MEM_FENCE);
+  for(int offset = number_of_threads / 2; offset > 0; offset = offset / 2) {
+    if (thread_index < offset) {
+      float other = scratch[thread_index + offset];
+      float mine = scratch[thread_index];
+      scratch[thread_index] = mine + other;
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+  }
+
+  if (thread_index == 0) {
+    *out = 666.0f; // scratch[0];
+  }
+}
+      );  // end of kSum
+
+    case kUnpackRealToComplex:
+      return CL_PROGRAM(
+// Copies a input buffer of single floats to an output buffer of float2s of a
+// larger size. This is used to expand real-valued packed image floats into a
+// zero-padded power-of-two size for FFT, with real values and zero imaginary
+// values interleaved. Should be run with global size of the maximum number of
+// threads the OpenCL API says it can do in a single work group.
+__kernel void unpack_real_to_complex(__global __read_only float* in_real,
+                                     __read_only int input_width,
+                                     __read_only int input_height,
+                                     __read_only int output_width,
+                                     __read_only int output_height,
+                                     __global __write_only float2* out_cplx) {
+  int number_of_threads = get_global_size(0);
+  int output_index = get_global_id(0);
+  int output_length = output_width * output_height;
+
+  while (output_index < output_length) {
+    int output_row = output_index / output_width;
+    int output_col = output_index % output_width;
+    if (output_row < input_height) {
+      if (output_col < input_width) {
+        int input_index = (output_row * input_width) + output_col;
+        out_cplx[output_index] = (float2)(in_real[input_index], 0.0f);
+      } else {
+        out_cplx[output_index] = (float2)(0.0f, 0.0f);
+      }
+    } else {
+      out_cplx[output_index] = (float2)(0.0f, 0.0f);
+    }
+    output_index += number_of_threads;
+  }
+}
+      );  // end of kUnpackRealToComplex
+
     default:
       assert(false);
       return "";
@@ -350,11 +455,23 @@ std::string CLProgram::GetProgramName(Programs program) {
     case kInverseFFTNormalize:
       return "inverse_fft_normalize";
 
+    case kPackComplexToReal:
+      return "pack_complex_to_real";
+
     case kRGBToLab:
       return "rgb_to_lab";
 
     case kSpectralResidual:
       return "spectral_residual";
+
+    case kSquare:
+      return "square";
+
+    case kSum:
+      return "sum";
+
+    case kUnpackRealToComplex:
+      return "unpack_real_to_complex";
 
     default:
       assert(false);

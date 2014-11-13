@@ -23,6 +23,7 @@ endif
 DEPS=constants.h image_file.h types.h
 OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/block.o                                                             \
+    $(OUT)/bit_map.o                                                           \
     $(OUT)/cl_buffer_impl.o                                                    \
     $(OUT)/cl_command_queue_impl.o                                             \
     $(OUT)/cl_device_context.o                                                 \

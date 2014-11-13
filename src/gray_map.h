@@ -24,17 +24,17 @@ class GrayMap {
 
   void Save(const std::string& file_path);
 
-  const uint32 width() const { return width_; }
-  const uint32 height() const { return height_; }
+  uint32 width() const { return width_; }
+  uint32 height() const { return height_; }
   const float* values() const { return values_.get(); }
   float* values_writeable() { return values_.get(); }
 
  private:
-  const uint32 width_;
-  const uint32 height_;
+  uint32 width_;
+  uint32 height_;
   std::unique_ptr<float[]> values_;
 };
 
-}
+}  // namespace vcsmc
 
 #endif  // SRC_GRAY_MAP_H_

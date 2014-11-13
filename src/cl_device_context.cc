@@ -106,7 +106,7 @@ bool CLDeviceContext::BuildProgram(CLProgram::Programs program) {
   if (!prog || result != CL_SUCCESS)
     return false;
 
-  result = clBuildProgram(prog, 0, NULL, /*"-Werror"*/ "", NULL, NULL);
+  result = clBuildProgram(prog, 0, NULL, "-Werror", NULL, NULL);
   if (result != CL_SUCCESS) {
     std::unique_ptr<char[]> log_char(new char[16384]);
     size_t log_length;
