@@ -55,8 +55,8 @@ int main(int argc, char* argv[]) {
     char file_name[kFileNameBufferSize];
     snprintf(file_name, kFileNameBufferSize, output_file_spec.c_str(),
         file_counter);
-    vcsmc::GrayMap::SaveFromBytes(file_name, image_buffer.get(), width, height,
-        8);
+    vcsmc::ValueMap::SaveFromBytes(file_name, image_buffer.get(), width, height,
+        8, width);
     lseek(yuv_fd, bytes_to_skip, SEEK_CUR);
     ++file_counter;
   }

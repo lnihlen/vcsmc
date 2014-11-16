@@ -1143,7 +1143,7 @@ ffmpeg -i sintel-1024-stereo.ogv -vsync passthrough -pix_fmt rgba -f image2 -s 4
 extract yuv format for fft work, format is YUV 4:2:0 uncompressed
 (note size is rounded up to keep even-numbered, to avoid format depression)
 
-ffmpeg -i sintel-1024-stereo.ogv -vsync passthrough -s 452x192 -pix_fmt yuv420p stills.yuv
+ffmpeg -i sintel-1024-stereo.ogv -vsync passthrough -s 160x192 -pix_fmt yuv420p stills.yuv
 
 creates one big blob file, which then needs slicing out to grayscale pngs:
 

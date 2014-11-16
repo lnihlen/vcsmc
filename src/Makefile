@@ -45,7 +45,8 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/shape_fit.o                                                         \
     $(OUT)/spec.o                                                              \
     $(OUT)/state.o                                                             \
-    $(OUT)/tiff_image_file.o
+    $(OUT)/tiff_image_file.o                                                   \
+    $(OUT)/value_map.o
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/block_unittests.o                                         \

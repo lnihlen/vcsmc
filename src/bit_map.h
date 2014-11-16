@@ -1,16 +1,14 @@
 #ifndef SRC_BIT_MAP_H_
 #define SRC_BIT_MAP_H_
 
-#include <memory>
-
-#include "types.h"
+#include "value_map.h"
 
 namespace vcsmc {
 
 // A BitMap defines a field of single-bit values and has a width and a height.
 // It can be read from and saved to a bitmap PNG image file. Designed to store
 // the bitmap as memory efficiently as possible.
-class BitMap {
+class BitMap : public ValueMap {
  public:
   BitMap(uint32 width, uint32 height);
 
@@ -20,16 +18,20 @@ class BitMap {
 
   void Save(const std::string& file_path);
 
+  // Given a pointer to bytemap with |bytes_per_row| >= |width_| BitMap will
+  // build its internal bitwise representation to match.
+  void Pack(const uint8* bytes, uint32 bytes_per_row_unpacked);
+
+  // Sets the bit at |x, y| to |value|.
+  void SetBit(uint32 x, uint32 y, bool value);
+
   // Returns the value of the bitmap at (x, y).
   bool bit(uint32 x, uint32 y);
 
-  uint32 width() const { return width_; }
-  uint32 height() const { return height_; }
-
  private:
-  uint32 width_;
-  uint32 byte_width_;
-  uint32 height_;
+  BitMap(uint32 width, uint32 height, std::unique_ptr<uint8[]> bytes,
+      uint32 bytes_per_row);
+  uint32 bytes_per_row_;
   std::unique_ptr<uint8[]> bytes_;
 };
 

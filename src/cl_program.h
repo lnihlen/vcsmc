@@ -12,13 +12,14 @@ class CLProgram {
     kDownsampleErrors = 1,
     kFFTRadix2 = 2,
     kInverseFFTNormalize = 3,
-    kPackComplexToReal = 4,
-    kRGBToLab = 5,
-    kSpectralResidual = 6,
-    kSquare = 7,
-    kSum = 8,
-    kUnpackRealToComplex = 9,
-    PROGRAM_COUNT = 10
+    kMakeBitmap = 4,
+    kPackComplexToReal = 5,
+    kRGBToLab = 6,
+    kSpectralResidual = 7,
+    kSquare = 8,
+    kSum = 9,
+    kUnpackRealToComplex = 10,
+    PROGRAM_COUNT = 11
   };
 
   static std::string GetProgramString(Programs program);

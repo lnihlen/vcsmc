@@ -3,6 +3,7 @@
 #include <list>
 #include <string>
 
+#include "bit_map.h"
 #include "cl_buffer.h"
 #include "cl_command_queue.h"
 #include "cl_device_context.h"
@@ -51,9 +52,9 @@ int main(int argc, char* argv[]) {
   uint32 power_height = NextHighestPower(input_map->height());
 
   // Make containers for OpenCL outputs.
-  float mean = -1.0f;
-  std::unique_ptr<vcsmc::GrayMap> output_map(
-      new vcsmc::GrayMap(input_map->width(), input_map->height()));
+  float mean = 0.0f;
+  std::unique_ptr<vcsmc::GrayMap> output_map(new vcsmc::GrayMap(width, height));
+  std::unique_ptr<uint8[]> output_bytemap(new uint8[width * height]);
 
   // Nested scope so that OpenCL wrapper objects get destructed before OpenCL
   // Teardown call at bottom of function.
@@ -261,10 +262,26 @@ int main(int argc, char* argv[]) {
     queue->Finish();
 
     mean = mean / (float)sum_length;
+    float threshold = mean * 3.0f;
+
+    std::unique_ptr<vcsmc::CLKernel> bm_kernel(
+        vcsmc::CLDeviceContext::MakeKernel(
+            vcsmc::CLProgram::Programs::kMakeBitmap));
+    std::unique_ptr<vcsmc::CLBuffer> bitmap_buffer(
+        vcsmc::CLDeviceContext::MakeBuffer(width * height));
+    bm_kernel->SetBufferArgument(0, square_buffer.get());
+    bm_kernel->SetByteArgument(1, sizeof(float), &threshold);
+    bm_kernel->SetBufferArgument(2, bitmap_buffer.get());
+    bm_kernel->Enqueue(queue.get(), width * height);
+
+    bitmap_buffer->EnqueueCopyFromDevice(queue.get(), output_bytemap.get());
+    queue->Finish();
   }
 
-  output_map->Save(output_file_path);
-  printf("mean: %f\n", mean);
+  output_map->Save(output_file_path + ".smap.png");
+  vcsmc::BitMap bit_map(width, height);
+  bit_map.Pack(output_bytemap.get(), width);
+  bit_map.Save(output_file_path);
 
   vcsmc::CLDeviceContext::Teardown();
   return 0;

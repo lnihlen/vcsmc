@@ -1,85 +1,89 @@
 #include "bit_map.h"
 
 #include <cassert>
-#include <png.h>
-#include <stdio.h>
-#include <string>
 
 namespace vcsmc {
 
 BitMap::BitMap(uint32 width, uint32 height)
-    : width_(width),
-      byte_width_(width_ / 8),
-      height_(height) {
+    : ValueMap(width, height),
+      bytes_per_row_(width_ / 8) {
   if (width_ % 8)
-    ++byte_width_;
-  bytes_.reset(new uint8[byte_width_ * height_]);
+    ++bytes_per_row_;
+  bytes_.reset(new uint8[bytes_per_row_ * height_]);
+}
+
+BitMap::BitMap(uint32 width, uint32 height, std::unique_ptr<uint8[]> bytes,
+    uint32 bytes_per_row) : ValueMap(width, height),
+                            bytes_per_row_(bytes_per_row),
+                            bytes_(std::move(bytes)) {
 }
 
 // static
 std::unique_ptr<BitMap> BitMap::Load(const std::string& file_path) {
-/*
-  // Code almost entirely copied from readpng.c by Greg Roelofs.
-  FILE* png_file = fopen(file_path.c_str(), "rb");
-  if (!png_file)
+  // Load png image bytes, they could be packed single bits or 8-bit unpacked.
+  uint32 width, height, bit_depth, bytes_per_row;
+  std::unique_ptr<uint8[]> image_bytes(ValueMap::LoadFromFile(file_path,
+      width, height, bit_depth, bytes_per_row));
+  if (!image_bytes || bit_depth > 8)
     return nullptr;
-
-  uint8 png_sig[8];
-  fread(png_sig, 1, 8, png_file);
-  if (!png_check_sig(png_sig, 8)) {
-    fclose(png_file);
-    return nullptr;
+  // If we loaded bytes pack them into bits before returning, otherwise we can
+  // construct the BitMap directly from the image bytes.
+  if (bit_depth == 8) {
+    std::unique_ptr<BitMap> bitmap(new BitMap(width, height));
+    bitmap->Pack(image_bytes.get(), bytes_per_row);
+    return std::move(bitmap);
+  } else {
+    assert(bit_depth == 1);
+    return std::unique_ptr<BitMap>(new BitMap(width, height,
+        std::move(image_bytes), bytes_per_row));
   }
-
-  png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
-      NULL, NULL, NULL);
-  assert(png_ptr);
-  png_infop info_ptr = png_create_info_struct(png_ptr);
-  assert(info_ptr);
-
-  png_init_io(png_ptr, png_file);
-  png_set_sig_bytes(png_ptr, 8);
-  png_read_info(png_ptr, info_ptr);
-
-  uint32 width = 0;
-  uint32 height = 0;
-  int bit_depth, color_type;
-  png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type,
-      NULL, NULL, NULL);
-  if (bit_depth != 1 || color_type != PNG_COLOR_TYPE_GRAY) {
-    png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-    fclose(png_file);
-    return nullptr;
-  }
-
-  // No transformations to register, so just update info.
-  png_read_update_info(png_ptr, info_ptr);
-
-  png_bytepp row_pointers = (png_bytepp)malloc(height * sizeof(png_bytep));
-  uint32 bytes_per_row = png_get_rowbytes(png_ptr, info_ptr);
-
-  // question - is this coming in packed or unpacked.
-
-  std::unique_ptr<uint8[]> image_bytes(new uint8[bytes_per_row * height]);
-  for (uint32 i = 0; i < height; ++i)
-    row_pointers[i] = image_bytes.get() + (i * bytes_per_row);
-  png_read_image(png_ptr, row_pointers);
-
-  // Build bitmap, if needed.
-
-  free(row_pointers);
-  png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-  fclose(png_file);
-  return std::move(gray_map);
-*/
   return nullptr;
 }
 
 void BitMap::Save(const std::string& file_path) {
+  std::unique_ptr<uint8[]> unpacked(new uint8[width_ * height_]);
+  std::memset(unpacked.get(), 0, width_ * height_);
+  uint8* byte_ptr = unpacked.get();
+  for (uint32 i = 0; i < height_; ++i) {
+    for(uint32 j = 0; j < width_; ++j) {
+      if (bit(j, i))
+        *byte_ptr = 0xff;
+      ++byte_ptr;
+    }
+  }
+
+  ValueMap::SaveFromBytes(file_path, unpacked.get(), width_, height_, 8,
+      width_);
+}
+
+void BitMap::Pack(const uint8* bytes, uint32 bytes_per_row_unpacked) {
+  assert(bytes_per_row_unpacked >= width_);
+  // It is assumed that most bits are zero when packing, as that is what most
+  // spectral maps bits are.
+  std::memset(bytes_.get(), 0, bytes_per_row_ * height_);
+  for (uint32 i = 0; i < height_; ++i) {
+    const uint8* row_ptr = bytes + (i * bytes_per_row_unpacked);
+    for (uint32 j = 0; j < width_; ++j) {
+      if (*row_ptr)
+        SetBit(j, i, true);
+      ++row_ptr;
+    }
+  }
+}
+
+void BitMap::SetBit(uint32 x, uint32 y, bool value) {
+  uint8* byte_ptr = bytes_.get() + (y * bytes_per_row_) + (x / 8);
+  uint32 bit_offset = x % 8;
+  if (value)
+    *byte_ptr = (*byte_ptr) | (1 << bit_offset);
+  else
+    *byte_ptr = (*byte_ptr) & (!(1 << bit_offset));
 }
 
 bool BitMap::bit(uint32 x, uint32 y) {
-  return false;
+  uint8* byte_ptr = bytes_.get() + (y * bytes_per_row_) + (x / 8);
+  uint32 bit_offset = x % 8;
+  return (*byte_ptr) & (1 << bit_offset);
 }
 
 }  // namespace vcsmc

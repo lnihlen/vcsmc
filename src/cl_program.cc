@@ -217,6 +217,17 @@ __kernel void inverse_fft_normalize(__global __read_only float4* input_data,
 }
       );  // end of kInverseFFTNormalize
 
+    case kMakeBitmap:
+      return CL_PROGRAM(
+__kernel void make_bitmap(__global __read_only float* input,
+                          __read_only float threshold,
+                          __global __write_only uchar* output) {
+  int i = get_global_id(0);
+  float inf = input[i];
+  output[i] = inf >= threshold ? 0xff : 0x00;
+}
+      );  // end of kMakeBitmap
+
     case kRGBToLab:
       return CL_PROGRAM(
 // Converts input RGB to CIE L*a*b* color. The fourth input and output column
@@ -454,6 +465,9 @@ std::string CLProgram::GetProgramName(Programs program) {
 
     case kInverseFFTNormalize:
       return "inverse_fft_normalize";
+
+    case kMakeBitmap:
+      return "make_bitmap";
 
     case kPackComplexToReal:
       return "pack_complex_to_real";
