@@ -24,6 +24,7 @@ CLDeviceContext* CLDeviceContext::instance_ = NULL;
 struct CLDeviceContext::Impl {
   cl_device_id device_id;
   cl_context context;
+  uint64 local_memory_size;
 
   // Our cache of previously loaded and compiled programs.
   cl_program programs[CLProgram::Programs::PROGRAM_COUNT];
@@ -68,6 +69,11 @@ std::unique_ptr<CLKernel> CLDeviceContext::MakeKernel(
   return instance_->DoMakeKernel(program);
 }
 
+// static
+uint64 CLDeviceContext::LocalMemorySize() {
+  return instance_->impl_->local_memory_size;
+}
+
 CLDeviceContext::CLDeviceContext() : impl_(new Impl) {
 }
 
@@ -94,7 +100,11 @@ bool CLDeviceContext::DoSetup() {
       return false;
   }
 
-  return true;
+  // Query for local memory size.
+  result = clGetDeviceInfo(impl_->device_id, CL_DEVICE_LOCAL_MEM_SIZE,
+      sizeof(uint64), &impl_->local_memory_size, NULL);
+
+  return result == CL_SUCCESS;
 }
 
 bool CLDeviceContext::BuildProgram(CLProgram::Programs program) {

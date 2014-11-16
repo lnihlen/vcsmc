@@ -20,6 +20,10 @@ class CLKernel {
   virtual bool Enqueue(CLCommandQueue* queue, size_t work_size) = 0;
   virtual bool Enqueue2D(CLCommandQueue* queue, size_t work_width,
       size_t work_height) = 0;
+
+  // Returns local memory consumed by the kernel, including any local memory
+  // area arguments whose size has been specified.
+  virtual uint64 LocalMemoryUsed() = 0;
 };
 
 }  // namespace vcsmc

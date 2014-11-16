@@ -30,10 +30,12 @@ class CLKernelImpl : public CLKernel {
   virtual bool Enqueue(CLCommandQueue* queue, size_t work_size) override;
   virtual bool Enqueue2D(CLCommandQueue* queue, size_t work_width,
       size_t work_height) override;
+  virtual uint64 LocalMemoryUsed() override;
 
  private:
   size_t work_group_size_;
   cl_kernel kernel_;
+  uint64 local_memory_used_;
 };
 
 }  // namespace vcsmc

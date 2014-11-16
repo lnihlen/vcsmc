@@ -9,6 +9,11 @@ namespace vcsmc {
 // static
 std::string CLProgram::GetProgramString(Programs program) {
   switch (program) {
+
+//
+// kCiede2k ===================================================================
+//
+
     case kCiede2k:
       return CL_PROGRAM(
 // Given input colors in L*a*b* color space returns the CIEDE2000 delta E value,
@@ -107,6 +112,10 @@ __kernel void ciede2k(__global __read_only float4* lab_1_row,
 }
       );  // end of kCiede2K
 
+//
+// kDownsampleErrors ==========================================================
+//
+
     case kDownsampleErrors:
       return CL_PROGRAM(
 // Given an input float array of error distances |input_errors| of |input_width|
@@ -148,6 +157,10 @@ __kernel void downsample_errors(__global __read_only float* input_errors,
   output_errors[output_pixel] = total_error;
 }
       );  // end of kDownsampleErrors
+
+//
+// kFFTRadix2 =================================================================
+//
 
     case kFFTRadix2:
       return CL_PROGRAM(
@@ -198,6 +211,10 @@ __kernel void fft_radix_2(__global __read_only float2* input_data,
 }
       );  // end of kFFTRadix2
 
+//
+// kInverseFFTNormalize =======================================================
+//
+
     case kInverseFFTNormalize:
       return CL_PROGRAM(
 // An inverse FFT can be performed by conjugating each input complex number,
@@ -217,16 +234,96 @@ __kernel void inverse_fft_normalize(__global __read_only float4* input_data,
 }
       );  // end of kInverseFFTNormalize
 
+//
+// kMakeBitmap ================================================================
+//
+
     case kMakeBitmap:
       return CL_PROGRAM(
+// TODO: write comment
 __kernel void make_bitmap(__global __read_only float* input,
-                          __read_only float threshold,
+                          __global __read_only float* mean,
+                          __global __read_only float* std_dev,
                           __global __write_only uchar* output) {
   int i = get_global_id(0);
   float inf = input[i];
+  float threshold = *mean + *std_dev;
   output[i] = inf >= threshold ? 0xff : 0x00;
 }
       );  // end of kMakeBitmap
+
+//
+// kMean ======================================================================
+//
+
+    case kMean:
+      return CL_PROGRAM(
+// Parallel reduction code. |in| points to |length| floats which are to be
+// summed. |out| points to a single float for mean. Run this with global
+// work group size equal to the max allowed in a local work group. |local|
+// points to scratch storage sufficient to hold one float for each thread.
+__kernel void mean(__global __read_only float* in,
+                   __read_only int length,
+                   __local float* scratch,
+                   __global __write_only float* out) {
+  int number_of_threads = get_global_size(0);
+  int thread_index = get_global_id(0);
+  int input_index = thread_index;
+  float accum = 0.0f;
+
+  // Serial addition of input array to reduce to |number_of_threads| sums.
+  while (input_index < length) {
+    accum += in[input_index];
+    input_index += number_of_threads;
+  }
+
+  scratch[thread_index] = accum;
+  barrier(CLK_LOCAL_MEM_FENCE);
+  for(int offset = number_of_threads / 2; offset > 0; offset = offset / 2) {
+    if (thread_index < offset) {
+      float other = scratch[thread_index + offset];
+      float mine = scratch[thread_index];
+      scratch[thread_index] = mine + other;
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+  }
+
+  if (thread_index == 0) {
+    *out = scratch[0] / (float)length;
+  }
+}
+      );  // end of kMean
+
+//
+// kPackComplexToReal =========================================================
+//
+
+    case kPackComplexToReal:
+      return CL_PROGRAM(
+__kernel void pack_complex_to_real(__global __read_only float2* in_complex,
+                                   __read_only int input_width,
+                                   __read_only int input_height,
+                                   __read_only int output_width,
+                                   __read_only int output_height,
+                                   __global __write_only float* out_real) {
+  int number_of_threads = get_global_size(0);
+  int output_index = get_global_id(0);
+  int output_length = output_width * output_height;
+
+  while (output_index < output_length) {
+    int input_row = output_index / output_width;
+    int input_col = output_index % output_width;
+    int input_index = (input_row * input_width) + input_col;
+    out_real[output_index] = in_complex[input_index].x;
+    output_index += number_of_threads;
+  }
+}
+      );  // end of kPackComplexToReal
+
+
+//
+// kRGBToLab ==================================================================
+//
 
     case kRGBToLab:
       return CL_PROGRAM(
@@ -276,27 +373,9 @@ __kernel void rgb_to_lab(__read_only image2d_t input_image,
 }
       );  // end of kRGBToLab
 
-    case kPackComplexToReal:
-      return CL_PROGRAM(
-__kernel void pack_complex_to_real(__global __read_only float2* in_complex,
-                                   __read_only int input_width,
-                                   __read_only int input_height,
-                                   __read_only int output_width,
-                                   __read_only int output_height,
-                                   __global __write_only float* out_real) {
-  int number_of_threads = get_global_size(0);
-  int output_index = get_global_id(0);
-  int output_length = output_width * output_height;
-
-  while (output_index < output_length) {
-    int input_row = output_index / output_width;
-    int input_col = output_index % output_width;
-    int input_index = (input_row * input_width) + input_col;
-    out_real[output_index] = in_complex[input_index].x;
-    output_index += number_of_threads;
-  }
-}
-      );  // end of kPackComplexToReal
+//
+// kSpectralResidual ==========================================================
+//
 
     case kSpectralResidual:
       return CL_PROGRAM(
@@ -362,6 +441,10 @@ __kernel void spectral_residual(__global __read_only float2* input_data,
 }
       );  // end of kSpectralResidual
 
+//
+// kSquare ====================================================================
+//
+
     case kSquare:
       return CL_PROGRAM(
 __kernel void square(__global __read_only float* in,
@@ -372,24 +455,26 @@ __kernel void square(__global __read_only float* in,
 }
       );  // end of kSquare
 
-    case kSum:
+//
+// kStandardDeviation =========================================================
+//
+
+    case kStandardDeviation:
       return CL_PROGRAM(
-// Parallel reduction code. |in| points to |length| floats which are to be
-// summed. |out| points to a single float for summation. Run this with global
-// work group size equal to the max allowed in a local work group. |local|
-// points to scratch storage sufficient to hold one float for each thread.
-__kernel void sum(__global __read_only float* in,
-                  __read_only int length,
-                  __local float* scratch,
-                  __global __write_only float* out) {
+__kernel void standard_deviation(__global __read_only float* in,
+                                 __global __read_only float* mean_in,
+                                 __read_only int length,
+                                 __local float* scratch,
+                                 __global __write_only float* out) {
   int number_of_threads = get_global_size(0);
   int thread_index = get_global_id(0);
   int input_index = thread_index;
   float accum = 0.0f;
+  float mean = *mean_in;
 
   // Serial addition of input array to reduce to |number_of_threads| sums.
   while (input_index < length) {
-    accum += in[input_index];
+    accum += pow(in[input_index] - mean, 2.0f);
     input_index += number_of_threads;
   }
 
@@ -405,10 +490,15 @@ __kernel void sum(__global __read_only float* in,
   }
 
   if (thread_index == 0) {
-    *out = 666.0f; // scratch[0];
+    *out = sqrt(scratch[0] / (float)length);
   }
 }
-      );  // end of kSum
+
+      );   // end of kStandardDeviation
+
+//
+// kUnpackRealToComplex =======================================================
+//
 
     case kUnpackRealToComplex:
       return CL_PROGRAM(
@@ -469,6 +559,9 @@ std::string CLProgram::GetProgramName(Programs program) {
     case kMakeBitmap:
       return "make_bitmap";
 
+    case kMean:
+      return "mean";
+
     case kPackComplexToReal:
       return "pack_complex_to_real";
 
@@ -481,8 +574,8 @@ std::string CLProgram::GetProgramName(Programs program) {
     case kSquare:
       return "square";
 
-    case kSum:
-      return "sum";
+    case kStandardDeviation:
+      return "standard_deviation";
 
     case kUnpackRealToComplex:
       return "unpack_real_to_complex";

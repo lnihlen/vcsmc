@@ -52,9 +52,9 @@ int main(int argc, char* argv[]) {
   uint32 power_height = NextHighestPower(input_map->height());
 
   // Make containers for OpenCL outputs.
-  float mean = 0.0f;
-  std::unique_ptr<vcsmc::GrayMap> output_map(new vcsmc::GrayMap(width, height));
   std::unique_ptr<uint8[]> output_bytemap(new uint8[width * height]);
+  float mean = 0.0f;
+  float std_dev = 0.0f;
 
   // Nested scope so that OpenCL wrapper objects get destructed before OpenCL
   // Teardown call at bottom of function.
@@ -241,28 +241,32 @@ int main(int argc, char* argv[]) {
     square_kernel->SetBufferArgument(1, square_buffer.get());
     square_kernel->Enqueue(queue.get(), width * height);
 
-    // Copy back out to spectral residual picture buffer.
-    square_buffer->EnqueueCopyFromDevice(queue.get(),
-       output_map->values_writeable());
-
-    // Sum squared error to get mean.
-    std::unique_ptr<vcsmc::CLKernel> sum_kernel(
-        vcsmc::CLDeviceContext::MakeKernel(vcsmc::CLProgram::Programs::kSum));
-    std::unique_ptr<vcsmc::CLBuffer> sum_buffer(
+    // Compute mean of squared buffer.
+    std::unique_ptr<vcsmc::CLKernel> mean_kernel(
+        vcsmc::CLDeviceContext::MakeKernel(vcsmc::CLProgram::Programs::kMean));
+    std::unique_ptr<vcsmc::CLBuffer> mean_buffer(
         vcsmc::CLDeviceContext::MakeBuffer(sizeof(float)));
-    sum_kernel->SetBufferArgument(0, square_buffer.get());
+    mean_kernel->SetBufferArgument(0, square_buffer.get());
     uint32 sum_length = width * height;
-    sum_kernel->SetByteArgument(1, sizeof(uint32), &sum_length);
-    sum_kernel->SetByteArgument(2,
-        sizeof(float) * sum_kernel->WorkGroupSize(), NULL);
-    sum_kernel->SetBufferArgument(3, sum_buffer.get());
-    sum_kernel->Enqueue(queue.get(), sum_kernel->WorkGroupSize());
+    mean_kernel->SetByteArgument(1, sizeof(uint32), &sum_length);
+    mean_kernel->SetByteArgument(2,
+        sizeof(float) * mean_kernel->WorkGroupSize(), NULL);
+    mean_kernel->SetBufferArgument(3, mean_buffer.get());
+    mean_kernel->Enqueue(queue.get(), mean_kernel->WorkGroupSize());
 
-    sum_buffer->EnqueueCopyFromDevice(queue.get(), &mean);
-    queue->Finish();
-
-    mean = mean / (float)sum_length;
-    float threshold = mean * 3.0f;
+    // Compute standard deviation of squared buffer.
+    std::unique_ptr<vcsmc::CLKernel> std_kernel(
+        vcsmc::CLDeviceContext::MakeKernel(
+            vcsmc::CLProgram::Programs::kStandardDeviation));
+    std::unique_ptr<vcsmc::CLBuffer> std_buffer(
+        vcsmc::CLDeviceContext::MakeBuffer(sizeof(float)));
+    std_kernel->SetBufferArgument(0, square_buffer.get());
+    std_kernel->SetBufferArgument(1, mean_buffer.get());
+    std_kernel->SetByteArgument(2, sizeof(uint32), &sum_length);
+    std_kernel->SetByteArgument(3,
+        sizeof(float) * std_kernel->WorkGroupSize(), NULL);
+    std_kernel->SetBufferArgument(4, std_buffer.get());
+    std_kernel->Enqueue(queue.get(), std_kernel->WorkGroupSize());
 
     std::unique_ptr<vcsmc::CLKernel> bm_kernel(
         vcsmc::CLDeviceContext::MakeKernel(
@@ -270,18 +274,30 @@ int main(int argc, char* argv[]) {
     std::unique_ptr<vcsmc::CLBuffer> bitmap_buffer(
         vcsmc::CLDeviceContext::MakeBuffer(width * height));
     bm_kernel->SetBufferArgument(0, square_buffer.get());
-    bm_kernel->SetByteArgument(1, sizeof(float), &threshold);
-    bm_kernel->SetBufferArgument(2, bitmap_buffer.get());
+    bm_kernel->SetBufferArgument(1, mean_buffer.get());
+    bm_kernel->SetBufferArgument(2, std_buffer.get());
+    bm_kernel->SetBufferArgument(3, bitmap_buffer.get());
     bm_kernel->Enqueue(queue.get(), width * height);
 
     bitmap_buffer->EnqueueCopyFromDevice(queue.get(), output_bytemap.get());
+    mean_buffer->EnqueueCopyFromDevice(queue.get(), &mean);
+    std_buffer->EnqueueCopyFromDevice(queue.get(), &std_dev);
     queue->Finish();
   }
 
-  output_map->Save(output_file_path + ".smap.png");
   vcsmc::BitMap bit_map(width, height);
   bit_map.Pack(output_bytemap.get(), width);
   bit_map.Save(output_file_path);
+
+  int white_count = 0;
+  uint8* byte = output_bytemap.get();
+  for (uint32 i = 0; i < width * height; ++i) {
+    if (*byte)
+      white_count++;
+    ++byte;
+  }
+  printf("mean: %f, std_dev: %f, percent white: %f\n", mean, std_dev,
+    (float)white_count * 100.0f / (float)(width * height));
 
   vcsmc::CLDeviceContext::Teardown();
   return 0;

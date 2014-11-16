@@ -30,6 +30,7 @@ class CLDeviceContext {
   static std::unique_ptr<CLImage> MakeImage(const Image* image);
   static std::unique_ptr<CLImage> MakeImageFromStrip(const PixelStrip* strip);
   static std::unique_ptr<CLKernel> MakeKernel(CLProgram::Programs program);
+  static uint64 LocalMemorySize();
 
  private:
   static CLDeviceContext* instance_;

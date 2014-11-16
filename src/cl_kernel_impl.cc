@@ -8,7 +8,9 @@
 
 namespace vcsmc {
 
-CLKernelImpl::CLKernelImpl() : work_group_size_(0) {
+CLKernelImpl::CLKernelImpl()
+    : work_group_size_(0),
+      local_memory_used_(0) {
 }
 
 CLKernelImpl::~CLKernelImpl() {
@@ -30,6 +32,17 @@ bool CLKernelImpl::Setup(cl_program program,
                                     sizeof(work_group_size_),
                                     &work_group_size_,
                                     NULL);
+
+  if (result != CL_SUCCESS)
+    return false;
+
+  result = clGetKernelWorkGroupInfo(kernel_,
+                                    device_id,
+                                    CL_KERNEL_LOCAL_MEM_SIZE,
+                                    sizeof(local_memory_used_),
+                                    &local_memory_used_,
+                                    NULL);
+
   return result == CL_SUCCESS;
 }
 
@@ -91,6 +104,10 @@ bool CLKernelImpl::Enqueue2D(CLCommandQueue* queue, size_t work_width,
                                       NULL,
                                       NULL);
   return (result == CL_SUCCESS);
+}
+
+uint64 CLKernelImpl::LocalMemoryUsed() {
+  return local_memory_used_;
 }
 
 }  // namespace vcsmc
