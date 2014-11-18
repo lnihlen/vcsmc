@@ -9,13 +9,16 @@ BitMap::BitMap(uint32 width, uint32 height)
       bytes_per_row_(width_ / 8) {
   if (width_ % 8)
     ++bytes_per_row_;
-  bytes_.reset(new uint8[bytes_per_row_ * height_]);
+  packed_bytes_.reset(new uint8[bytes_per_row_ * height_]);
 }
 
 BitMap::BitMap(uint32 width, uint32 height, std::unique_ptr<uint8[]> bytes,
     uint32 bytes_per_row) : ValueMap(width, height),
                             bytes_per_row_(bytes_per_row),
-                            bytes_(std::move(bytes)) {
+                            packed_bytes_(std::move(bytes)) {
+}
+
+BitMap::~BitMap() {
 }
 
 // static
@@ -60,7 +63,7 @@ void BitMap::Pack(const uint8* bytes, uint32 bytes_per_row_unpacked) {
   assert(bytes_per_row_unpacked >= width_);
   // It is assumed that most bits are zero when packing, as that is what most
   // spectral maps bits are.
-  std::memset(bytes_.get(), 0, bytes_per_row_ * height_);
+  std::memset(packed_bytes_.get(), 0, bytes_per_row_ * height_);
   for (uint32 i = 0; i < height_; ++i) {
     const uint8* row_ptr = bytes + (i * bytes_per_row_unpacked);
     for (uint32 j = 0; j < width_; ++j) {
@@ -72,16 +75,16 @@ void BitMap::Pack(const uint8* bytes, uint32 bytes_per_row_unpacked) {
 }
 
 void BitMap::SetBit(uint32 x, uint32 y, bool value) {
-  uint8* byte_ptr = bytes_.get() + (y * bytes_per_row_) + (x / 8);
+  uint8* byte_ptr = packed_bytes_.get() + (y * bytes_per_row_) + (x / 8);
   uint32 bit_offset = x % 8;
   if (value)
     *byte_ptr = (*byte_ptr) | (1 << bit_offset);
   else
-    *byte_ptr = (*byte_ptr) & (!(1 << bit_offset));
+    *byte_ptr = (*byte_ptr) & (~(1 << bit_offset));
 }
 
 bool BitMap::bit(uint32 x, uint32 y) {
-  uint8* byte_ptr = bytes_.get() + (y * bytes_per_row_) + (x / 8);
+  uint8* byte_ptr = packed_bytes_.get() + (y * bytes_per_row_) + (x / 8);
   uint32 bit_offset = x % 8;
   return (*byte_ptr) & (1 << bit_offset);
 }

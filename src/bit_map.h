@@ -11,6 +11,9 @@ namespace vcsmc {
 class BitMap : public ValueMap {
  public:
   BitMap(uint32 width, uint32 height);
+  BitMap(uint32 width, uint32 height, std::unique_ptr<uint8[]> bytes,
+      uint32 bytes_per_row);
+  virtual ~BitMap();
 
   // Loads a BitMap from the provided monochromatic 1-bit .png file and returns
   // it, or nullptr on error.
@@ -28,11 +31,12 @@ class BitMap : public ValueMap {
   // Returns the value of the bitmap at (x, y).
   bool bit(uint32 x, uint32 y);
 
+  const uint8* packed_bytes() { return packed_bytes_.get(); }
+  const uint32 bytes_per_row() { return bytes_per_row_; }
+
  private:
-  BitMap(uint32 width, uint32 height, std::unique_ptr<uint8[]> bytes,
-      uint32 bytes_per_row);
   uint32 bytes_per_row_;
-  std::unique_ptr<uint8[]> bytes_;
+  std::unique_ptr<uint8[]> packed_bytes_;
 };
 
 }  // namespace vcsmc

@@ -13,6 +13,8 @@ class CLCommandQueue {
   // Enqueues a barrier which won't allow the queue to proceed until all
   // previous commands have completed.
   virtual void EnqueueBarrier() = 0;
+
+  virtual ~CLCommandQueue() {}
 };
 
 }  // namespace vcsmc

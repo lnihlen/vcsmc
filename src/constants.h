@@ -20,6 +20,7 @@ const uint32 kScanLineWidthCycles =
     kScanLineWidthClocks / kColorClocksPerCPUCycle;
 const uint32 kNTSCColors = 128;
 const uint32 kInfinity = 0xffffffff;
+const double kClockRateHz = 76.0 * 262.0 * 60.0;
 
 // Screen vertical dimensions/timing constants.
 const uint32 kVSyncScanLines = 3;

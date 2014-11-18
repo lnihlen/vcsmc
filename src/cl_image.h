@@ -9,6 +9,8 @@ class Image;
 class CLImage {
  public:
   virtual bool EnqueueCopyToDevice(CLCommandQueue* queue) = 0;
+
+  virtual ~CLImage() {}
 };
 
 }  // namespace vcsmc

@@ -1,7 +1,7 @@
 # VCSMC src/ Makefile.
 # Dependencies: libtiff, libpng, clang, OpenCL
 # tools dependencies: python colormath, Wand, ImageMagick
-CFLAGS+=-I.
+CFLAGS+=-I. -g # -O2
 LIBS+=-lm -ltiff -lpng
 OUTTESTS=$(OUT)/tests
 
@@ -46,9 +46,12 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/spec.o                                                              \
     $(OUT)/state.o                                                             \
     $(OUT)/tiff_image_file.o                                                   \
-    $(OUT)/value_map.o
+    $(OUT)/value_map.o                                                         \
+    $(OUT)/video_frame_data.o                                                  \
+    $(OUT)/video_frame_data_parser.o
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
+         $(OUTTESTS)/bit_map_unittests.o                                       \
          $(OUTTESTS)/block_unittests.o                                         \
          $(OUTTESTS)/ciede2k_unittests.o                                       \
          $(OUTTESTS)/fft_radix_2_unittests.o                                   \
@@ -61,27 +64,27 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
 all: $(OUT)/picc $(OUT)/asm $(OUT)/exty $(OUT)/smap tests
 
 $(OUT)/%.o: %.cc $(DEPS)
-	$(CC) -c -g -o $@ $< $(CFLAGS)
+	$(CC) -c -o $@ $< $(CFLAGS)
 
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
-	$(CC) -c -g -o $@ $< $(CFLAGS) -I$(GTEST_INCLUDE)
+	$(CC) -c -o $@ $< $(CFLAGS) -I$(GTEST_INCLUDE)
 
 $(OUT)/picc: $(OBJ) $(OUT)/picc.o
-	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/asm: $(OBJ) $(OUT)/asm.o
-	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/exty: $(OBJ) $(OUT)/exty.o
-	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/smap: $(OBJ) $(OUT)/smap.o
-	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o | $(OUTTESTS)/
-	$(CC) -g -o $@ $^ $(GTEST_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(GTEST_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUTTESTS)/:
 	mkdir -p $(OUTTESTS)

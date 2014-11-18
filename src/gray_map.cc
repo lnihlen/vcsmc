@@ -7,6 +7,9 @@ GrayMap::GrayMap(uint32 width, uint32 height)
       values_(new float[width * height]) {
 }
 
+GrayMap::~GrayMap() {
+}
+
 // static
 std::unique_ptr<GrayMap> GrayMap::Load(const std::string& file_path) {
   // Load png image bytes.

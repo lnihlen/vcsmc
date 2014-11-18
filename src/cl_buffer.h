@@ -16,6 +16,8 @@ class CLBuffer {
   // Call queue->Finish() after issuing this before accessing data!
   virtual bool EnqueueCopyFromDevice(
       CLCommandQueue* queue, void* data) = 0;
+
+  virtual ~CLBuffer() {}
 };
 
 }  // namespace vcsmc

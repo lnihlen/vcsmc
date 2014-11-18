@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <stdio.h>
 
 #include "cl_command_queue_impl.h"
 

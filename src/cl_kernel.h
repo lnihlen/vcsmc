@@ -24,6 +24,8 @@ class CLKernel {
   // Returns local memory consumed by the kernel, including any local memory
   // area arguments whose size has been specified.
   virtual uint64 LocalMemoryUsed() = 0;
+
+  virtual ~CLKernel() {}
 };
 
 }  // namespace vcsmc

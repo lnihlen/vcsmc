@@ -14,7 +14,7 @@ class CLImageImpl : public CLImage {
  public:
   CLImageImpl(const Image* image);
   CLImageImpl(const PixelStrip* strip);
-  ~CLImageImpl();
+  virtual ~CLImageImpl();
 
   bool Setup(cl_context context);
 

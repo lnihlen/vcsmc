@@ -10,6 +10,7 @@ namespace vcsmc {
 class GrayMap : public ValueMap {
  public:
   GrayMap(uint32 width, uint32 height);
+  virtual ~GrayMap();
 
   // Loads a GrayMap from the provided monochromatic 8 or 16 bit .png file
   // and returns it, or nullptr on error.

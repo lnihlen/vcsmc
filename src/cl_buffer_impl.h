@@ -14,7 +14,7 @@ namespace vcsmc {
 class CLBufferImpl : public CLBuffer {
  public:
   CLBufferImpl();
-  ~CLBufferImpl();
+  virtual ~CLBufferImpl();
 
   bool Setup(size_t size, cl_context context);
 

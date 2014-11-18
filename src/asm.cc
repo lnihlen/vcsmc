@@ -16,7 +16,7 @@ static const size_t kFileBufferSize = 16384;
 
 int main(int argc, char* argv[]) {
   if (argc != 3) {
-    printf("asm usage: asm input_file.asm output_file.bin\n");
+    fprintf(stderr, "asm usage: asm input_file.asm output_file.bin\n");
     return -1;
   }
 

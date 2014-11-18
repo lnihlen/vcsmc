@@ -40,11 +40,12 @@ bool ProcessSingleImage(const char* file_name) {
 int main(int argc, char* argv[]) {
   // Parse command line.
   if (argc != 4) {
-    printf("picc usage:\n"
-           "  picc <input_file_spec.tiff> <frame_rate_in_Hz> "
-              "<spec_output_file>\n\n"
-           "picc example:\n"
-           "  picc test_%%05d.tiff 60 demo.spec\n");
+    fprintf(stderr,
+        "picc usage:\n"
+        "  picc <input_file_spec.tiff> <frame_rate_in_Hz> "
+        "<spec_output_file>\n\n"
+        "picc example:\n"
+        "  picc test_%%05d.tiff 60 demo.spec\n");
     return -1;
   }
   std::string input_file_spec(argv[1]);

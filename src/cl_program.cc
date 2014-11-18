@@ -314,7 +314,7 @@ __kernel void pack_complex_to_real(__global __read_only float2* in_complex,
     int input_row = output_index / output_width;
     int input_col = output_index % output_width;
     int input_index = (input_row * input_width) + input_col;
-    out_real[output_index] = in_complex[input_index].x;
+    out_real[output_index] = length(in_complex[input_index]);
     output_index += number_of_threads;
   }
 }
