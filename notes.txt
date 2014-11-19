@@ -1189,3 +1189,18 @@ shader to threshold against value and save byte ff or 00 output.
 copy bytemap back to main memory, save to bitmap file.
 
 bitmaps allow for very compact bit-per-pixel representation.
+
+
+command line to make side-by-side comparison of stills:
+
+ffmpeg -pix_fmt abgr -s 160x192 -f image2 -i stills_yuv/frame-%02d.png -i \
+stills_tsmap/frame-%02d.png -r 24 -filter_complex \
+"[0:v:0]pad=iw*2:ih[bg]; [bg][1:v:0]overlay=w" oni_tsmap.mp4
+
+===============================================================================
+
+*** Player and Background fitting in this new era of Saliency Maps
+
+The saliency maps provide a guideline as to the higher-value pixels in a given
+image. Player fitting code should attempt to fit the areas highlighted by the
+saliency map.

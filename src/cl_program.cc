@@ -113,6 +113,47 @@ __kernel void ciede2k(__global __read_only float4* lab_1_row,
       );  // end of kCiede2K
 
 //
+// kConvolve ==================================================================
+//
+    case kConvolve:
+      return CL_PROGRAM(
+// Convolves a square input |kernel| of dimensions |kernel_size| against the
+// |input|, which is assumed to be of dimensions provided by global size, and
+// saving the result in |output|. |
+__kernel void convolve(__global __read_only float* input,
+                       __global __read_only float* c_kernel,
+                       __read_only int kernel_size,
+                       __global __write_only float* output) {
+  int input_width = get_global_size(0);
+  int input_height = get_global_size(1);
+  int input_x = get_global_id(0);
+  int input_y = get_global_id(1);
+
+  // Start convolution on upper-right hand corner of kernel and continue
+  // until reaching lower-right hand corner.
+  int center_offset = (input_y * input_width) + input_x;
+  int input_offset = center_offset -
+      (kernel_size / 2) - ((kernel_size / 2) * input_width);
+  int input_size = input_width * input_height;
+  int kernel_offset = 0;
+  float accum = 0.0f;
+  for (int i = 0; i < kernel_size; ++i) {
+    for (int j = 0; j < kernel_size; ++j) {
+      if (input_offset >= 0 && input_offset < input_size) {
+        accum += input[input_offset] * c_kernel[kernel_offset];
+      }
+      ++kernel_offset;
+      ++input_offset;
+    }
+    // skip to next row of input kernel.
+    input_offset += input_width - (1 + kernel_size);
+  }
+
+  output[center_offset] = accum;
+}
+      );  // end of kConvolve
+
+//
 // kDownsampleErrors ==========================================================
 //
 
@@ -502,7 +543,7 @@ __kernel void standard_deviation(__global __read_only float* in,
 
     case kUnpackRealToComplex:
       return CL_PROGRAM(
-// Copies a input buffer of single floats to an output buffer of float2s of a
+// Copies a input image of single floats to an output buffer of float2s of a
 // larger size. This is used to expand real-valued packed image floats into a
 // zero-padded power-of-two size for FFT, with real values and zero imaginary
 // values interleaved. Should be run with global size of the maximum number of
@@ -546,6 +587,9 @@ std::string CLProgram::GetProgramName(Programs program) {
   switch (program) {
     case kCiede2k:
       return "ciede2k";
+
+    case kConvolve:
+      return "convolve";
 
     case kDownsampleErrors:
       return "downsample_errors";

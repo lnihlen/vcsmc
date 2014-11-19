@@ -9,18 +9,19 @@ class CLProgram {
  public:
   enum Programs : size_t {
     kCiede2k              = 0,
-    kDownsampleErrors     = 1,
-    kFFTRadix2            = 2,
-    kInverseFFTNormalize  = 3,
-    kMakeBitmap           = 4,
-    kMean                 = 5,
-    kPackComplexToReal    = 6,
-    kRGBToLab             = 7,
-    kSpectralResidual     = 8,
-    kSquare               = 9,
-    kStandardDeviation    = 10,
-    kUnpackRealToComplex  = 11,
-    PROGRAM_COUNT         = 12
+    kConvolve             = 1,
+    kDownsampleErrors     = 2,
+    kFFTRadix2            = 3,
+    kInverseFFTNormalize  = 4,
+    kMakeBitmap           = 5,
+    kMean                 = 6,
+    kPackComplexToReal    = 7,
+    kRGBToLab             = 8,
+    kSpectralResidual     = 9,
+    kSquare               = 10,
+    kStandardDeviation    = 11,
+    kUnpackRealToComplex  = 12,
+    PROGRAM_COUNT         = 13
   };
 
   static std::string GetProgramString(Programs program);

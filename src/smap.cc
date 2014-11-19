@@ -14,6 +14,8 @@
 #include "video_frame_data.h"
 #include "video_frame_data_parser.h"
 
+#include "blur_kernel_table.cc"
+
 // With thanks to Sean Aaron Anderson
 // http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
 uint32 NextHighestPower(uint32 v) {
@@ -27,8 +29,11 @@ uint32 NextHighestPower(uint32 v) {
   return v;
 }
 
-std::unique_ptr<vcsmc::BitMap> BuildSaliencyMap(vcsmc::CLCommandQueue* queue,
-    vcsmc::GrayMap* input_map) {
+std::unique_ptr<vcsmc::BitMap> BuildSaliencyMap(
+    vcsmc::CLCommandQueue* queue,
+    vcsmc::GrayMap* input_map,
+    vcsmc::CLBuffer* blur_kernel_buffer,
+    uint32 blur_kernel_size) {
   std::vector<std::unique_ptr<vcsmc::CLKernel>> kernels;
   uint32 width = input_map->width();
   uint32 height = input_map->height();
@@ -215,11 +220,21 @@ std::unique_ptr<vcsmc::BitMap> BuildSaliencyMap(vcsmc::CLCommandQueue* queue,
   square_kernel->SetBufferArgument(1, square_buffer.get());
   square_kernel->Enqueue(queue, width * height);
 
+  // Blur results by convolution with Gaussian kernel.
+  std::unique_ptr<vcsmc::CLKernel> convolve_kernel(
+      vcsmc::CLDeviceContext::MakeKernel(
+          vcsmc::CLProgram::Programs::kConvolve));
+  convolve_kernel->SetBufferArgument(0, square_buffer.get());
+  convolve_kernel->SetBufferArgument(1, blur_kernel_buffer);
+  convolve_kernel->SetByteArgument(2, sizeof(uint32), &blur_kernel_size);
+  convolve_kernel->SetBufferArgument(3, map_buffer.get());
+  convolve_kernel->Enqueue2D(queue, width, height);
+
   // Compute mean of squared buffer.
   std::unique_ptr<vcsmc::CLKernel> mean_kernel(
       vcsmc::CLDeviceContext::MakeKernel(
           vcsmc::CLProgram::Programs::kMean));
-  mean_kernel->SetBufferArgument(0, square_buffer.get());
+  mean_kernel->SetBufferArgument(0, map_buffer.get());
   uint32 sum_length = width * height;
   mean_kernel->SetByteArgument(1, sizeof(uint32), &sum_length);
   mean_kernel->SetByteArgument(2,
@@ -233,7 +248,7 @@ std::unique_ptr<vcsmc::BitMap> BuildSaliencyMap(vcsmc::CLCommandQueue* queue,
   std::unique_ptr<vcsmc::CLKernel> std_kernel(
       vcsmc::CLDeviceContext::MakeKernel(
           vcsmc::CLProgram::Programs::kStandardDeviation));
-  std_kernel->SetBufferArgument(0, square_buffer.get());
+  std_kernel->SetBufferArgument(0, map_buffer.get());
   std_kernel->SetBufferArgument(1, mean_buffer.get());
   std_kernel->SetByteArgument(2, sizeof(uint32), &sum_length);
   std_kernel->SetByteArgument(3,
@@ -246,7 +261,7 @@ std::unique_ptr<vcsmc::BitMap> BuildSaliencyMap(vcsmc::CLCommandQueue* queue,
   std::unique_ptr<vcsmc::CLKernel> bm_kernel(
       vcsmc::CLDeviceContext::MakeKernel(
           vcsmc::CLProgram::Programs::kMakeBitmap));
-  bm_kernel->SetBufferArgument(0, square_buffer.get());
+  bm_kernel->SetBufferArgument(0, map_buffer.get());
   bm_kernel->SetBufferArgument(1, mean_buffer.get());
   bm_kernel->SetBufferArgument(2, std_buffer.get());
   std::unique_ptr<vcsmc::CLBuffer> bm_buffer(
@@ -290,7 +305,11 @@ int main(int argc, char* argv[]) {
   }
 
   std::unique_ptr<vcsmc::CLCommandQueue> queue =
-    vcsmc::CLDeviceContext::MakeCommandQueue();
+      vcsmc::CLDeviceContext::MakeCommandQueue();
+  std::unique_ptr<vcsmc::CLBuffer> blur_kernel_buffer(
+      vcsmc::CLDeviceContext::MakeBuffer(
+          vcsmc::kBlurKernelSize * vcsmc::kBlurKernelSize * sizeof(float)));
+  blur_kernel_buffer->EnqueueCopyToDevice(queue.get(), vcsmc::kBlurKernel);
 
   std::unique_ptr<vcsmc::VideoFrameDataParser::Frames> frames;
   while (nullptr != (frames = parser.GetNextFrameSet())) {
@@ -393,8 +412,11 @@ int main(int argc, char* argv[]) {
         }
       }
 
-      std::unique_ptr<vcsmc::BitMap> xy_map = BuildSaliencyMap(queue.get(),
-          input_map.get());
+      std::unique_ptr<vcsmc::BitMap> xy_map = BuildSaliencyMap(
+          queue.get(),
+          input_map.get(),
+          blur_kernel_buffer.get(),
+          vcsmc::kBlurKernelSize);
 
       xy_maps.push_back(std::move(xy_map));
     }
@@ -413,8 +435,11 @@ int main(int argc, char* argv[]) {
     std::vector<std::unique_ptr<vcsmc::BitMap>> xt_maps;
     xt_maps.reserve(height);
     for (uint32 i = 0; i < height; ++i) {
-      std::unique_ptr<vcsmc::BitMap> xt_map = BuildSaliencyMap(queue.get(),
-          xt_images[i].get());
+      std::unique_ptr<vcsmc::BitMap> xt_map = BuildSaliencyMap(
+          queue.get(),
+          xt_images[i].get(),
+          blur_kernel_buffer.get(),
+          vcsmc::kBlurKernelSize);
       xt_maps.push_back(std::move(xt_map));
     }
     // Can clear the xt_images vector to save memory.
@@ -424,8 +449,11 @@ int main(int argc, char* argv[]) {
     std::vector<std::unique_ptr<vcsmc::BitMap>> yt_maps;
     yt_maps.reserve(width);
     for (uint32 i = 0; i < width; ++i) {
-      std::unique_ptr<vcsmc::BitMap> yt_map = BuildSaliencyMap(queue.get(),
-          yt_images[i].get());
+      std::unique_ptr<vcsmc::BitMap> yt_map = BuildSaliencyMap(
+          queue.get(),
+          yt_images[i].get(),
+          blur_kernel_buffer.get(),
+          vcsmc::kBlurKernelSize);
       yt_maps.push_back(std::move(yt_map));
     }
     yt_images.clear();
