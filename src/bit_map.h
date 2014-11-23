@@ -29,10 +29,10 @@ class BitMap : public ValueMap {
   void SetBit(uint32 x, uint32 y, bool value);
 
   // Returns the value of the bitmap at (x, y).
-  bool bit(uint32 x, uint32 y);
+  bool bit(uint32 x, uint32 y) const;
 
-  const uint8* packed_bytes() { return packed_bytes_.get(); }
-  const uint32 bytes_per_row() { return bytes_per_row_; }
+  uint8* packed_bytes() const { return packed_bytes_.get(); }
+  uint32 bytes_per_row() const { return bytes_per_row_; }
 
  private:
   uint32 bytes_per_row_;

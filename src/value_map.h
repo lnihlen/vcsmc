@@ -11,8 +11,8 @@ class ValueMap {
  public:
   ValueMap(uint32 width, uint32 height);
 
-  uint32 width() { return width_; }
-  uint32 height() { return height_; }
+  uint32 width() const { return width_; }
+  uint32 height() const { return height_; }
 
   // Given a pointer to an 8-bit raw graymap saves it into a file. |bit_depth|
   // should 16, 8, or 1.

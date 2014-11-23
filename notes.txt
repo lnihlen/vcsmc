@@ -1204,3 +1204,68 @@ stills_tsmap/frame-%02d.png -r 24 -filter_complex \
 The saliency maps provide a guideline as to the higher-value pixels in a given
 image. Player fitting code should attempt to fit the areas highlighted by the
 saliency map.
+
+We can the image from top to bottom. We use the saliency map only to determine
+the position and NUSIZ settings of the players. Players start with normal NUSIZ
+and overlapping each other on the first scanline.
+
+Start with the saliency map for the given scanline. Build an array of 152 bytes
+each with a count of the number of saliency bits in this and the adjacent 7
+pixels. The output is the array plus a flag indicating if there are any salient
+bits on the line. The maxima are identified by location and sorted by pixel
+count.
+
+We need to decide where to move each player, if they are moving. Since moving
+a player costs the loss of player graphics for the current scan line that is
+the trade-off. So we analyze scan lines 2 at a time, current and next. current
+already has coverage. The question is what maxima do we cover in next, and at
+what cost to coverage in current? Score of each target is net gain in coverage.
+
+so given a current line and a next line we evaluate each maxima in the next
+line. For each maxima we produce two numbers, a net coverage score and an
+expense metric (for tiebreakers). expense metric is some combo of distance
+moved + some additional expense for NUSIZ. Then we sort these and choose
+the highest coverage score with the lowest expense.
+
+Some number 1-8 of adjacent pixels with ties. We keep
+behind the top 2 classes - so perhaps there's an 8 loci but several 7 loci.
+p1 should be considered only after p0 has done a fit and removed all matched
+bits.
+
+evaluation of maxima -
+count the overlapped pixels gained by moving the player to this position.
+count the pixels lost, if any, from current coverage by resetting the player
+when moved.
+consider a change to NUSIZ and if this would add any additional coverage,
+count this coverage in.
+
+** Dynamic Programming Solution
+
+For each scanline identify *all* local maxima in adjacent salient pixels count
+(there may be quite a few or only a few or none).
+Handle each player at a time.
+
+are these overlapping subproblems? They kind of feel like it, in the since that
+once you've arrived at a point it doesn't matter how you got there it will
+cost the same to travel to the next spot. But where you came from impacts how
+you get there:
+
+a b c d e f
+
+g h i j k l
+
+m n o p q r
+
+Consider bottom-up approach? Like start at mnopqr and evaluate change in
+coverage to move to each of ghijkl from each of last row. Then store max
+coverage at each node along with max coverage direction, and iterate up.
+
+Once at the top you have the best coverage table, to find max path through it
+then start again at the bottom and take the best step at each point, recording
+path through. Then reverse what's been recorded and that's the optimal path
+through the saliency map.
+
+Then, take a copy of the bitmap and wipe out all of the pixels covered by the
+first player, then repeat the process for the second player.
+
+

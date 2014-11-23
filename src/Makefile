@@ -21,7 +21,8 @@ LIBS+=-framework OpenCL
 endif
 
 DEPS=constants.h image_file.h types.h
-OBJ=$(OUT)/assembler.o                                                         \
+OBJ=$(OUT)/adjacency_map.o                                                     \
+    $(OUT)/assembler.o                                                         \
     $(OUT)/block.o                                                             \
     $(OUT)/bit_map.o                                                           \
     $(OUT)/cl_buffer_impl.o                                                    \
@@ -39,6 +40,7 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/opcode.o                                                            \
     $(OUT)/palette.o                                                           \
     $(OUT)/pixel_strip.o                                                       \
+    $(OUT)/player_fitter.o                                                     \
     $(OUT)/random.o                                                            \
     $(OUT)/range.o                                                             \
     $(OUT)/schedule.o                                                          \
@@ -50,12 +52,14 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/video_frame_data.o                                                  \
     $(OUT)/video_frame_data_parser.o
 
-TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
+TEST_OBJ=$(OUTTESTS)/adjacency_map_unittests.o                                 \
+         $(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
          $(OUTTESTS)/block_unittests.o                                         \
          $(OUTTESTS)/ciede2k_unittests.o                                       \
          $(OUTTESTS)/fft_radix_2_unittests.o                                   \
          $(OUTTESTS)/inverse_fft_norm_unittests.o                              \
+         $(OUTTESTS)/player_fitter_unittests.o                                 \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
          $(OUTTESTS)/shape_fit_unittests.o                                     \

@@ -83,7 +83,7 @@ void BitMap::SetBit(uint32 x, uint32 y, bool value) {
     *byte_ptr = (*byte_ptr) & (~(1 << bit_offset));
 }
 
-bool BitMap::bit(uint32 x, uint32 y) {
+bool BitMap::bit(uint32 x, uint32 y) const {
   uint8* byte_ptr = packed_bytes_.get() + (y * bytes_per_row_) + (x / 8);
   uint32 bit_offset = x % 8;
   return (*byte_ptr) & (1 << bit_offset);
