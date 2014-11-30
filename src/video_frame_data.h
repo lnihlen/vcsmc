@@ -11,10 +11,12 @@ class VideoFrameData {
  public:
   VideoFrameData(uint64 frame_number, uint64 pts, bool is_keyframe);
 
-  uint64 frame_number() { return frame_number_; }
+  uint64 frame_number() const { return frame_number_; }
+
   // Presentation Time Stamp, in color clocks.
-  uint64 pts() { return pts_; }
-  bool is_keyframe() { return is_keyframe_; }
+  uint64 pts() const { return pts_; }
+
+  bool is_keyframe() const { return is_keyframe_; }
 
  private:
   uint64 frame_number_;

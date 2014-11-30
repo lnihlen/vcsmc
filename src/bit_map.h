@@ -25,6 +25,9 @@ class BitMap : public ValueMap {
   // build its internal bitwise representation to match.
   void Pack(const uint8* bytes, uint32 bytes_per_row_unpacked);
 
+  // Any bits that are 1 in |bm| will be set to 0 in this BitMap.
+  void Subtract(const BitMap* bm);
+
   // Sets the bit at |x, y| to |value|.
   void SetBit(uint32 x, uint32 y, bool value);
 

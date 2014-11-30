@@ -102,12 +102,11 @@ void PixelStrip::BuildDistances(CLCommandQueue* queue) {
   queue->Finish();
 }
 
-void PixelStrip::BuildPalettes(const uint32 max_colus, Random* random) {
-  for (uint32 i = 1; i <= max_colus; ++i) {
-    std::unique_ptr<Palette> palette(new Palette(i));
-    palette->Compute(this, random);
-    palettes_.push_back(std::move(palette));
-  }
+std::unique_ptr<Palette> PixelStrip::BuildPalette(const uint32 max_colus,
+      Random* random) {
+  std::unique_ptr<Palette> palette(new Palette(max_colus));
+  palette->Compute(this, random);
+  return std::move(palette);
 }
 
 float PixelStrip::DistanceFrom(ColuStrip* colu_strip) {

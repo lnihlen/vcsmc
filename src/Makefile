@@ -36,7 +36,7 @@ OBJ=$(OUT)/adjacency_map.o                                                     \
     $(OUT)/colu_strip.o                                                        \
     $(OUT)/gray_map.o                                                          \
     $(OUT)/image.o                                                             \
-    $(OUT)/image_fitter.o                                                      \
+    $(OUT)/image_file.o                                                        \
     $(OUT)/opcode.o                                                            \
     $(OUT)/palette.o                                                           \
     $(OUT)/pixel_strip.o                                                       \
@@ -44,10 +44,8 @@ OBJ=$(OUT)/adjacency_map.o                                                     \
     $(OUT)/random.o                                                            \
     $(OUT)/range.o                                                             \
     $(OUT)/schedule.o                                                          \
-    $(OUT)/shape_fit.o                                                         \
     $(OUT)/spec.o                                                              \
     $(OUT)/state.o                                                             \
-    $(OUT)/tiff_image_file.o                                                   \
     $(OUT)/value_map.o                                                         \
     $(OUT)/video_frame_data.o                                                  \
     $(OUT)/video_frame_data_parser.o
@@ -59,10 +57,8 @@ TEST_OBJ=$(OUTTESTS)/adjacency_map_unittests.o                                 \
          $(OUTTESTS)/ciede2k_unittests.o                                       \
          $(OUTTESTS)/fft_radix_2_unittests.o                                   \
          $(OUTTESTS)/inverse_fft_norm_unittests.o                              \
-         $(OUTTESTS)/player_fitter_unittests.o                                 \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
-         $(OUTTESTS)/shape_fit_unittests.o                                     \
          $(OUTTESTS)/state_unittests.o                                         \
 
 all: $(OUT)/picc $(OUT)/asm $(OUT)/exty $(OUT)/smap tests

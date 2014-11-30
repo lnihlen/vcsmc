@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
     printf("exty usage:\n"
            "  exty <input_file.yuv> <width> <height> <output_file_spec>\n\n"
            "exty example:\n"
-           "  exty slices.yuv 452 192 slices_yuv/frame-y-%%07d.png\n");
+           "  exty slices.yuv 160 192 slices_yuv/frame-y-%%07d.png\n");
     return -1;
   }
 

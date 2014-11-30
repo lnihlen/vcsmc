@@ -26,9 +26,11 @@ class PixelStrip {
 
   // Use OpenCL to compute the error distance between every pixel in the strip
   // and every color in the Atari spectrum. Call before calling
-  // BuildPalettes().
+  // BuildPalette().
   void BuildDistances(CLCommandQueue* queue);
-  void BuildPalettes(const uint32 max_colus, Random* random);
+
+  // Use a clustering algorithm 
+  std::unique_ptr<Palette> BuildPalette(const uint32 max_colus, Random* random);
 
   // Returns total error distance from a provided ColuStrip.
   float DistanceFrom(ColuStrip* colu_strip);
@@ -41,8 +43,6 @@ class PixelStrip {
   uint32 width() const { return width_; }
   const uint32* pixels() const { return pixels_; }
   uint32 row_id() const { return row_id_; }
-  // Returns the Palette built with i colors.
-  const Palette* palette(uint32 i) const { return palettes_[i - 1].get(); }
 
  private:
   const uint32 width_;
@@ -51,7 +51,6 @@ class PixelStrip {
   const Image* image_;
   // Array of [color / 2][kFrameWidthPixels] float error distances.
   std::vector<std::unique_ptr<float[]>> distances_;
-  std::vector<std::unique_ptr<Palette>> palettes_;
 };
 
 }  // namespace vcsmc

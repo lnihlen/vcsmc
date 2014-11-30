@@ -12,7 +12,10 @@ class CLImage;
 class ColuStrip;
 class PixelStrip;
 
-// Defines a field of uint32 ABGR colors, has a width and height, etc.
+// Defines a field of uint32 ABGR colors, has a width and height, etc. On
+// little-endian machines the bytes will be RGBA in order from lowest address
+// to highest, meaning that the A will end up in the most significant byte of
+// the uint32.
 class Image {
  public:
   // Constructs an Image that owns a pixel array.

@@ -296,13 +296,14 @@ int main(int argc, char* argv[]) {
   }
   std::string input_path_spec(argv[2]);
   std::string output_path_spec(argv[3]);
-  const uint32 kMaxFilenameLength = 2048;
-  std::unique_ptr<char[]> file_name_buffer(new char[kMaxFilenameLength]);
 
   if (!vcsmc::CLDeviceContext::Setup()) {
     fprintf(stderr, "OpenCL setup failed!\n");
     return -1;
   }
+
+  const uint32 kMaxFilenameLength = 2048;
+  std::unique_ptr<char[]> file_name_buffer(new char[kMaxFilenameLength]);
 
   std::unique_ptr<vcsmc::CLCommandQueue> queue =
       vcsmc::CLDeviceContext::MakeCommandQueue();
@@ -354,7 +355,6 @@ int main(int argc, char* argv[]) {
     xy_maps.reserve(frames->size());
     for (uint32 i = 0; i < frames->size(); ++i) {
       vcsmc::VideoFrameData* frame = frames->at(i).get();
-      printf("processing frame %llu..\n", frame->frame_number());
       snprintf(file_name_buffer.get(), kMaxFilenameLength,
           input_path_spec.c_str(), frame->frame_number());
       std::string input_file_path(file_name_buffer.get());

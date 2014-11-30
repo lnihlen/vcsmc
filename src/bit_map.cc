@@ -74,6 +74,15 @@ void BitMap::Pack(const uint8* bytes, uint32 bytes_per_row_unpacked) {
   }
 }
 
+void BitMap::Subtract(const BitMap* bm) {
+  assert(width_ == bm->width());
+  assert(height_ == bm->height());
+  assert(bytes_per_row_ == bm->bytes_per_row());
+  for (uint32 i = 0; i < bytes_per_row_ * height_; ++i) {
+    packed_bytes_[i] = packed_bytes_[i] & ~(bm->packed_bytes_[i]);
+  }
+}
+
 void BitMap::SetBit(uint32 x, uint32 y, bool value) {
   uint8* byte_ptr = packed_bytes_.get() + (y * bytes_per_row_) + (x / 8);
   uint32 bit_offset = x % 8;

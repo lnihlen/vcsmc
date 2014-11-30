@@ -4,25 +4,23 @@
 #include <memory>
 #include <string>
 
-#include "image.h"
-
 namespace vcsmc {
 
-// Abstract base class for defining image files, which can read and write Image
-// objects.
+class Image;
+
+// Class for loading and saving Image objects from supported image file formats,
+// currently TIFF and PNG.
 class ImageFile {
  public:
-  ImageFile(const std::string& file_path) : file_path_(file_path) {}
-
-  virtual std::unique_ptr<Image> Load() = 0;
-  virtual bool Save(Image* image) = 0;
-
- protected:
-  std::string file_path_;
+  static std::unique_ptr<Image> Load(const std::string& file_name);
+  static bool Save(const Image* image, const std::string& file_name);
 
  private:
-  // Default ctor private to disable.
-  ImageFile() {}
+  static std::unique_ptr<Image> LoadPNG(const std::string& file_name);
+  static std::unique_ptr<Image> LoadTIFF(const std::string& file_name);
+
+  static bool SavePNG(const Image* image, const std::string& file_name);
+  static bool SaveTIFF(const Image* image, const std::string& file_name);
 };
 
 }  // namespace vcsmc
