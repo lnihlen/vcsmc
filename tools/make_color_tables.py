@@ -154,7 +154,7 @@ def main(argv):
 namespace vcsmc {
 
 // Index is atari_color / 2, 0xAABBGGRR
-static const uint32 kAtariNTSCABGRColorTable[128] = {
+const uint32 kAtariNTSCABGRColorTable[128] = {
 """)
 
   # build ABGR uint32 hex strings
@@ -167,7 +167,7 @@ static const uint32 kAtariNTSCABGRColorTable[128] = {
   output_file.write("""
 };
 
-static const float kAtariNTSCLabColorTable[128 * 4] = {
+const float kAtariNTSCLabColorTable[128 * 4] = {
 """)
   lab_strings = []
   for color_lab in atari_colors_lab:

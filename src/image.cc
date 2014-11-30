@@ -22,6 +22,9 @@ Image::Image(uint32 width, uint32 height)
       pixels_(new uint32[width * height]) {
 }
 
+Image::~Image() {
+}
+
 bool Image::CopyToDevice(CLCommandQueue* queue) {
   cl_image_ = CLDeviceContext::MakeImage(this);
   if (!cl_image_)

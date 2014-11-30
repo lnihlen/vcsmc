@@ -9,6 +9,8 @@
 
 #include "types.h"
 
+#error deprecate me
+
 namespace vcsmc {
 
 class CLBuffer;

@@ -27,10 +27,8 @@ TEST(RgbToLabTest, TestAtariColorConversion) {
   std::unique_ptr<CLKernel> kernel(
       CLDeviceContext::MakeKernel(CLProgram::Programs::kRGBToLab));
   kernel->SetImageArgument(0, atari_colors_rgb_image->cl_image());
-  int first_row = 0;
-  kernel->SetByteArgument(1, sizeof(int), &first_row);
-  kernel->SetBufferArgument(2, lab_results_buffer.get());
-  kernel->Enqueue(queue.get(), 128);
+  kernel->SetBufferArgument(1, lab_results_buffer.get());
+  kernel->Enqueue2D(queue.get(), 128, 1);
   std::unique_ptr<float[]> lab_results(new float[128 * 4]);
   lab_results_buffer->EnqueueCopyFromDevice(queue.get(), lab_results.get());
   queue->Finish();

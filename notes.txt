@@ -1268,4 +1268,29 @@ through the saliency map.
 Then, take a copy of the bitmap and wipe out all of the pixels covered by the
 first player, then repeat the process for the second player.
 
+===============================================================================
+
+k-means hardware acceleration.
+
+pick K colors at random, these are the K classes
+
+for each input pixel choose minimum error class of the K classes - this is a
+min over the K precomputed distances for each pixel - input is table of the
+K colors along with error distance/color table, take min of K values in the
+distance/color table and output the color for each pixel.
+
+then for each classified input pixel choose minimum error color out of 128 -
+k tables of 128 floats each, so for each pixel identify the current class and
+add 128 error distances, one for each color, to that K table, then reduce table
+to min errors and index.
+
+TODO: rgb_to_lab needs to become a 2D kernel, so we can just convert entire
+image to Lab once.
+
+deprecate pixel_strip?
+
+refactor the whole color distance code + downsample so that a whole pixel strip
+is done in one call.
+
+refactor K means to run on the GPU
 

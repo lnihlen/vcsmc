@@ -20,6 +20,8 @@ class Image {
  public:
   // Constructs an Image that owns a pixel array.
   Image(uint32 width, uint32 height);
+  ~Image();
+
   bool CopyToDevice(CLCommandQueue* queue);
 
   // Builds a copy of our |row| of pixels and returns.

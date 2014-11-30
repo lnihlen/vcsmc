@@ -1,7 +1,7 @@
 # VCSMC src/ Makefile.
 # Dependencies: libtiff, libpng, clang, OpenCL
 # tools dependencies: python colormath, Wand, ImageMagick
-CFLAGS+=-I. -g # -O2
+CFLAGS+=-I. -g -O0 # -O2
 LIBS+=-lm -ltiff -lpng
 OUTTESTS=$(OUT)/tests
 
@@ -39,7 +39,6 @@ OBJ=$(OUT)/adjacency_map.o                                                     \
     $(OUT)/image_file.o                                                        \
     $(OUT)/opcode.o                                                            \
     $(OUT)/palette.o                                                           \
-    $(OUT)/pixel_strip.o                                                       \
     $(OUT)/player_fitter.o                                                     \
     $(OUT)/random.o                                                            \
     $(OUT)/range.o                                                             \

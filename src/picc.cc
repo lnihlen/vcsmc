@@ -12,13 +12,15 @@
 #include <vector>
 
 #include "bit_map.h"
+#include "cl_buffer.h"
 #include "cl_command_queue.h"
 #include "cl_device_context.h"
 #include "cl_image.h"
+#include "cl_kernel.h"
+#include "cl_program.h"
 #include "image.h"
 #include "image_file.h"
 #include "palette.h"
-#include "pixel_strip.h"
 #include "player_fitter.h"
 #include "random.h"
 #include "range.h"
@@ -59,7 +61,46 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
               const std::string& input_image_path_spec,
               const std::string& input_saliency_map_path_spec,
               const std::string& output_path_spec) {
-  // First load saliency map and perform player fitting.
+  // Load the color image, and per scanline we cluster into colors depending
+  // on the number of objects rendering on that scene (always BG color with
+  // addition of playfield and up to two players), then compute majority color
+  // for each object and specify it all.
+  snprintf(file_name_buffer.get(), kMaxFilenameLength,
+      input_image_path_spec.c_str(), frame->frame_number());
+  std::unique_ptr<vcsmc::Image> image =
+      vcsmc::ImageFile::Load(file_name_buffer.get());
+  if (!image) {
+    fprintf(stderr, "error opening image file %s\n", file_name_buffer.get());
+    return false;
+  }
+
+  if (image->height() != vcsmc::kFrameHeightPixels) {
+    fprintf(stderr, "unsupported height %d for image file %s\n",
+        image->height(), file_name_buffer.get());
+    return false;
+  }
+
+  // Transfer image to card for conversion to Lab color.
+  std::unique_ptr<vcsmc::CLCommandQueue> queue(
+      vcsmc::CLDeviceContext::MakeCommandQueue());
+  if (!image->CopyToDevice(queue.get())) {
+    fprintf(stderr, "error transferring image to OpenCL device.\n");
+    return false;
+  }
+
+  assert(image->height() == kFrameHeightPixels);
+  std::unique_ptr<vcsmc::CLBuffer> image_lab(
+      vcsmc::CLDeviceContext::MakeBuffer(
+          sizeof(float) * 4 * image_width * kFrameHeightPixels));
+  uint32 image_width = image->width();
+  std::unique_ptr<vcsmc::CLKernel> lab_kernel(
+      vcsmc::CLDeviceContext::MakeKernel(vcsmc::CLProgram::kRGBToLab));
+  kernel->SetImageArgument(0, image->cl_image());
+  kernel->SetBufferArgument(1, image_lab.get());
+  kernel->Enqueue2D(queue.get(), image_width, kFrameHeightPixels);
+
+  // While Lab conversion is cooking on the GPU load saliency map and perform
+  // player fitting.
   const uint32 kMaxFilenameLength = 2048;
   std::unique_ptr<char[]> file_name_buffer(new char[kMaxFilenameLength]);
   snprintf(file_name_buffer.get(), kMaxFilenameLength,
@@ -79,28 +120,6 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
   vcsmc::PlayerFitter player_1;
   player_1.FindOptimumPath(saliency_map.get(), true);
 
-  // Now load the color image, and per scanline we cluster into colors depending
-  // on the number of objects rendering on that scene (always BG color with
-  // addition of playfield and up to two players), then compute majority color
-  // for each object and specify it all.
-  snprintf(file_name_buffer.get(), kMaxFilenameLength,
-      input_image_path_spec.c_str(), frame->frame_number());
-  std::unique_ptr<vcsmc::Image> image =
-      vcsmc::ImageFile::Load(file_name_buffer.get());
-  if (!image) {
-    fprintf(stderr, "error opening image file %s\n", file_name_buffer.get());
-    return false;
-  }
-
-  if (image->height() != vcsmc::kFrameHeightPixels) {
-    fprintf(stderr, "unsupported height %d for image file %s\n",
-        image->height(), file_name_buffer.get());
-    return false;
-  }
-
-  std::unique_ptr<vcsmc::CLCommandQueue> queue(
-      vcsmc::CLDeviceContext::MakeCommandQueue());
-
   std::vector<vcsmc::Spec> specs;
   player_0.AppendSpecs(&specs, false);
   player_1.AppendSpecs(&specs, true);
@@ -109,6 +128,10 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
   uint32 pixel_start =
       ((vcsmc::kVSyncScanLines + vcsmc::kVBlankScanLines) *
           vcsmc::kScanLineWidthClocks) + vcsmc::kHBlankWidthClocks;
+
+  // Drop image buffer to free up resources on heap and on GPU.
+  queue->Finish();
+  image.reset();
 
   for (uint32 i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
     std::unique_ptr<vcsmc::PixelStrip> strip = image->GetPixelStrip(i);
