@@ -5,7 +5,6 @@
 #include "adjacency_map.h"
 #include "bit_map.h"
 #include "palette.h"
-#include "pixel_strip.h"
 #include "spec.h"
 
 namespace vcsmc {

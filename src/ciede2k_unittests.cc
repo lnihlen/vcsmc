@@ -104,15 +104,21 @@ TEST(Ciede2kTest, SharmaWuBalalTestData) {
   std::unique_ptr<CLBuffer> lab_2_buffer(CLDeviceContext::MakeBuffer(
       kSWBTestDataCount * 4 * sizeof(float)));
   lab_2_buffer->EnqueueCopyToDevice(queue.get(), lab_2);
+  // Our ciede2k program is designed to compute the distance from each input
+  // in lab_1 to each input in lab_2. We therefore square the size of the
+  // output buffer and evaluate the diagonal for the results.
   std::unique_ptr<CLBuffer> out_buffer(CLDeviceContext::MakeBuffer(
-      kSWBTestDataCount * sizeof(float)));
+      kSWBTestDataCount * kSWBTestDataCount * sizeof(float)));
   std::unique_ptr<CLKernel> kernel(
       CLDeviceContext::MakeKernel(CLProgram::Programs::kCiede2k));
   kernel->SetBufferArgument(0, lab_1_buffer.get());
   kernel->SetBufferArgument(1, lab_2_buffer.get());
   kernel->SetBufferArgument(2, out_buffer.get());
-  kernel->Enqueue(queue.get(), kSWBTestDataCount);
-  std::unique_ptr<float[]> results(new float[kSWBTestDataCount]);
+  size_t dim[] = { kSWBTestDataCount, kSWBTestDataCount };
+  size_t off[] = { 0, 0 };
+  kernel->EnqueueWithOffset(queue.get(), 2, dim, off);
+  std::unique_ptr<float[]> results(
+      new float[kSWBTestDataCount * kSWBTestDataCount]);
   out_buffer->EnqueueCopyFromDevice(queue.get(), results.get());
   queue->Finish();
   // Dropping to single precision can result in some substantially different
@@ -120,12 +126,13 @@ TEST(Ciede2kTest, SharmaWuBalalTestData) {
   // near the arctan discontinuity, but we should always be within the same
   // ballpark. The following tolerances were derived experimentally.
   for (int i = 0; i < kSWBTestDataCount; ++i) {
+    uint32 results_index = (i * kSWBTestDataCount) + i;
     if (i == 9) {
-      EXPECT_NEAR(expected_results[i], results[i], 0.05);
+      EXPECT_NEAR(expected_results[i], results[results_index], 0.05);
     } else if (i == 13) {
-      EXPECT_NEAR(expected_results[i], results[i], 0.06);
+      EXPECT_NEAR(expected_results[i], results[results_index], 0.06);
     } else {
-      EXPECT_NEAR(expected_results[i], results[i], 0.0001);
+      EXPECT_NEAR(expected_results[i], results[results_index], 0.0001);
     }
   }
 }

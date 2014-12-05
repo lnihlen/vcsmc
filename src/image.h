@@ -10,7 +10,6 @@ namespace vcsmc {
 class CLCommandQueue;
 class CLImage;
 class ColuStrip;
-class PixelStrip;
 
 // Defines a field of uint32 ABGR colors, has a width and height, etc. On
 // little-endian machines the bytes will be RGBA in order from lowest address
@@ -23,11 +22,6 @@ class Image {
   ~Image();
 
   bool CopyToDevice(CLCommandQueue* queue);
-
-  // Builds a copy of our |row| of pixels and returns.
-  std::unique_ptr<PixelStrip> GetPixelStrip(uint32 row);
-  // Copies contents of |strip| into our own buffer at row.
-  void SetStrip(uint32 row, ColuStrip* strip);
 
   const uint32 width() const { return width_; }
   const uint32 height() const { return height_; }

@@ -6,10 +6,11 @@
 #include <limits>
 #include <unordered_set>
 
+#include "cl_buffer.h"
 #include "cl_command_queue.h"
 #include "cl_device_context.h"
+#include "cl_kernel.h"
 #include "constants.h"
-#include "pixel_strip.h"
 #include "random.h"
 
 namespace vcsmc {
@@ -21,6 +22,103 @@ Palette::Palette(uint32 num_colus)
   assert(num_colus_ > 0);
 }
 
+void Palette::Compute(CLCommandQueue* queue, const CLBuffer* error_buffer,
+    Random* random) {
+  // We deal in uint32s for the OpenCL data so construct temporary buffers for
+  // colors and classes.
+  std::unique_ptr<uint32[]> colors_uint32(new uint32[num_colus_]);
+  std::unique_ptr<uint32[]> classes_uint32(new uint32[kFrameWidthPixels]);
+
+  // Generate random initial colors for each of the classes.
+  for (uint32 i = 0; i < num_colus_; ++i)
+    colors_uint32[i] = random->next() % kNTSCColors;
+
+  std::unique_ptr<CLBuffer> colors_buffer(CLDeviceContext::MakeBuffer(
+      sizeof(uint32) * num_colus_));
+  colors_buffer->EnqueueCopyToDevice(queue, colors_uint32.get());
+  std::unique_ptr<CLBuffer> classes_buffer(CLDeviceContext::MakeBuffer(
+      sizeof(uint32) * kFrameWidthPixels));
+
+  // Since we run k-means on the GPU it is difficult to estimate how many
+  // iterations we should run it until the total error becomes stable. We
+  // therefore run it in batches, copying the error sums for each iteration
+  // within the batch back from the GPU until encounter a stable error value.
+  const uint32 kBatchIterations = 8;
+  std::unique_ptr<float[]> fit_errors(new float[kBatchIterations]);
+  std::unique_ptr<CLBuffer> fit_errors_buffer(CLDeviceContext::MakeBuffer(
+      sizeof(float) * kBatchIterations));
+
+  const uint32 kMaxIterations = 64;
+  uint32 total_iterations = 0;
+  bool stable = false;
+  uint32 image_width = kFrameWidthPixels;
+  uint32 scratch_size = sizeof(uint32) * kNTSCColors * num_colus_;
+
+  while (!stable && total_iterations < kMaxIterations) {
+    std::vector<std::unique_ptr<CLKernel>> kernels;
+    kernels.reserve(kBatchIterations);
+    for (uint32 i = 0; i < kBatchIterations; ++i) {
+      std::unique_ptr<CLKernel> classify(CLDeviceContext::MakeKernel(
+          CLProgram::Programs::kKMeansClassify));
+      classify->SetBufferArgument(0, error_buffer);
+      classify->SetBufferArgument(1, colors_buffer.get());
+      classify->SetByteArgument(2, sizeof(uint32), &num_colus_);
+      classify->SetBufferArgument(3, classes_buffer.get());
+      classify->Enqueue(queue, kFrameWidthPixels);
+      kernels.push_back(std::move(classify));
+
+      std::unique_ptr<CLKernel> color(CLDeviceContext::MakeKernel(
+          CLProgram::Programs::kKMeansColor));
+      color->SetBufferArgument(0, error_buffer);
+      color->SetBufferArgument(1, classes_buffer.get());
+      color->SetByteArgument(2, sizeof(uint32), &image_width);
+      color->SetByteArgument(3, sizeof(uint32), &num_colus_);
+      color->SetByteArgument(4, sizeof(uint32), &i);
+      color->SetByteArgument(5, scratch_size, nullptr);
+      color->SetByteArgument(6, scratch_size, nullptr);
+      color->SetBufferArgument(7, fit_errors_buffer.get());
+      color->SetBufferArgument(8, colors_buffer.get());
+      color->Enqueue(queue, kNTSCColors);
+    }
+
+    fit_errors_buffer->EnqueueCopyFromDevice(queue, fit_errors.get());
+    queue->Finish();
+
+    // Check for stable error values.
+    float last_error = fit_errors[0];
+    for (uint32 i = 1; i < kBatchIterations; ++i) {
+      ++total_iterations;
+      if (fit_errors[i] == last_error) {
+        stable = true;
+        error_ = last_error;
+        break;
+      }
+      last_error = fit_errors[i];
+    }
+  }
+
+
+  // Compute histogram of classes on GPU.
+  std::unique_ptr<CLKernel> histo_kernel(
+      CLDeviceContext::MakeKernel(CLProgram::Programs::kHistogramClasses));
+  histo_kernel->SetBufferArgument(0, classes_buffer.get());
+  histo_kernel->SetByteArgument(1, sizeof(uint32), &num_colus_);
+  histo_kernel->SetByteArgument(2,
+      sizeof(uint32) * kFrameWidthPixels * num_colus_, nullptr);
+  std::unique_ptr<CLBuffer> counts_buffer(
+      CLDeviceContext::MakeBuffer(sizeof(uint32) * num_colus_));
+  histo_kernel->SetBufferArgument(3, counts_buffer.get());
+  histo_kernel->Enqueue(queue, kFrameWidthPixels);
+
+  // Copy classes, colors, and counts back to CPU.
+  colors_buffer->EnqueueCopyFromDevice(queue, colors_uint32.get());
+  classes_buffer->EnqueueCopyFromDevice(queue, classes_uint32.get());
+  std::unique_ptr<uint32[]> counts(new uint32[num_colus_]);
+  counts_buffer->EnqueueCopyFromDevice(queue, counts.get());
+  queue->Finish();
+}
+
+/*
 void Palette::Compute(const PixelStrip* pixel_strip, Random* random) {
   // Pick K colors at random
   colus_.reserve(num_colus_);
@@ -125,5 +223,5 @@ void Palette::Color(const PixelStrip* pixel_strip) {
     colus_.push_back(minimum_error_colu);
   }
 }
-
+*/
 }  // namespace vcsmc

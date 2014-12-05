@@ -106,6 +106,22 @@ bool CLKernelImpl::Enqueue2D(CLCommandQueue* queue, size_t work_width,
   return (result == CL_SUCCESS);
 }
 
+bool CLKernelImpl::EnqueueWithOffset(CLCommandQueue* queue, size_t dimension,
+      const size_t* sizes, const size_t* offsets) {
+  CLCommandQueueImpl* queue_impl = static_cast<CLCommandQueueImpl*>(queue);
+  assert(queue_impl);
+  int result = clEnqueueNDRangeKernel(queue_impl->get(),
+                                      kernel_,
+                                      dimension,
+                                      offsets,
+                                      sizes,
+                                      NULL,
+                                      0,
+                                      NULL,
+                                      NULL);
+  return (result == CL_SUCCESS);
+}
+
 uint64 CLKernelImpl::LocalMemoryUsed() {
   return local_memory_used_;
 }

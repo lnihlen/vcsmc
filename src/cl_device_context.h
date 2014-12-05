@@ -15,7 +15,6 @@ class CLImage;
 class CLKernel;
 class CLProgram;
 class Image;
-class PixelStrip;
 
 // Singleton class to represent single ownership of a global OpenCL device.
 // Constructs all other CL objects.
@@ -28,7 +27,6 @@ class CLDeviceContext {
   static std::unique_ptr<CLBuffer> MakeBuffer(size_t size);
   static std::unique_ptr<CLCommandQueue> MakeCommandQueue();
   static std::unique_ptr<CLImage> MakeImage(const Image* image);
-  static std::unique_ptr<CLImage> MakeImageFromStrip(const PixelStrip* strip);
   static std::unique_ptr<CLKernel> MakeKernel(CLProgram::Programs program);
   static uint64 LocalMemorySize();
 
@@ -43,7 +41,6 @@ class CLDeviceContext {
   std::unique_ptr<CLBuffer> DoMakeBuffer(size_t size);
   std::unique_ptr<CLCommandQueue> DoMakeCommandQueue();
   std::unique_ptr<CLImage> DoMakeImage(const Image* image);
-  std::unique_ptr<CLImage> DoMakeImageFromStrip(const PixelStrip* strip);
   std::unique_ptr<CLKernel> DoMakeKernel(CLProgram::Programs program);
 
   struct Impl;

@@ -18,6 +18,7 @@
 #include "cl_image.h"
 #include "cl_kernel.h"
 #include "cl_program.h"
+#include "color_table.h"
 #include "image.h"
 #include "image_file.h"
 #include "palette.h"
@@ -133,9 +134,41 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
   queue->Finish();
   image.reset();
 
+  // Upload Atari colors in Lab format for error distance calculations.
+  std::unique_ptr<vcsmc::CLBuffer> atari_lab_colors(
+      vcsmc::CLDeviceContext::MakeBuffer(
+        sizeof(float) * 4 * kNTSCColors));
+  atari_lab_colors->EnqueueCopyToDevice(queue.get(),
+      vcsmc::kAtariNTSCLabColorTable);
+
+  // Reusable buffers for intermediate and final results.
+  std::unique_ptr<vcsmc::CLBuffer> full_width_errors(
+      vcsmc::CLDeviceContext::MakeBuffer(
+          sizeof(float) * image_width * vcsmc::kNTSCColors));
+  std::unique_ptr<vcsmc::CLBuffer> downsampled_errors(
+      vcsmc::CLDeviceContext::MakeBuffer(
+          sizeof(float) * vcsmc::kFrameWidthPixels * vcsmc::kNTSCColors));
+
   for (uint32 i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
-    std::unique_ptr<vcsmc::PixelStrip> strip = image->GetPixelStrip(i);
-    strip->BuildDistances(queue.get());
+    // Compute error distances for the ith row of the image.
+    std::unique_ptr<vcsmc::CLKernel> ciede_kernel(
+        vcsmc::CLDeviceContext::MakeKernel(vcsmc::CLProgram::kCiede2k));
+    ciede_kernel->SetBufferArgument(0, image_lab.get());
+    ciede_kernel->SetBufferArgument(1, atar_lab_colors.get());
+    ciede_kernel->SetBufferArgument(2, full_width_errors.get());
+    size_t ciede_sizes = { image_width, kNTSCColors };
+    size_t ciede_offsets = { i * image_width, 0 };
+    ciede_kernel->EnqueueWithOffset(queue.get, 2, ciede_sizes, ciede_offsets);
+
+    // Downsample errors to atari image width.
+    std::unique_ptr<vcsmc::CLKernel> downsample_kernel(
+        vcsmc::CLDeviceContext::MakeKernel(
+            vcsmc::CLProgram::kDownsampleErrors));
+    downsample_kernel->SetBufferArgument(0, full_width_errors.get());
+    downsample_kernel->SetByteArgument(1, sizeof(uint32), &image_width);
+    downsample_kernel->SetBufferArgument(2, downsampled_errors.get());
+    downsample_kernel->Enqueue2D(queue.get(), vcsmc::kFrameWidthPixels,
+        vcsmc::kNTSCColors);
 
     // We always try and fit at least 2 colors, one each for the background
     // color and one for the playfield.
@@ -144,8 +177,8 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
       ++color_count;
     if (!player_1.IsLineEmpty(i))
       ++color_count;
-    std::unique_ptr<vcsmc::Palette> palette(strip->BuildPalette(color_count,
-        &random));
+    std::unique_ptr<vcsmc::Palette> palette(color_count);
+    palette->Compute(queue.get(), downsampled_errors.get(), &random);
 
     // Issue background spec for the most numerous color, covering entire line
     // of pixels, and playfield color for the second most frequent.
@@ -155,6 +188,8 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
         vcsmc::Range(pixel_start, pixel_start + vcsmc::kFrameWidthPixels)));
     specs.push_back(vcsmc::Spec(vcsmc::TIA::COLUPF, colupf,
         vcsmc::Range(pixel_start, pixel_start + vcsmc::kFrameWidthPixels)));
+
+    // TODO: push playfield fitting and player color fitting back to the card?
 
     // Calculate minimum error color for the pixels in the player bitmask, and
     // set a spec for it.

@@ -30,12 +30,22 @@ std::string CLProgram::GetProgramString(Programs program) {
 // Note that CIEDE2000 is discontinuous so is not useful for gradient
 // descent algorithms.
 
-__kernel void ciede2k(__global __read_only float4* lab_1_row,
-                      __global __read_only float4* lab_2_row,
+// For inputs |pixel_lab_in| is pointing at some large array of pixel values
+// and it is assumed that there is an offset applied to the global id.  The
+// |reference_lab_in| points at the reference colors. This function will store
+// the output at the row given by the index into the reference color table and
+// the column by the pixel row with offset removed. It is assumed that the
+// distances between every pixel color within the work dimensions described by
+// |pixel_lab_in| and every color in |reference_lab_in| are to be computed.
+__kernel void ciede2k(__global __read_only float4* pixel_lab_in,
+                      __global __read_only float4* reference_lab_in,
                       __global __write_only float* delta_e_out) {
-  int col = get_global_id(0);
-  float4 lab_1 = lab_1_row[col];
-  float4 lab_2 = lab_2_row[col];
+  int pixel_id = get_global_id(0);
+  int reference_id = get_global_id(1);
+  int output_id = (reference_id * get_global_size(1)) +
+      (pixel_id - get_global_offset(0));
+  float4 lab_1 = pixel_lab_in[pixel_id];
+  float4 lab_2 = reference_lab_in[reference_id];
 
   // Calculate C_1, h_1, and C_2, h_2.
   float C_star_1 = length(lab_1.yz);
@@ -105,10 +115,10 @@ __kernel void ciede2k(__global __read_only float4* lab_1_row,
   float S_C = 1.0f + 0.045f * C_mean;
   float S_H = 1.0f + 0.015f * C_mean * T;
   float R_T = -1.0f * sin(2.0f * del_theta * (M_PI_F / 180.0f)) * R_c;
-  delta_e_out[col] = sqrt(pow(del_L / S_L, 2.0f) +
-                          pow(del_C / S_C, 2.0f) +
-                          pow(del_H / S_H, 2.0f) +
-                          R_T * (del_C / S_C) * (del_H / S_H));
+  delta_e_out[output_id] = sqrt(pow(del_L / S_L, 2.0f) +
+                                pow(del_C / S_C, 2.0f) +
+                                pow(del_H / S_H, 2.0f) +
+                                R_T * (del_C / S_C) * (del_H / S_H));
 }
       );  // end of kCiede2K
 
@@ -160,24 +170,27 @@ __kernel void convolve(__global __read_only float* input,
     case kDownsampleErrors:
       return CL_PROGRAM(
 // Given an input float array of error distances |input_errors| of |input_width|
-// fills an output array at |output_width| with interpolated distances.
+// fills an output array with interpolated distances. Width of output is assumed
+// to be equal to the x dimension of the global work group.
 __kernel void downsample_errors(__global __read_only float* input_errors,
                                 __read_only int input_width,
-                                __read_only int output_width,
                                 __global __write_only float* output_errors) {
-  int output_pixel = get_global_id(0);
+  int output_col = get_global_id(0);
+  int output_row = get_global_id(1);
+  int output_width = get_global_size(0);
+  int input_row_offset = output_row * input_width;
   // It is possible the work group is of size related to the |input_width| not
   // the |output_width|, if so we exit.
-  if (output_pixel >= input_width)
+  if (output_col >= input_width)
     return;
-  float start_pixel = ((float)output_pixel * (float)output_width) /
-      (float)input_width;
-  float end_pixel = (((float)output_pixel + 1.0f) * (float)output_width) /
-      (float)input_width;
+  float start_pixel = ((float)output_col * (float)input_width) /
+      (float)output_width;
+  float end_pixel = (((float)output_col + 1.0f) * (float)input_width) /
+      (float)output_width;
   float first_whole_pixel = ceil(start_pixel);
-  int first_whole_pixel_int = (int)first_whole_pixel;
+  int first_whole_pixel_int = (int)first_whole_pixel + input_row_offset;
   float last_fractional_pixel = floor(end_pixel);
-  int last_fractional_pixel_int = (int)last_fractional_pixel;
+  int last_fractional_pixel_int = (int)last_fractional_pixel + input_row_offset;
   float total_error = 0.0f;
 
   // Calculate whole pixel error
@@ -185,17 +198,17 @@ __kernel void downsample_errors(__global __read_only float* input_errors,
     total_error += input_errors[i];
 
   // Include left-side fractional error
-  total_error += input_errors[(int)floor(start_pixel)] *
-    (first_whole_pixel - start_pixel);
+  total_error += input_errors[(int)floor(start_pixel) + input_row_offset] *
+      (first_whole_pixel - start_pixel);
 
   // Right-side fractional error. It's possible that due to roundoff error the
   // last_fractional_pixel may equal output_width, if so we ignore.
-  if (last_fractional_pixel_int < output_width) {
+  if (last_fractional_pixel_int - input_row_offset < input_width) {
     total_error += input_errors[last_fractional_pixel_int] *
         (end_pixel - last_fractional_pixel);
   }
 
-  output_errors[output_pixel] = total_error;
+  output_errors[(output_row * output_width) + output_col] = total_error;
 }
       );  // end of kDownsampleErrors
 
@@ -253,6 +266,44 @@ __kernel void fft_radix_2(__global __read_only float2* input_data,
       );  // end of kFFTRadix2
 
 //
+// kHistogramClasses ==========================================================
+//
+
+    case kHistogramClasses:
+      return CL_PROGRAM(
+// |scratch| needs to be num_classes * width in size.
+__kernel void histogram_classes(__global __read_only uint* classes,
+                                __read_only uint num_classes,
+                                __local uint* scratch,
+                                __global __write_only uint* counts) {
+  uint pixel = get_global_id(0);
+  uint width = get_global_size(0);
+  uint npot_width = (uint)pown(2.0f, ilogb((float)width) + 1);
+  uint scratch_index = pixel * num_classes;
+  for (uint i = 0; i < num_classes; ++i)
+    scratch[scratch_index + i] = 0;
+  scratch[scratch_index + classes[pixel]] = 1;
+
+  // Reduce counts to final output.
+  barrier(CLK_LOCAL_MEM_FENCE);
+  for (uint offset = npot_width / 2; offset > 0; offset = offset / 2) {
+    uint their_index = scratch_index + (offset * num_classes);
+    if (pixel < offset && pixel + offset < width) {
+      for (uint i = 0; i < num_classes; ++i) {
+        uint their_count = scratch[their_index + i];
+        uint my_count = scratch[scratch_index + i];
+        scratch[scratch_index + i] = their_count + my_count;
+      }
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+  }
+
+  if (pixel < num_classes)
+    counts[pixel] = scratch[pixel];
+}
+      );  // end of kHistogramClasses
+
+//
 // kInverseFFTNormalize =======================================================
 //
 
@@ -275,6 +326,101 @@ __kernel void inverse_fft_normalize(__global __read_only float4* input_data,
 }
       );  // end of kInverseFFTNormalize
 
+//
+// kKMeansClassify =============================================================
+//
+
+    case kKMeansClassify:
+      return CL_PROGRAM(
+// Given a 2D array of color distances with width global_size(0) and height of
+// kNTSCColors at |color_errors|, and an array of currently selected |colors| of
+// length |num_classes|, this shader will determine the lowest error color at
+// each pixel and store its index into |classes|.
+__kernel void k_means_classify(__global __read_only float* color_errors,
+                               __global __read_only uint* colors,
+                               __read_only uint num_classes,
+                               __global __write_only uint* classes) {
+  uint pixel = get_global_id(0);
+  uint width = get_global_size(0);
+  float min_error = color_errors[(colors[0] * width) + pixel];
+  uint min_error_index = 0;
+  for (uint i = 1; i < num_classes; ++i) {
+    float error = color_errors[(colors[i] * width) + pixel];
+    if (error < min_error) {
+      min_error = error;
+      min_error_index = i;
+    }
+  }
+  classes[pixel] = min_error_index;
+}
+      );  // end of kKMeansClassify
+
+//
+// kKMeansColor ===============================================================
+//
+
+    case kKMeansColor:
+      return CL_PROGRAM(
+// Run one thread for each color. |error_scratch| needs to be number of possible
+// colors times |num_classes| in size, and |class_scratch| needs to be
+// the same. Note that the number of possible colors must be a power of 2.
+__kernel void k_means_color(__global __read_only float* color_errors,
+                            __global __read_only uint* classes,
+                            __read_only uint image_width,
+                            __read_only uint num_classes,
+                            __read_only uint iteration,
+                            __local float* error_scratch,
+                            __local uint* class_scratch,
+                            __global __write_only float* fit_error,
+                            __global __write_only uint* colors) {
+  uint color_id = get_global_id(0);
+  uint num_colors = get_global_size(0);
+  // The |scratch| arrays are {num_colors| rows of |num_classes| elements.
+  int scratch_index = (num_classes * color_id);
+
+  // Zero out scratch arrays for each class error counter for this color.
+  for (uint i = 0; i < num_classes; ++i) {
+    error_scratch[scratch_index + i] = 0.0f;
+    class_scratch[scratch_index + i] = color_id;
+  }
+
+  // Advance error table pointer to our color.
+  color_errors += image_width * color_id;
+  // Sum up error for our color for each class of pixel.
+  for (uint i = 0; i < image_width; ++i)
+    error_scratch[scratch_index + classes[i]] += color_errors[i];
+
+  // Now we reduce to find min error color for each class.
+  barrier(CLK_LOCAL_MEM_FENCE);
+  for (uint offset = num_colors / 2; offset > 0; offset = offset / 2) {
+    uint their_index = scratch_index + (offset * num_classes);
+    if (color_id < offset) {
+      for (uint i = 0; i < num_classes; ++i) {
+        float my_error = error_scratch[scratch_index + i];
+        float their_error = error_scratch[their_index + i];
+        if (their_error < my_error) {
+          error_scratch[scratch_index + i] = their_error;
+          class_scratch[scratch_index + i] = class_scratch[their_index + i];
+        }
+      }
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+  }
+
+  // Use the lowest |num_classes| threads to copy final class reductions to
+  // the output.
+  if (color_id < num_classes)
+    colors[color_id] = class_scratch[color_id];
+
+  if (color_id == 0) {
+    float total_error = 0.0f;
+    for (uint i = 0; i < num_classes; ++i) {
+      total_error += error_scratch[i];
+    }
+    fit_error[iteration] = total_error;
+  }
+}
+      );  // end of kKMeansColor
 //
 // kMakeBitmap ================================================================
 //
@@ -594,8 +740,17 @@ std::string CLProgram::GetProgramName(Programs program) {
     case kFFTRadix2:
       return "fft_radix_2";
 
+    case kHistogramClasses:
+      return "histogram_classes";
+
     case kInverseFFTNormalize:
       return "inverse_fft_normalize";
+
+    case kKMeansClassify:
+      return "k_means_classify";
+
+    case kKMeansColor:
+      return "k_means_color";
 
     case kMakeBitmap:
       return "make_bitmap";

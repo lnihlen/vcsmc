@@ -12,16 +12,19 @@ class CLProgram {
     kConvolve             = 1,
     kDownsampleErrors     = 2,
     kFFTRadix2            = 3,
-    kInverseFFTNormalize  = 4,
-    kMakeBitmap           = 5,
-    kMean                 = 6,
-    kPackComplexToReal    = 7,
-    kRGBToLab             = 8,
-    kSpectralResidual     = 9,
-    kSquare               = 10,
-    kStandardDeviation    = 11,
-    kUnpackRealToComplex  = 12,
-    PROGRAM_COUNT         = 13
+    kHistogramClasses     = 4,
+    kInverseFFTNormalize  = 5,
+    kKMeansClassify       = 6,
+    kKMeansColor          = 7,
+    kMakeBitmap           = 8,
+    kMean                 = 9,
+    kPackComplexToReal    = 10,
+    kRGBToLab             = 11,
+    kSpectralResidual     = 12,
+    kSquare               = 13,
+    kStandardDeviation    = 14,
+    kUnpackRealToComplex  = 15,
+    PROGRAM_COUNT         = 16
   };
 
   static std::string GetProgramString(Programs program);

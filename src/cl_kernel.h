@@ -20,6 +20,8 @@ class CLKernel {
   virtual bool Enqueue(CLCommandQueue* queue, size_t work_size) = 0;
   virtual bool Enqueue2D(CLCommandQueue* queue, size_t work_width,
       size_t work_height) = 0;
+  virtual bool EnqueueWithOffset(CLCommandQueue* queue, size_t dimension,
+      const size_t* sizes, const size_t* offsets) = 0;
 
   // Returns local memory consumed by the kernel, including any local memory
   // area arguments whose size has been specified.

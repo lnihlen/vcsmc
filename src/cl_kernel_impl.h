@@ -30,6 +30,8 @@ class CLKernelImpl : public CLKernel {
   virtual bool Enqueue(CLCommandQueue* queue, size_t work_size) override;
   virtual bool Enqueue2D(CLCommandQueue* queue, size_t work_width,
       size_t work_height) override;
+  virtual bool EnqueueWithOffset(CLCommandQueue* queue, size_t dimension,
+      const size_t* sizes, const size_t* offsets) override;
   virtual uint64 LocalMemoryUsed() override;
 
  private:

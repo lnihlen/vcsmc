@@ -3,7 +3,6 @@
 #include "cl_command_queue_impl.h"
 #include "cl_include.h"
 #include "image.h"
-#include "pixel_strip.h"
 
 namespace vcsmc {
 
@@ -12,13 +11,6 @@ CLImageImpl::CLImageImpl(const Image* image)
       width_(image->width()),
       height_(image->height()),
       pixels_(image->pixels()) {
-}
-
-CLImageImpl::CLImageImpl(const PixelStrip* strip)
-    : mem_(0),
-      width_(strip->width()),
-      height_(1),
-      pixels_(strip->pixels()) {
 }
 
 CLImageImpl::~CLImageImpl() {

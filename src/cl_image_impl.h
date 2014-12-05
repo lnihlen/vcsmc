@@ -8,12 +8,10 @@
 namespace vcsmc {
 
 class Image;
-class PixelStrip;
 
 class CLImageImpl : public CLImage {
  public:
   CLImageImpl(const Image* image);
-  CLImageImpl(const PixelStrip* strip);
   virtual ~CLImageImpl();
 
   bool Setup(cl_context context);

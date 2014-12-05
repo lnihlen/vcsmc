@@ -12,7 +12,6 @@
 #include "colu_strip.h"
 #include "constants.h"
 #include "palette.h"
-#include "pixel_strip.h"
 
 namespace vcsmc {
 
@@ -30,24 +29,6 @@ bool Image::CopyToDevice(CLCommandQueue* queue) {
   if (!cl_image_)
     return false;
   return cl_image_->EnqueueCopyToDevice(queue);
-}
-
-std::unique_ptr<PixelStrip> Image::GetPixelStrip(uint32 row) {
-  assert(row < height_);
-  return std::unique_ptr<PixelStrip>(
-    new PixelStrip(this, row));
-}
-
-void Image::SetStrip(uint32 row, ColuStrip* strip) {
-  assert(row < height_);
-  assert(width_ / 2 == kFrameWidthPixels);
-
-  uint32* px = pixels_.get() + (row * width_);
-  for (uint32 i = 0; i < kFrameWidthPixels; ++i) {
-    uint32 colu_abgr = Color::AtariColorToABGR(strip->colu(i));
-    *(px++) = colu_abgr;
-    *(px++) = colu_abgr;
-  }
 }
 
 }  // namespace vcsmc
