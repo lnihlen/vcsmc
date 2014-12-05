@@ -266,6 +266,95 @@ __kernel void fft_radix_2(__global __read_only float2* input_data,
       );  // end of kFFTRadix2
 
 //
+// kFitPlayer =================================================================
+//
+
+    case kFitPlayer:
+      return CL_PROGRAM(
+// |scratch| should be num_colus * 8 in size.
+__kernel void fit_player(__global __read_only float* color_errors,
+                         __global __read_only uint* colors,
+                         __read_only uint start_pixel,
+                         __read_only uint pixel_mask,
+                         __read_only uint num_colors,
+                         __read_only uint image_width,
+                         __local float* scratch,
+                         __global __write_only uint* player_color) {
+  uint bit = get_global_id(0);
+  uint scratch_offset = bit * num_colors;
+  if (pixel_mask & (1 << bit)) {
+    for (uint i = 0; i < num_colors; ++i) {
+      scratch[scratch_offset + i] =
+          color_errors[(image_width * colors[i]) + start_pixel];
+    }
+  } else {
+    for (uint i = 0; i < num_colors; ++i) {
+      scratch[scratch_offset + i] = 0.0f;
+    }
+  }
+
+  // Reduce to total errors and determine color based on min.
+  barrier(CLK_LOCAL_MEM_FENCE);
+  for (uint offset = 4; offset > 0; offset = offset / 2) {
+    uint their_offset = scratch_offset + (offset * num_colors);
+    if (bit < offset) {
+      for (uint i = 0; i < num_colors; ++i) {
+        scratch[scratch_offset + i] += scratch[their_offset + i];
+      }
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+  }
+
+  // Have thread 0 do a linear search for the min and return.
+  if (bit == 0) {
+    uint min_index = 0;
+    uint min_error = scratch[0];
+    for (uint i = 1; i < num_colors; ++i) {
+      if (scratch[i] < min_error) {
+        min_error = scratch[i];
+        min_index = i;
+      }
+    }
+
+    *player_color = colors[min_index];
+  }
+}
+      );  // end of kFitPlayer
+
+//
+// kFitPlayfield ==============================================================
+//
+
+    case kFitPlayfield:
+      return CL_PROGRAM(
+// Should be image_width / 4 threads, each thread handles four pixels and
+// computes one bit of playfield fit.
+__kernel void fit_playfield(__global __read_only float* color_errors,
+                            __read_only uint bk_color,
+                            __read_only uint pf_color,
+                            __global __write_only uint* playfield) {
+  uint pf_group = get_global_id(0);
+  uint pf_width = get_global_size(0);
+  uint pixel = pf_group * 4;
+  uint image_width = pf_width * 4;
+
+  uint pf_offset = (pf_color * image_width) + pixel;
+  float pf_error = color_errors[pf_offset];
+  pf_error += color_errors[pf_offset + 1];
+  pf_error += color_errors[pf_offset + 2];
+  pf_error += color_errors[pf_offset + 3];
+
+  uint bk_offset = (bk_color * image_width) + pixel;
+  float bk_error = color_errors[bk_offset];
+  bk_error += color_errors[bk_offset + 1];
+  bk_error += color_errors[bk_offset + 2];
+  bk_error += color_errors[bk_offset + 3];
+
+  playfield[pf_group] = pf_error < bk_error ? 1 : 0;
+}
+      );  // end of kFitPlayfield
+
+//
 // kHistogramClasses ==========================================================
 //
 
@@ -278,6 +367,8 @@ __kernel void histogram_classes(__global __read_only uint* classes,
                                 __global __write_only uint* counts) {
   uint pixel = get_global_id(0);
   uint width = get_global_size(0);
+
+  // Next power of two width, for subdivision during the reduction phase.
   uint npot_width = (uint)pown(2.0f, ilogb((float)width) + 1);
   uint scratch_index = pixel * num_classes;
   for (uint i = 0; i < num_classes; ++i)
@@ -739,6 +830,12 @@ std::string CLProgram::GetProgramName(Programs program) {
 
     case kFFTRadix2:
       return "fft_radix_2";
+
+    case kFitPlayer:
+      return "fit_player";
+
+    case kFitPlayfield:
+      return "fit_playfield";
 
     case kHistogramClasses:
       return "histogram_classes";

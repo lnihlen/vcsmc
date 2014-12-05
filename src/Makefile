@@ -38,7 +38,6 @@ OBJ=$(OUT)/adjacency_map.o                                                     \
     $(OUT)/image.o                                                             \
     $(OUT)/image_file.o                                                        \
     $(OUT)/opcode.o                                                            \
-    $(OUT)/palette.o                                                           \
     $(OUT)/player_fitter.o                                                     \
     $(OUT)/random.o                                                            \
     $(OUT)/range.o                                                             \
