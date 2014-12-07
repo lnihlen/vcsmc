@@ -105,8 +105,10 @@ class State {
 
  private:
   State(const State& state);
+  void SetTIA(TIA address, uint8 value);
 
-  const bool PlayfieldPaints(uint32 local_clock) const;
+  bool PlayfieldPaints(uint32 local_clock) const;
+  bool PlayerPaints(uint32 global_clock, bool is_player_one) const;
 
   const uint32 EarliestPlayfieldPaints(const Range& range) const;
 
@@ -121,6 +123,8 @@ class State {
   uint8 registers_[Register::REGISTER_COUNT];
   uint8 registers_known_;
   Range range_;
+  uint32 p0_clock_;
+  uint32 p1_clock_;
 };
 
 }  // namespace vcsmc

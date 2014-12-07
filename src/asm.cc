@@ -24,7 +24,8 @@ int main(int argc, char* argv[]) {
   if (input_fd < 0)
     return -1;
 
-  int output_fd = open(argv[2], O_WRONLY | O_CREAT);
+  int output_fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC,
+      S_IRUSR | S_IWUSR);
   if (output_fd < 0)
     return -1;
 

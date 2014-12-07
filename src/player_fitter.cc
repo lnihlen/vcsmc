@@ -202,19 +202,23 @@ void PlayerFitter::AppendSpecs(std::vector<Spec>* specs,
   TIA grpx = is_player_one ? TIA::GRP1 : TIA::GRP0;
   // The ith item in |row_offsets_| indicates when the reset should be strobed
   // at the (i - 1)th scanline. Both players start at unknown positions and
-  // must be reset, so we put them at a position off the screen.
+  // must be reset, so we put them at a position off the screen, and turn off
+  // their graphics for the vertical blank.
   uint32 previous_position = kFrameWidthPixels;
   uint32 scanline_start =
       (kVSyncScanLines + kVBlankScanLines - 1) * kScanLineWidthClocks;
+  specs->push_back(Spec(grpx, 0, Range(0, scanline_start)));
+
   for (uint32 i = 0; i < kFrameHeightPixels; ++i) {
     uint32 current_position = row_offsets_[i];
     if (previous_position != current_position) {
       // From the player graphics timing table it's apparent that positioning
       // the player graphics at pixel x requires issuing a reset that finishes
-      // on the previous line plus 63 clocks plus the start pixel offset.
+      // on the previous line plus 63 clocks plus the start pixel offset, or
+      // five pixels and one scanline prior to desired position.
       uint32 reset_clock = scanline_start + 63 + current_position;
       specs->push_back(Spec(respx, 0, Range(reset_clock, reset_clock)));
-      current_position = previous_position;
+      previous_position = current_position;
     }
     scanline_start += kScanLineWidthClocks;
     uint32 graphics_start = scanline_start + kHBlankWidthClocks +

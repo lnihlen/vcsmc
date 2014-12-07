@@ -210,6 +210,7 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
   vcsmc::PlayerFitter player_0;
   player_0.FindOptimumPath(saliency_map.get(), false);
   std::unique_ptr<vcsmc::BitMap> p0_coverage = player_0.MakeCoverageMap();
+
   saliency_map->Subtract(p0_coverage.get());
   vcsmc::PlayerFitter player_1;
   player_1.FindOptimumPath(saliency_map.get(), true);

@@ -28,12 +28,7 @@ class StateTest : public ::testing::Test {
         EXPECT_EQ(s1->tia(tia), s2->tia(tia));
     }
   }
-/*
-  void ExpectUnpainted(const ColuStrip* colu_strip) const {
-    for (uint32 i = 0; i < kFrameWidthPixels; ++i)
-      EXPECT_EQ(kColuUnpainted, colu_strip->colu(i));
-  }
-*/
+
   void ExpectCanScheduleBefore(const State* s, TIA tia) const {
     EXPECT_EQ(0, s->EarliestTimeAfter(Spec(tia, 0xfe,
         Range(0, kFrameSizeClocks))));
@@ -308,6 +303,7 @@ TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeHMCLR) {
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeCXCLR) {
   // TODO
 }
+
 /*
 TEST_F(StateTest, PaintIntoBeforeStateRange) {
   std::unique_ptr<State> state(new State);

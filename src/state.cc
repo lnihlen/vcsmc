@@ -36,7 +36,9 @@ namespace vcsmc {
 State::State()
     : tia_known_(kTIAStrobeMask),
       registers_known_(0),
-      range_(0, kFrameSizeClocks) {
+      range_(0, kFrameSizeClocks),
+      p0_clock_(0),
+      p1_clock_(0) {
   // The unknown/known logic asserts on |tia_| or |registers_| access, so we
   // can skip initialization of their memory areas.
 }
@@ -44,12 +46,16 @@ State::State()
 State::State(const uint8* tia_values)
     : tia_known_(0xffffffffffffffff),
       registers_known_(0),
-      range_(0, kFrameSizeClocks) {
+      range_(0, kFrameSizeClocks),
+      p0_clock_(0),
+      p1_clock_(0) {
   std::memcpy(tia_, tia_values, sizeof(tia_));
 }
 
 std::unique_ptr<State> State::Clone() const {
   std::unique_ptr<State> state(new State(*this));
+  state->p0_clock_ = p0_clock_;
+  state->p1_clock_ = p1_clock_;
   return state;
 }
 
@@ -63,6 +69,8 @@ std::unique_ptr<State> State::AdvanceTime(uint32 delta) {
   if (state->range_.end_time() < new_start_time)
     state->range_.set_end_time(new_start_time);
   state->range_.set_start_time(new_start_time);
+  state->p0_clock_ += delta;
+  state->p1_clock_ += delta;
   return state;
 }
 
@@ -78,17 +86,7 @@ std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
     uint32 delta, Register axy, TIA address) {
   std::unique_ptr<State> state(AdvanceTime(delta));
   uint8 reg_value = state->reg(axy);
-  switch (address) {
-    // interesting code for strobes and the like here... :)
-
-    // TODO: consider adding an assert here to verify that EarliestTimeAfter()
-    // would actually allow the transition during the duration of |this| state.
-
-    default:
-      state->tia_known_ |= (1 << static_cast<int>(address));
-      state->tia_[address] = reg_value;
-      break;
-  }
+  state->SetTIA(address, reg_value);
   return state;
 }
 
@@ -109,8 +107,7 @@ std::unique_ptr<State> State::MakeIdealState(const Spec& spec) {
   assert(spec.range().start_time() >= range_.start_time());
   uint32 delta = spec.range().start_time() - range_.start_time();
   std::unique_ptr<State> state(AdvanceTime(delta));
-  state->tia_known_ |= (1 << static_cast<int>(spec.tia()));
-  state->tia_[spec.tia()] = spec.value();
+  state->SetTIA(spec.tia(), spec.value());
   return state;
 }
 
@@ -128,7 +125,11 @@ void State::PaintInto(Image* image) const {
     if (clock < kHBlankWidthClocks)
       continue;
     uint8 colu = tia(TIA::COLUBK);
-    if (PlayfieldPaints(clock)) {
+    if (PlayerPaints(i, false)) {
+      colu = tia(TIA::COLUP0);
+    } else if (PlayerPaints(i, true)) {
+      colu = tia(TIA::COLUP1);
+    } else if (PlayfieldPaints(clock)) {
       // If D1 of CTRLPF is set the playfield paints with COLUP0 on the left
       // side and COLUP1 on the right side.
       if (tia(TIA::CTRLPF) & 0x02) {
@@ -292,7 +293,24 @@ State::State(const State& state) {
   range_ = state.range_;
 }
 
-const bool State::PlayfieldPaints(uint32 local_clock) const {
+void State::SetTIA(TIA address, uint8 value) {
+  switch (address) {
+    case TIA::RESP0:
+      p0_clock_ = 0;
+      break;
+
+    case TIA::RESP1:
+      p1_clock_ = 0;
+      break;
+
+    default:
+      tia_known_ |= (1 << static_cast<int>(address));
+      tia_[address] = value;
+      break;
+  }
+}
+
+bool State::PlayfieldPaints(uint32 local_clock) const {
   assert(local_clock >= kPF0Left);
 
   if (local_clock < kPFMidline || !(tia(TIA::CTRLPF) & 0x01)) {
@@ -335,6 +353,28 @@ const bool State::PlayfieldPaints(uint32 local_clock) const {
       return tia(TIA::PF0) & (0x80 >> pfbit);
     }
   }
+}
+
+bool State::PlayerPaints(uint32 global_clock, bool is_player_one) const {
+  // Early-out for player graphics disabled.
+  TIA grpx = is_player_one ? TIA::GRP1 : TIA::GRP0;
+  if (!tia(grpx))
+    return false;
+
+  assert(global_clock >= range_.start_time());
+  uint32 offset_from_start = global_clock - range_.start_time();
+  uint32 player_clock = is_player_one ? p1_clock_ : p0_clock_;
+  player_clock += offset_from_start;
+  if (player_clock < kScanLineWidthClocks)
+    return false;
+
+  uint32 pixel_clock = player_clock % kScanLineWidthClocks;
+  if (pixel_clock >= 5 && pixel_clock < 13) {
+    uint32 bit = pixel_clock - 5;
+    return (tia(grpx) & (1 << bit));
+  }
+
+  return false;
 }
 
 const uint32 State::EarliestPlayfieldPaints(const Range& range) const {
