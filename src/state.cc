@@ -3,8 +3,9 @@
 #include <cstring>
 #include <iostream>
 
+#include "cl_image.h"
 #include "color.h"
-#include "colu_strip.h"
+#include "image.h"
 #include "spec.h"
 
 namespace {
@@ -30,7 +31,6 @@ const uint32 kPFMidline = 148;
 
 }
 
-
 namespace vcsmc {
 
 State::State()
@@ -54,7 +54,6 @@ std::unique_ptr<State> State::Clone() const {
 }
 
 std::unique_ptr<State> State::AdvanceTime(uint32 delta) {
-  assert(delta > 0);
   std::unique_ptr<State> state(Clone());
   uint32 new_start_time = range_.start_time() + delta;
   range_.set_end_time(new_start_time);
@@ -106,24 +105,42 @@ std::unique_ptr<State> State::MakeEntryState(uint32 delta) {
   return state;
 }
 
-void State::PaintInto(ColuStrip* colu_strip) const {
-  Range strip_range(Range::IntersectRanges(colu_strip->range(), range_));
-  uint32 local_clock = strip_range.start_time() % kScanLineWidthClocks;
-  uint32 local_until = local_clock + strip_range.Duration();
-  uint32 starting_clock = std::max(local_clock, kHBlankWidthClocks);
-  uint32 starting_column = starting_clock - kHBlankWidthClocks;
-  for (uint32 clock = starting_clock; clock < local_until; ++clock) {
+std::unique_ptr<State> State::MakeIdealState(const Spec& spec) {
+  assert(spec.range().start_time() >= range_.start_time());
+  uint32 delta = spec.range().start_time() - range_.start_time();
+  std::unique_ptr<State> state(AdvanceTime(delta));
+  state->tia_known_ |= (1 << static_cast<int>(spec.tia()));
+  state->tia_[spec.tia()] = spec.value();
+  return state;
+}
+
+void State::PaintInto(Image* image) const {
+  // Cull any states outside of the range of painting scan lines.
+  Range paint_range = Range::IntersectRanges(Range(
+      (kVSyncScanLines + kVBlankScanLines) * kScanLineWidthClocks,
+      (kVSyncScanLines + kVBlankScanLines + kFrameHeightPixels)
+          * kScanLineWidthClocks), range_);
+  if (paint_range.IsEmpty())
+    return;
+
+  for (uint32 i = paint_range.start_time(); i < paint_range.end_time(); ++i) {
+    uint32 clock = i % kScanLineWidthClocks;
+    if (clock < kHBlankWidthClocks)
+      continue;
     uint8 colu = tia(TIA::COLUBK);
     if (PlayfieldPaints(clock)) {
       // If D1 of CTRLPF is set the playfield paints with COLUP0 on the left
       // side and COLUP1 on the right side.
-      if (tia(TIA::CTRLPF) & 0x02)
+      if (tia(TIA::CTRLPF) & 0x02) {
         colu = clock < kPFMidline ? tia(TIA::COLUP0) : tia(TIA::COLUP1);
-      else
+      } else {
         colu = tia(TIA::COLUPF);
+      }
     }
-
-    colu_strip->set_colu(starting_column++, colu);
+    uint32 x = clock - kHBlankWidthClocks;
+    uint32 y = (i / kScanLineWidthClocks) - kVSyncScanLines - kVBlankScanLines;
+    *(image->pixels_writeable() + (y * kFrameWidthPixels) + x) =
+        Color::AtariColorToABGR(colu);
   }
 }
 

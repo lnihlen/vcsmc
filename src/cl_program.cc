@@ -42,7 +42,7 @@ __kernel void ciede2k(__global __read_only float4* pixel_lab_in,
                       __global __write_only float* delta_e_out) {
   int pixel_id = get_global_id(0);
   int reference_id = get_global_id(1);
-  int output_id = (reference_id * get_global_size(1)) +
+  int output_id = (reference_id * get_global_size(0)) +
       (pixel_id - get_global_offset(0));
   float4 lab_1 = pixel_lab_in[pixel_id];
   float4 lab_2 = reference_lab_in[reference_id];
@@ -500,12 +500,13 @@ __kernel void k_means_color(__global __read_only float* color_errors,
 
   // Use the lowest |num_classes| threads to copy final class reductions to
   // the output.
-  if (color_id < num_classes)
+  if (color_id < num_classes) {
     colors[color_id] = class_scratch[color_id];
+  }
 
   if (color_id == 0) {
-    float total_error = 0.0f;
-    for (uint i = 0; i < num_classes; ++i) {
+    float total_error = error_scratch[0];
+    for (uint i = 1; i < num_classes; ++i) {
       total_error += error_scratch[i];
     }
     fit_error[iteration] = total_error;

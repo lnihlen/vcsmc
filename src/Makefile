@@ -62,7 +62,7 @@ TEST_OBJ=$(OUTTESTS)/adjacency_map_unittests.o                                 \
          $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
          $(OUTTESTS)/state_unittests.o                                         \
 
-all: $(OUT)/picc $(OUT)/asm $(OUT)/exty $(OUT)/smap tests
+all: $(OUT)/picc $(OUT)/asm $(OUT)/exty $(OUT)/smap $(OUT)/sim tests
 
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -80,6 +80,9 @@ $(OUT)/exty: $(OBJ) $(OUT)/exty.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/smap: $(OBJ) $(OUT)/smap.o
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/sim: $(OBJ) $(OUT)/sim.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/

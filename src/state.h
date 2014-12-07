@@ -10,7 +10,7 @@
 
 namespace vcsmc {
 
-class ColuStrip;
+class Image;
 class Spec;
 
 // State represents a moment in time for the VCS. It is a complete (enough for
@@ -34,7 +34,7 @@ class State {
 
   // Given this state at |color_clock_| = t, produce a new State which is an
   // exact copy of this one but at color_clock_ = t + delta time. ALSO HAS THE
-  // SIDE EFFECT OF MODIFYING OUR OWN TIME RANGE. |delta| must be > 0.
+  // SIDE EFFECT OF MODIFYING OUR OWN TIME RANGE.
   std::unique_ptr<State> AdvanceTime(uint32 delta);
 
   // Same as above, but the returned state also has new value stored in reg.
@@ -58,10 +58,14 @@ class State {
   // starting at this State's end_time().
   std::unique_ptr<State> MakeEntryState(uint32 delta);
 
+  // Adapt whatever change ordered by |spec| to a new state starting at the
+  // start time of the range of the |spec| and return.
+  std::unique_ptr<State> MakeIdealState(const Spec& spec);
+
   //====== Simulation and Scheduling
 
-   // Fill pixels into |colu_strip| for all time values within |range_|
-  void PaintInto(ColuStrip* pixel_strip) const;
+   // Fill pixels in |image| for all time values within |range_|
+  void PaintInto(Image* image) const;
 
   // Returns a color clock value that is the earliest time after which this spec
   // could be added. Returns 0 if it occurs before this State. If this State

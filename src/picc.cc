@@ -70,7 +70,7 @@ void BuildPalette(vcsmc::CLCommandQueue* queue,
 
   while (!stable && total_iterations < kMaxIterations) {
     std::vector<std::unique_ptr<vcsmc::CLKernel>> kernels;
-    kernels.reserve(kBatchIterations);
+    kernels.reserve(kBatchIterations * 2);
     for (uint32 i = 0; i < kBatchIterations; ++i) {
       std::unique_ptr<vcsmc::CLKernel> classify(
           vcsmc::CLDeviceContext::MakeKernel(
@@ -94,6 +94,7 @@ void BuildPalette(vcsmc::CLCommandQueue* queue,
       color->SetBufferArgument(7, fit_errors_buffer.get());
       color->SetBufferArgument(8, color_values);
       color->Enqueue(queue, vcsmc::kNTSCColors);
+      kernels.push_back(std::move(color));
     }
 
     fit_errors_buffer->EnqueueCopyFromDevice(queue, fit_errors.get());
@@ -294,13 +295,14 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
     color_counts_buffer->EnqueueCopyFromDevice(queue.get(), color_counts.get());
     std::unique_ptr<uint32[]> color_values(new uint32[num_colus]);
     color_values_buffer->EnqueueCopyFromDevice(queue.get(), color_values.get());
+
     queue->Finish();
 
     // In-place sort color indices by histogram frequency in ascending order.
     std::vector<std::pair<uint32, uint32>> colu_sorted;
     colu_sorted.reserve(num_colus);
-    for (uint32 i = 0; i < num_colus; ++i)
-      colu_sorted.push_back(std::make_pair(color_counts[i], i));
+    for (uint32 j = 0; j < num_colus; ++j)
+      colu_sorted.push_back(std::make_pair(color_counts[j], j));
     std::sort(colu_sorted.begin(), colu_sorted.end());
 
     // Issue background spec for the most numerous color, covering entire line
@@ -321,7 +323,6 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
     pf_fit->SetBufferArgument(3, playfield_buffer.get());
     pf_fit->Enqueue(queue.get(), vcsmc::kFrameWidthPixels / 4);
     playfield_buffer->EnqueueCopyFromDevice(queue.get(), playfield.get());
-
 
     // Calculate minimum error color for the pixels in the player bitmask, and
     // set a spec for it, if they are drawn.
@@ -355,9 +356,9 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
 
     // PF0 D4 through D7 left to right.
     uint8 pf0 = 0;
-    for (uint32 i = 0; i < 4; ++i) {
+    for (uint32 j = 0; j < 4; ++j) {
       pf0 = pf0 >> 1;
-      if (playfield[i])
+      if (playfield[j])
         pf0 = pf0 | 0x80;
     }
     specs.push_back(vcsmc::Spec(vcsmc::TIA::PF0, pf0,
@@ -365,9 +366,9 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
 
     // PF1 D7 through D0 left to right.
     uint8 pf1 = 0;
-    for (uint32 i = 4; i < 12; ++i) {
+    for (uint32 j = 4; j < 12; ++j) {
       pf1 = pf1 << 1;
-      if (playfield[i])
+      if (playfield[j])
         pf1 = pf1 | 0x01;
     }
     specs.push_back(vcsmc::Spec(vcsmc::TIA::PF1, pf1,
@@ -375,9 +376,9 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
 
     // PF2 D0 through D7 left to right.
     uint8 pf2 = 0;
-    for (uint32 i = 12; i < 20; ++i) {
+    for (uint32 j = 12; j < 20; ++j) {
       pf2 = pf2 >> 1;
-      if (playfield[i])
+      if (playfield[j])
         pf2 = pf2 | 0x80;
     }
     specs.push_back(vcsmc::Spec(vcsmc::TIA::PF2, pf2,
@@ -385,9 +386,9 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
 
     // PF0 D4 through D7 left to right.
     pf0 = 0;
-    for (uint32 i = 20; i < 24; ++i) {
+    for (uint32 j = 20; j < 24; ++j) {
       pf0 = pf0 >> 1;
-      if (playfield[i])
+      if (playfield[j])
         pf0 = pf0 | 0x80;
     }
     specs.push_back(vcsmc::Spec(vcsmc::TIA::PF0, pf0,
@@ -395,9 +396,9 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
 
     // PF1 D7 through D0 left to right.
     pf1 = 0;
-    for (uint32 i = 24; i < 32; ++i) {
+    for (uint32 j = 24; j < 32; ++j) {
       pf1 = pf1 << 1;
-      if (playfield[i])
+      if (playfield[j])
         pf1 = pf1 | 0x01;
     }
     specs.push_back(vcsmc::Spec(vcsmc::TIA::PF1, pf1,
@@ -405,13 +406,17 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
 
     // PF2 D0 through D7 left to right.
     pf2 = 0;
-    for (uint32 i = 32; i < 40; ++i) {
+    for (uint32 j = 32; j < 40; ++j) {
       pf2 = pf2 >> 1;
-      if (playfield[i])
+      if (playfield[j])
         pf2 = pf2 | 0x80;
     }
     specs.push_back(vcsmc::Spec(vcsmc::TIA::PF2, pf2,
         vcsmc::Range(pixel_start + 128, pixel_start + 160)));
+
+    // Always asymmetric playfield for now.
+    specs.push_back(vcsmc::Spec(vcsmc::TIA::CTRLPF, 0,
+        vcsmc::Range(pixel_start, pixel_start + vcsmc::kFrameWidthPixels)));
 
     // Issue specs for player color, if needed.
     if (!player_0.IsLineEmpty(i)) {
@@ -430,14 +435,15 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
   }
 
   // All player and playfield specs are now in place. Save to a file and return.
-  uint32 spec_buffer_size = 18 * specs.size();
+  uint32 spec_buffer_size = 10 * specs.size();
   std::unique_ptr<uint8[]> spec_buffer(new uint8[spec_buffer_size]);
   uint8* buffer_ptr = spec_buffer.get();
   for (uint32 i = 0; i < specs.size(); ++i)
     buffer_ptr += specs[i].Serialize(buffer_ptr);
   snprintf(file_name_buffer.get(), kMaxFilenameLength, output_path_spec.c_str(),
       frame->frame_number());
-  int spec_fd = open(file_name_buffer.get(), O_WRONLY | O_CREAT);
+  int spec_fd = open(file_name_buffer.get(), O_WRONLY | O_CREAT | O_TRUNC,
+      S_IRUSR | S_IWUSR);
   if (spec_fd < 0) {
     fprintf(stderr, "error opening output spec file %s\n",
         file_name_buffer.get());

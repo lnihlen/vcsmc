@@ -28,9 +28,13 @@ class Range {
   static Range IntersectRanges(const Range& r1, const Range& r2);
   // static Range UnionRanges(const Range& r1, const Range& r2);
 
-  // Saves the range as two 32-bit numbers (begin, end) in the supplied buffer.
+  // Saves the Range as two 32-bit numbers (begin, end) in the supplied buffer.
   // Returns the number of bytes saved, or 16 bytes.
   size_t Serialize(uint8* buffer);
+
+  // Loads the Range from two 32-bit numbers (begin, end) in the supplied
+  // buffer. Returns the number of bytes consumed, or 16 bytes.
+  static Range Deserialize(const uint8* buffer, size_t* bytes_read_out);
 
   void set_start_time(uint32 start_time);
   void set_end_time(uint32 end_time);

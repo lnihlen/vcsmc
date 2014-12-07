@@ -53,6 +53,14 @@ size_t Range::Serialize(uint8* buffer) {
   return 2 * sizeof(uint32);
 }
 
+// static
+Range Range::Deserialize(const uint8* buffer, size_t* bytes_read_out) {
+  const uint32* buffer_long = reinterpret_cast<const uint32*>(buffer);
+  Range range(buffer_long[0], buffer_long[1]);
+  *bytes_read_out = 2 * sizeof(uint32);
+  return range;
+}
+
 void Range::set_start_time(uint32 start_time) {
   assert(end_time_ >= start_time);
   start_time_ = start_time;

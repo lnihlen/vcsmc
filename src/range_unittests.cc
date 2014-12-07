@@ -190,6 +190,17 @@ TEST(RangeTest, SerializeToBufferNonZeroLittleEndian) {
   }
 }
 
+TEST(RangeTest, SerializeDeserializeRange) {
+  uint8 buffer[8];
+  Range range(0x01234567, 0x89abcdef);
+  size_t size = range.Serialize(buffer);
+  size_t de_size = 0;
+  Range de_range = Range::Deserialize(buffer, &de_size);
+  EXPECT_EQ(size, de_size);
+  EXPECT_EQ(range.start_time(), de_range.start_time());
+  EXPECT_EQ(range.end_time(), de_range.end_time());
+}
+
 TEST(RangeTest, IntersectRangeZero) {
   Range empty_range;
   Range range(0, 1777);

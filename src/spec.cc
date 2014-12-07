@@ -16,4 +16,14 @@ size_t Spec::Serialize(uint8* buffer) {
   return range_size + 2;
 }
 
+// static
+Spec Spec::Deserialize(const uint8* buffer, size_t* bytes_read_out) {
+  size_t spec_read = 0;
+  Range range = Range::Deserialize(buffer, &spec_read);
+  const uint8* buffer_after_range = buffer + spec_read;
+  *bytes_read_out = spec_read + 2;
+  return Spec(static_cast<TIA>(buffer_after_range[0]), buffer_after_range[1],
+      range);
+}
+
 }  // namespace vcsmc
