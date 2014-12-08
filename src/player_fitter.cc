@@ -76,8 +76,8 @@ void PlayerFitter::FindOptimumPath(const BitMap* bitmap, bool favor_right) {
     }
   }
 
-  // Now we extract the optimum path from top to bottop and store the masks and
-  // offsets per-row.
+  // Now we extract the optimum path from top to bottom and store the optimum
+  // path, which determines the bitmasks, so compute those next.
   row_masks_.reset(new uint8[kFrameHeightPixels]);
   row_offsets_.reset(new uint32[kFrameHeightPixels]);
   for (uint32 i = 0; i < kFrameHeightPixels; ++i) {
@@ -95,16 +95,23 @@ void PlayerFitter::FindOptimumPath(const BitMap* bitmap, bool favor_right) {
 
     // Save max offset.
     row_offsets_[i] = max_offset;
+  }
+
+  for (uint32 i = 0; i < kFrameHeightPixels; ++i) {
+    uint32 max_offset = row_offsets_[i];
 
     uint8 bitmask = 0;
-    if (bitmap->bit(max_offset + 0, i)) bitmask |= 0x01;
-    if (bitmap->bit(max_offset + 1, i)) bitmask |= 0x02;
-    if (bitmap->bit(max_offset + 2, i)) bitmask |= 0x04;
-    if (bitmap->bit(max_offset + 3, i)) bitmask |= 0x08;
-    if (bitmap->bit(max_offset + 4, i)) bitmask |= 0x10;
-    if (bitmap->bit(max_offset + 5, i)) bitmask |= 0x20;
-    if (bitmap->bit(max_offset + 6, i)) bitmask |= 0x40;
-    if (bitmap->bit(max_offset + 7, i)) bitmask |= 0x80;
+    if ((i == kFrameHeightPixels - 1) ||
+        (max_offset <= row_offsets_[i + 1])) {
+      if (bitmap->bit(max_offset + 0, i)) bitmask |= 0x01;
+      if (bitmap->bit(max_offset + 1, i)) bitmask |= 0x02;
+      if (bitmap->bit(max_offset + 2, i)) bitmask |= 0x04;
+      if (bitmap->bit(max_offset + 3, i)) bitmask |= 0x08;
+      if (bitmap->bit(max_offset + 4, i)) bitmask |= 0x10;
+      if (bitmap->bit(max_offset + 5, i)) bitmask |= 0x20;
+      if (bitmap->bit(max_offset + 6, i)) bitmask |= 0x40;
+      if (bitmap->bit(max_offset + 7, i)) bitmask |= 0x80;
+    }
 
     row_masks_[i] = bitmask;
   }

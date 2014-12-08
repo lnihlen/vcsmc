@@ -107,8 +107,9 @@ int main(int argc, char* argv[]) {
 
   // We always assume ideal mode for now, real mode support is TODO.
   uint64 frame_number = 1;
-  while (SimFileIdeal(input_file_spec, output_file_spec, frame_number))
+  while (SimFileIdeal(input_file_spec, output_file_spec, frame_number)) {
     ++frame_number;
+  }
 
   return 0;
 }

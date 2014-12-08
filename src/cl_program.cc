@@ -271,53 +271,46 @@ __kernel void fft_radix_2(__global __read_only float2* input_data,
 
     case kFitPlayer:
       return CL_PROGRAM(
-// |scratch| should be num_colus * 8 in size.
+// One thread per color, goes through that color error and sums the total error
+// in using that color to scratch space. We then reduce all color errors to find
+// the min, and store that index in |player_color|.
+//
+// Both scratch buffers should be number of threads in size.
 __kernel void fit_player(__global __read_only float* color_errors,
-                         __global __read_only uint* colors,
                          __read_only uint start_pixel,
                          __read_only uint pixel_mask,
-                         __read_only uint num_colors,
                          __read_only uint image_width,
-                         __local float* scratch,
+                         __local float* error_scratch,
+                         __local uint* color_scratch,
                          __global __write_only uint* player_color) {
-  uint bit = get_global_id(0);
-  uint scratch_offset = bit * num_colors;
-  if (pixel_mask & (1 << bit)) {
-    for (uint i = 0; i < num_colors; ++i) {
-      scratch[scratch_offset + i] =
-          color_errors[(image_width * colors[i]) + start_pixel];
-    }
-  } else {
-    for (uint i = 0; i < num_colors; ++i) {
-      scratch[scratch_offset + i] = 0.0f;
+  uint color = get_global_id(0);
+  uint num_colus = get_global_size(0);
+  uint error_offset = (color * image_width) + start_pixel;
+  float total_error = 0.0f;
+  for (uint i = 0; i < 8; ++i) {
+    if ((pixel_mask & (1 << i)) != 0) {
+      total_error += color_errors[error_offset + i];
     }
   }
 
-  // Reduce to total errors and determine color based on min.
+  error_scratch[color] = total_error;
+  color_scratch[color] = color;
+
   barrier(CLK_LOCAL_MEM_FENCE);
-  for (uint offset = 4; offset > 0; offset = offset / 2) {
-    uint their_offset = scratch_offset + (offset * num_colors);
-    if (bit < offset) {
-      for (uint i = 0; i < num_colors; ++i) {
-        scratch[scratch_offset + i] += scratch[their_offset + i];
+
+  for (uint offset = num_colus / 2; offset > 0; offset = offset / 2) {
+    if (color < offset) {
+      float their_error = error_scratch[color + offset];
+      if (their_error < error_scratch[color]) {
+        error_scratch[color] = their_error;
+        color_scratch[color] = color_scratch[color + offset];
       }
     }
     barrier(CLK_LOCAL_MEM_FENCE);
   }
 
-  // Have thread 0 do a linear search for the min and return.
-  if (bit == 0) {
-    uint min_index = 0;
-    uint min_error = scratch[0];
-    for (uint i = 1; i < num_colors; ++i) {
-      if (scratch[i] < min_error) {
-        min_error = scratch[i];
-        min_index = i;
-      }
-    }
-
-    *player_color = colors[min_index];
-  }
+  if (color == 0)
+    *player_color = color_scratch[0];
 }
       );  // end of kFitPlayer
 
@@ -614,11 +607,8 @@ __kernel void rgb_to_lab(__read_only image2d_t input_image,
   int col = get_global_id(0);
   int row = get_global_id(1);
   int width = get_global_size(0);
-  int height = get_global_size(1);
 
-  // OpenCL reads images in the opposite orientation of what we expect, so we
-  // flip the image vertically.
-  float4 rgba = read_imagef(input_image, (int2)(col, height - row - 1));
+  float4 rgba = read_imagef(input_image, (int2)(col, row));
   float3 rgb_in = rgba.xyz;
 
   float3 v_below = rgb_in / 12.92f;

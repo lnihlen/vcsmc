@@ -23,6 +23,7 @@ class State {
 
   // Constructs a default initial State, with all values set to unknown.
   State();
+  ~State();
 
   // Constructs a State with all TIA values known and set to a copy of the
   // provided byte pointer, all registers set to unknown, and all over values
@@ -124,7 +125,9 @@ class State {
   uint8 registers_known_;
   Range range_;
   uint32 p0_clock_;
+  uint32 p0_bit_;
   uint32 p1_clock_;
+  uint32 p1_bit_;
 };
 
 }  // namespace vcsmc

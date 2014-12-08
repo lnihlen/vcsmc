@@ -38,9 +38,14 @@ State::State()
       registers_known_(0),
       range_(0, kFrameSizeClocks),
       p0_clock_(0),
-      p1_clock_(0) {
+      p0_bit_(kInfinity),
+      p1_clock_(0),
+      p1_bit_(kInfinity) {
   // The unknown/known logic asserts on |tia_| or |registers_| access, so we
   // can skip initialization of their memory areas.
+}
+
+State::~State() {
 }
 
 State::State(const uint8* tia_values)
@@ -48,14 +53,18 @@ State::State(const uint8* tia_values)
       registers_known_(0),
       range_(0, kFrameSizeClocks),
       p0_clock_(0),
-      p1_clock_(0) {
+      p0_bit_(kInfinity),
+      p1_clock_(0),
+      p1_bit_(kInfinity) {
   std::memcpy(tia_, tia_values, sizeof(tia_));
 }
 
 std::unique_ptr<State> State::Clone() const {
   std::unique_ptr<State> state(new State(*this));
   state->p0_clock_ = p0_clock_;
+  state->p0_bit_ = p0_bit_;
   state->p1_clock_ = p1_clock_;
+  state->p1_bit_ = p1_bit_;
   return state;
 }
 
@@ -69,8 +78,21 @@ std::unique_ptr<State> State::AdvanceTime(uint32 delta) {
   if (state->range_.end_time() < new_start_time)
     state->range_.set_end_time(new_start_time);
   state->range_.set_start_time(new_start_time);
+
   state->p0_clock_ += delta;
+  if (state->p0_bit_ != kInfinity) {
+    state->p0_bit_ += delta;
+    if (state->p0_bit_ >= 13)
+      state->p0_bit_ = kInfinity;
+  }
+
   state->p1_clock_ += delta;
+  if (state->p1_bit_ != kInfinity) {
+    state->p1_bit_ += delta;
+    if (state->p1_bit_ >= 13)
+      state->p1_bit_ = kInfinity;
+  }
+
   return state;
 }
 
@@ -294,12 +316,27 @@ State::State(const State& state) {
 }
 
 void State::SetTIA(TIA address, uint8 value) {
+  uint32 player_clock = 0;
   switch (address) {
     case TIA::RESP0:
+      player_clock = p0_clock_ % kScanLineWidthClocks;
+      if (p0_clock_ > kScanLineWidthClocks &&
+          player_clock < 13) {
+        p0_bit_ = player_clock;
+      } else {
+        p0_bit_ = kInfinity;
+      }
       p0_clock_ = 0;
       break;
 
     case TIA::RESP1:
+      player_clock = p1_clock_ % kScanLineWidthClocks;
+      if (p1_clock_ > kScanLineWidthClocks &&
+          player_clock < 13) {
+        p1_bit_ = player_clock;
+      } else {
+        p1_bit_ = kInfinity;
+      }
       p1_clock_ = 0;
       break;
 
@@ -363,6 +400,12 @@ bool State::PlayerPaints(uint32 global_clock, bool is_player_one) const {
 
   assert(global_clock >= range_.start_time());
   uint32 offset_from_start = global_clock - range_.start_time();
+  uint32 px_bit = is_player_one ? p1_bit_ : p0_bit_;
+  if (px_bit != kInfinity &&
+      px_bit + offset_from_start >= 5 &&
+      px_bit + offset_from_start < 13)
+    return (tia(grpx) & (1 << (px_bit + offset_from_start - 5)));
+
   uint32 player_clock = is_player_one ? p1_clock_ : p0_clock_;
   player_clock += offset_from_start;
   if (player_clock < kScanLineWidthClocks)
