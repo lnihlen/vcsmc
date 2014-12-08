@@ -10,7 +10,6 @@
 
 namespace vcsmc {
 
-class ColuStrip;
 class Block;
 class Spec;
 class State;
@@ -62,8 +61,6 @@ class Schedule {
 
   uint64 AddSpec(const Spec& spec);
   uint64 AddSpecs(const std::vector<Spec>* specs);
-
-  std::unique_ptr<ColuStrip> Simulate(uint64 row);
 
   std::string Assemble() const;
 

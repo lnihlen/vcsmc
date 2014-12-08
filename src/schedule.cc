@@ -3,7 +3,6 @@
 #include <cassert>
 
 #include "block.h"
-#include "colu_strip.h"
 #include "opcode.h"
 #include "spec.h"
 #include "state.h"
@@ -152,10 +151,6 @@ uint64 Schedule::CostToAddSpec(const Spec& spec) {
 
 uint64 Schedule::CostToAddSpecs(const std::vector<Spec>* specs) {
   return kInfinity;
-}
-
-std::unique_ptr<ColuStrip> Schedule::Simulate(uint64 row) {
-  return std::unique_ptr<ColuStrip>();
 }
 
 std::string Schedule::Assemble() const {

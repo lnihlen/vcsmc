@@ -36,7 +36,7 @@ namespace vcsmc {
 State::State()
     : tia_known_(kTIAStrobeMask),
       registers_known_(0),
-      range_(0, kFrameSizeClocks),
+      range_(0, kScreenSizeClocks),
       p0_clock_(0),
       p0_bit_(kInfinity),
       p1_clock_(0),
@@ -51,7 +51,7 @@ State::~State() {
 State::State(const uint8* tia_values)
     : tia_known_(0xffffffffffffffff),
       registers_known_(0),
-      range_(0, kFrameSizeClocks),
+      range_(0, kScreenSizeClocks),
       p0_clock_(0),
       p0_bit_(kInfinity),
       p1_clock_(0),

@@ -9,7 +9,6 @@
 #include "cl_image.h"
 #include "cl_kernel.h"
 #include "color.h"
-#include "colu_strip.h"
 #include "constants.h"
 
 namespace vcsmc {

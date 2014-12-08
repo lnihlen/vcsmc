@@ -27,6 +27,7 @@ const uint32 kVSyncScanLines = 3;
 const uint32 kVBlankScanLines = 37;
 const uint32 kOverscanScanLines = 30;
 const uint32 kScreenHeight = 262;
+const uint32 kScreenSizeClocks = kScreenHeight * kScanLineWidthClocks;
 
 const uint8 kColuUnpainted = 0xff;
 // The ith most significant bit in this field represents the ith address in the
