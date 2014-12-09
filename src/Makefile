@@ -1,7 +1,7 @@
 # VCSMC src/ Makefile.
 # Dependencies: libtiff, libpng, clang, OpenCL
 # tools dependencies: python colormath, Wand, ImageMagick
-CFLAGS+=-I. -g -O0 # -O2
+CFLAGS+=-I. -O2
 LIBS+=-lm -ltiff -lpng
 OUTTESTS=$(OUT)/tests
 
@@ -33,7 +33,6 @@ OBJ=$(OUT)/adjacency_map.o                                                     \
     $(OUT)/cl_program.o                                                        \
     $(OUT)/color.o                                                             \
     $(OUT)/color_table.o                                                       \
-    $(OUT)/colu_strip.o                                                        \
     $(OUT)/gray_map.o                                                          \
     $(OUT)/image.o                                                             \
     $(OUT)/image_file.o                                                        \
