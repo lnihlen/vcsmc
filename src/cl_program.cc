@@ -30,22 +30,18 @@ std::string CLProgram::GetProgramString(Programs program) {
 // Note that CIEDE2000 is discontinuous so is not useful for gradient
 // descent algorithms.
 
-// For inputs |pixel_lab_in| is pointing at some large array of pixel values
-// and it is assumed that there is an offset applied to the global id.  The
-// |reference_lab_in| points at the reference colors. This function will store
-// the output at the row given by the index into the reference color table and
-// the column by the pixel row with offset removed. It is assumed that the
-// distances between every pixel color within the work dimensions described by
-// |pixel_lab_in| and every color in |reference_lab_in| are to be computed.
+// Computes a distance for each pixel at |pixel_lab_in|, which should be of
+// the dimensions of a 2D working group, to the reference color supplied at
+// |reference_lab_in|, and stores the distance at the corresponding output
+// float in |delta_e_out|.
 __kernel void ciede2k(__global __read_only float4* pixel_lab_in,
-                      __global __read_only float4* reference_lab_in,
+                      __read_only float4 reference_lab_in,
                       __global __write_only float* delta_e_out) {
-  int pixel_id = get_global_id(0);
-  int reference_id = get_global_id(1);
-  int output_id = (reference_id * get_global_size(0)) +
-      (pixel_id - get_global_offset(0));
+  int col = get_global_id(0);
+  int row = get_global_id(1);
+  int pixel_id = (row * get_global_size(0)) + col;
   float4 lab_1 = pixel_lab_in[pixel_id];
-  float4 lab_2 = reference_lab_in[reference_id];
+  float4 lab_2 = reference_lab_in;
 
   // Calculate C_1, h_1, and C_2, h_2.
   float C_star_1 = length(lab_1.yz);
@@ -115,10 +111,10 @@ __kernel void ciede2k(__global __read_only float4* pixel_lab_in,
   float S_C = 1.0f + 0.045f * C_mean;
   float S_H = 1.0f + 0.015f * C_mean * T;
   float R_T = -1.0f * sin(2.0f * del_theta * (M_PI_F / 180.0f)) * R_c;
-  delta_e_out[output_id] = sqrt(pow(del_L / S_L, 2.0f) +
-                                pow(del_C / S_C, 2.0f) +
-                                pow(del_H / S_H, 2.0f) +
-                                R_T * (del_C / S_C) * (del_H / S_H));
+  delta_e_out[pixel_id] = sqrt(pow(del_L / S_L, 2.0f) +
+                               pow(del_C / S_C, 2.0f) +
+                               pow(del_H / S_H, 2.0f) +
+                               R_T * (del_C / S_C) * (del_H / S_H));
 }
       );  // end of kCiede2K
 
@@ -174,6 +170,7 @@ __kernel void convolve(__global __read_only float* input,
 // to be equal to the x dimension of the global work group.
 __kernel void downsample_errors(__global __read_only float* input_errors,
                                 __read_only int input_width,
+                                __read_only int output_offset,
                                 __global __write_only float* output_errors) {
   int output_col = get_global_id(0);
   int output_row = get_global_id(1);
@@ -208,7 +205,8 @@ __kernel void downsample_errors(__global __read_only float* input_errors,
         (end_pixel - last_fractional_pixel);
   }
 
-  output_errors[(output_row * output_width) + output_col] = total_error;
+  int output_pixel = (output_row * output_width) + output_col + output_offset;
+  output_errors[output_pixel] = total_error;
 }
       );  // end of kDownsampleErrors
 
@@ -280,12 +278,13 @@ __kernel void fit_player(__global __read_only float* color_errors,
                          __read_only uint start_pixel,
                          __read_only uint pixel_mask,
                          __read_only uint image_width,
+                         __read_only uint image_height,
                          __local float* error_scratch,
                          __local uint* color_scratch,
                          __global __write_only uint* player_color) {
   uint color = get_global_id(0);
   uint num_colus = get_global_size(0);
-  uint error_offset = (color * image_width) + start_pixel;
+  uint error_offset = (color * image_width * image_height) + start_pixel;
   float total_error = 0.0f;
   for (uint i = 0; i < 8; ++i) {
     if ((pixel_mask & (1 << i)) != 0) {
@@ -320,72 +319,34 @@ __kernel void fit_player(__global __read_only float* color_errors,
 
     case kFitPlayfield:
       return CL_PROGRAM(
-// Should be image_width / 4 threads, each thread handles four pixels and
-// computes one bit of playfield fit.
+// Should be image_width / 4 x image_height threads, each thread handles four
+// pixels horizontally and computes one bit of playfield fit.
 __kernel void fit_playfield(__global __read_only float* color_errors,
                             __read_only uint bk_color,
                             __read_only uint pf_color,
                             __global __write_only uint* playfield) {
   uint pf_group = get_global_id(0);
+  uint pf_line = get_global_id(1);
   uint pf_width = get_global_size(0);
-  uint pixel = pf_group * 4;
   uint image_width = pf_width * 4;
+  uint pixel = (pf_line * image_width) + (pf_group * 4);
+  uint image_height = get_global_size(1);
 
-  uint pf_offset = (pf_color * image_width) + pixel;
+  uint pf_offset = (pf_color * image_width * image_height) + pixel;
   float pf_error = color_errors[pf_offset];
   pf_error += color_errors[pf_offset + 1];
   pf_error += color_errors[pf_offset + 2];
   pf_error += color_errors[pf_offset + 3];
 
-  uint bk_offset = (bk_color * image_width) + pixel;
+  uint bk_offset = (bk_color * image_width * image_height) + pixel;
   float bk_error = color_errors[bk_offset];
   bk_error += color_errors[bk_offset + 1];
   bk_error += color_errors[bk_offset + 2];
   bk_error += color_errors[bk_offset + 3];
 
-  playfield[pf_group] = pf_error < bk_error ? 1 : 0;
+  playfield[(pf_line * pf_width) + pf_group] = pf_error < bk_error ? 1 : 0;
 }
       );  // end of kFitPlayfield
-
-//
-// kHistogramClasses ==========================================================
-//
-
-    case kHistogramClasses:
-      return CL_PROGRAM(
-// |scratch| needs to be num_classes * width in size.
-__kernel void histogram_classes(__global __read_only uint* classes,
-                                __read_only uint num_classes,
-                                __local uint* scratch,
-                                __global __write_only uint* counts) {
-  uint pixel = get_global_id(0);
-  uint width = get_global_size(0);
-
-  // Next power of two width, for subdivision during the reduction phase.
-  uint npot_width = (uint)pown(2.0f, ilogb((float)width) + 1);
-  uint scratch_index = pixel * num_classes;
-  for (uint i = 0; i < num_classes; ++i)
-    scratch[scratch_index + i] = 0;
-  scratch[scratch_index + classes[pixel]] = 1;
-
-  // Reduce counts to final output.
-  barrier(CLK_LOCAL_MEM_FENCE);
-  for (uint offset = npot_width / 2; offset > 0; offset = offset / 2) {
-    uint their_index = scratch_index + (offset * num_classes);
-    if (pixel < offset && pixel + offset < width) {
-      for (uint i = 0; i < num_classes; ++i) {
-        uint their_count = scratch[their_index + i];
-        uint my_count = scratch[scratch_index + i];
-        scratch[scratch_index + i] = their_count + my_count;
-      }
-    }
-    barrier(CLK_LOCAL_MEM_FENCE);
-  }
-
-  if (pixel < num_classes)
-    counts[pixel] = scratch[pixel];
-}
-      );  // end of kHistogramClasses
 
 //
 // kInverseFFTNormalize =======================================================
@@ -416,20 +377,24 @@ __kernel void inverse_fft_normalize(__global __read_only float4* input_data,
 
     case kKMeansClassify:
       return CL_PROGRAM(
-// Given a 2D array of color distances with width global_size(0) and height of
-// kNTSCColors at |color_errors|, and an array of currently selected |colors| of
-// length |num_classes|, this shader will determine the lowest error color at
-// each pixel and store its index into |classes|.
+// Given a 3D array of color distances with width global_size(0), height of
+// global_size(1), and depth of kNTSCColors at |color_errors|, and an array of
+// currently selected |colors| of length |num_classes|, this shader will
+// determine the lowest error color at each pixel and store its index into 2D
+// array |classes|.
 __kernel void k_means_classify(__global __read_only float* color_errors,
                                __global __read_only uint* colors,
                                __read_only uint num_classes,
                                __global __write_only uint* classes) {
-  uint pixel = get_global_id(0);
+  uint col = get_global_id(0);
+  uint row = get_global_id(1);
   uint width = get_global_size(0);
-  float min_error = color_errors[(colors[0] * width) + pixel];
+  uint height = get_global_size(1);
+  uint pixel = (row * width) + col;
+  float min_error = color_errors[(colors[0] * width * height) + pixel];
   uint min_error_index = 0;
   for (uint i = 1; i < num_classes; ++i) {
-    float error = color_errors[(colors[i] * width) + pixel];
+    float error = color_errors[(colors[i] * width * height) + pixel];
     if (error < min_error) {
       min_error = error;
       min_error_index = i;
@@ -451,6 +416,7 @@ __kernel void k_means_classify(__global __read_only float* color_errors,
 __kernel void k_means_color(__global __read_only float* color_errors,
                             __global __read_only uint* classes,
                             __read_only uint image_width,
+                            __read_only uint image_height,
                             __read_only uint num_classes,
                             __read_only uint iteration,
                             __local float* error_scratch,
@@ -469,9 +435,11 @@ __kernel void k_means_color(__global __read_only float* color_errors,
   }
 
   // Advance error table pointer to our color.
-  color_errors += image_width * color_id;
+  color_errors += image_width * image_height * color_id;
   // Sum up error for our color for each class of pixel.
-  for (uint i = 0; i < image_width; ++i)
+  // TODO: consider breaking up work for multiple threads per color, at the
+  // expense of more storage for a first reduction stage which sums.
+  for (uint i = 0; i < image_width * image_height; ++i)
     error_scratch[scratch_index + classes[i]] += color_errors[i];
 
   // Now we reduce to find min error color for each class.
@@ -827,9 +795,6 @@ std::string CLProgram::GetProgramName(Programs program) {
 
     case kFitPlayfield:
       return "fit_playfield";
-
-    case kHistogramClasses:
-      return "histogram_classes";
 
     case kInverseFFTNormalize:
       return "inverse_fft_normalize";

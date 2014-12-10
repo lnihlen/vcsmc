@@ -29,101 +29,6 @@
 #include "video_frame_data.h"
 #include "video_frame_data_parser.h"
 
-// Using the |color_errors| consisting of downsampled errors from each pixel to
-// each possible atari color, populates provided buffers |color_values| with
-// |num_colus| uint32s of indices into the Atari color table for each color
-// class, a minimum-error color class for each pixel in |color_classes|, and a
-// count of the frequency of each color class in |counts|.
-void BuildPalette(vcsmc::CLCommandQueue* queue,
-                  vcsmc::CLBuffer* color_errors,
-                  uint32 num_colus,
-                  vcsmc::CLBuffer* color_values,
-                  vcsmc::CLBuffer* color_classes,
-                  vcsmc::CLBuffer* counts) {
-  vcsmc::Random random;
-  std::unique_ptr<uint32[]> colors_uint32(new uint32[num_colus]);
-  // Generate random initial colors for each of the classes.
-  for (uint32 i = 0; i < num_colus; ++i)
-    colors_uint32[i] = random.next() % vcsmc::kNTSCColors;
-
-  std::unique_ptr<vcsmc::CLBuffer> colors_buffer(
-      vcsmc::CLDeviceContext::MakeBuffer(sizeof(uint32) * num_colus));
-  colors_buffer->EnqueueCopyToDevice(queue, colors_uint32.get());
-  std::unique_ptr<vcsmc::CLBuffer> classes_buffer(
-      vcsmc::CLDeviceContext::MakeBuffer(
-          sizeof(uint32) * vcsmc::kFrameWidthPixels));
-
-  // Since we run k-means on the GPU it is difficult to estimate how many
-  // iterations we should run it until the total error becomes stable. We
-  // therefore run it in batches, copying the error sums for each iteration
-  // within the batch back from the GPU until encounter a stable error value.
-  const uint32 kBatchIterations = 4;
-  std::unique_ptr<float[]> fit_errors(new float[kBatchIterations]);
-  std::unique_ptr<vcsmc::CLBuffer> fit_errors_buffer(
-      vcsmc::CLDeviceContext::MakeBuffer(sizeof(float) * kBatchIterations));
-
-  const uint32 kMaxIterations = 64;
-  uint32 total_iterations = 0;
-  bool stable = false;
-  uint32 image_width = vcsmc::kFrameWidthPixels;
-  uint32 scratch_size = sizeof(uint32) * vcsmc::kNTSCColors * num_colus;
-
-  while (!stable && total_iterations < kMaxIterations) {
-    std::vector<std::unique_ptr<vcsmc::CLKernel>> kernels;
-    kernels.reserve(kBatchIterations * 2);
-    for (uint32 i = 0; i < kBatchIterations; ++i) {
-      std::unique_ptr<vcsmc::CLKernel> classify(
-          vcsmc::CLDeviceContext::MakeKernel(
-              vcsmc::CLProgram::Programs::kKMeansClassify));
-      classify->SetBufferArgument(0, color_errors);
-      classify->SetBufferArgument(1, color_values);
-      classify->SetByteArgument(2, sizeof(uint32), &num_colus);
-      classify->SetBufferArgument(3, color_classes);
-      classify->Enqueue(queue, vcsmc::kFrameWidthPixels);
-      kernels.push_back(std::move(classify));
-
-      std::unique_ptr<vcsmc::CLKernel> color(vcsmc::CLDeviceContext::MakeKernel(
-          vcsmc::CLProgram::Programs::kKMeansColor));
-      color->SetBufferArgument(0, color_errors);
-      color->SetBufferArgument(1, color_classes);
-      color->SetByteArgument(2, sizeof(uint32), &image_width);
-      color->SetByteArgument(3, sizeof(uint32), &num_colus);
-      color->SetByteArgument(4, sizeof(uint32), &i);
-      color->SetByteArgument(5, scratch_size, nullptr);
-      color->SetByteArgument(6, scratch_size, nullptr);
-      color->SetBufferArgument(7, fit_errors_buffer.get());
-      color->SetBufferArgument(8, color_values);
-      color->Enqueue(queue, vcsmc::kNTSCColors);
-      kernels.push_back(std::move(color));
-    }
-
-    fit_errors_buffer->EnqueueCopyFromDevice(queue, fit_errors.get());
-    queue->Finish();
-
-    // Check for stable error values within a batch.
-    float last_error = fit_errors[0];
-    for (uint32 i = 1; i < kBatchIterations; ++i) {
-      ++total_iterations;
-      if (fit_errors[i] == last_error) {
-        stable = true;
-        break;
-      }
-      last_error = fit_errors[i];
-    }
-  }
-
-  // Compute histogram of final classes on GPU.
-  std::unique_ptr<vcsmc::CLKernel> histo_kernel(
-      vcsmc::CLDeviceContext::MakeKernel(
-          vcsmc::CLProgram::Programs::kHistogramClasses));
-  histo_kernel->SetBufferArgument(0, color_classes);
-  histo_kernel->SetByteArgument(1, sizeof(uint32), &num_colus);
-  histo_kernel->SetByteArgument(2,
-      sizeof(uint32) * vcsmc::kFrameWidthPixels * num_colus, nullptr);
-  histo_kernel->SetBufferArgument(3, counts);
-  histo_kernel->Enqueue(queue, vcsmc::kFrameWidthPixels);
-}
-
 std::unique_ptr<vcsmc::CLKernel> EnqueuePlayerFit(
     vcsmc::CLCommandQueue* queue,
     vcsmc::CLBuffer* color_errors,
@@ -139,9 +44,11 @@ std::unique_ptr<vcsmc::CLKernel> EnqueuePlayerFit(
   fit_kernel->SetByteArgument(2, sizeof(uint32), &pixel_mask);
   uint32 image_width = vcsmc::kFrameWidthPixels;
   fit_kernel->SetByteArgument(3, sizeof(uint32), &image_width);
-  fit_kernel->SetByteArgument(4, sizeof(float) * vcsmc::kNTSCColors, nullptr);
-  fit_kernel->SetByteArgument(5, sizeof(uint32) * vcsmc::kNTSCColors, nullptr);
-  fit_kernel->SetBufferArgument(6, player_color_buffer);
+  uint32 image_height = vcsmc::kFrameHeightPixels;
+  fit_kernel->SetByteArgument(4, sizeof(uint32), &image_height);
+  fit_kernel->SetByteArgument(5, sizeof(float) * vcsmc::kNTSCColors, nullptr);
+  fit_kernel->SetByteArgument(6, sizeof(uint32) * vcsmc::kNTSCColors, nullptr);
+  fit_kernel->SetBufferArgument(7, player_color_buffer);
   fit_kernel->Enqueue(queue, vcsmc::kNTSCColors);
 
   player_color_buffer->EnqueueCopyFromDevice(queue, player_color);
@@ -193,8 +100,49 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
   lab_kernel->SetBufferArgument(1, image_lab.get());
   lab_kernel->Enqueue2D(queue.get(), image_width, vcsmc::kFrameHeightPixels);
 
-  // While Lab conversion is cooking on the GPU load saliency map and perform
-  // player fitting.
+  // We compute error distance from each Atari color to every pixel in the
+  // input image at full image width, then downsample the error buffers to the
+  // output size. We therefore need one buffer to hold the intermediate full
+  // sized distance results, and kNTSCColors buffers to hold the downsampled
+  // results.
+  std::unique_ptr<vcsmc::CLBuffer> full_width_errors(
+      vcsmc::CLDeviceContext::MakeBuffer(
+          sizeof(float) * image_width * vcsmc::kFrameHeightPixels));
+  std::unique_ptr<vcsmc::CLBuffer> color_errors(
+      vcsmc::CLDeviceContext::MakeBuffer(
+          sizeof(float) *
+          vcsmc::kFrameWidthPixels *
+          vcsmc::kFrameHeightPixels *
+          vcsmc::kNTSCColors));
+  std::vector<std::unique_ptr<vcsmc::CLKernel>> kernels;
+  for (uint32 i = 0; i < vcsmc::kNTSCColors; ++i) {
+    // Compute error distances for the ith color.
+    std::unique_ptr<vcsmc::CLKernel> ciede_kernel(
+        vcsmc::CLDeviceContext::MakeKernel(vcsmc::CLProgram::kCiede2k));
+    ciede_kernel->SetBufferArgument(0, image_lab.get());
+    ciede_kernel->SetByteArgument(1, sizeof(uint32) * 4,
+        &(vcsmc::kAtariNTSCLabColorTable[i * 4]));
+    ciede_kernel->SetBufferArgument(2, full_width_errors.get());
+    ciede_kernel->Enqueue2D(
+        queue.get(), image_width, vcsmc::kFrameHeightPixels);
+    kernels.push_back(std::move(ciede_kernel));
+
+    // Downsample errors to Atari image width.
+    std::unique_ptr<vcsmc::CLKernel> downsample_kernel(
+        vcsmc::CLDeviceContext::MakeKernel(
+            vcsmc::CLProgram::kDownsampleErrors));
+    downsample_kernel->SetBufferArgument(0, full_width_errors.get());
+    downsample_kernel->SetByteArgument(1, sizeof(uint32), &image_width);
+    uint32 output_offset =
+        i * vcsmc::kFrameHeightPixels * vcsmc::kFrameWidthPixels;
+    downsample_kernel->SetByteArgument(2, sizeof(uint32), &output_offset);
+    downsample_kernel->SetBufferArgument(3, color_errors.get());
+    downsample_kernel->Enqueue2D(queue.get(), vcsmc::kFrameWidthPixels,
+        vcsmc::kFrameHeightPixels);
+  }
+
+  // While distance calculation is cooking on the GPU load saliency map and
+  // perform player fitting.
   snprintf(file_name_buffer.get(), kMaxFilenameLength,
       input_saliency_map_path_spec.c_str(), frame->frame_number());
   std::unique_ptr<vcsmc::BitMap> saliency_map(
@@ -213,114 +161,144 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
   vcsmc::PlayerFitter player_1;
   player_1.FindOptimumPath(saliency_map.get(), true);
 
-  snprintf(file_name_buffer.get(), kMaxFilenameLength,
-      "coverage/p0-%02d.png", frame->frame_number());
-  p0_coverage->Save(file_name_buffer.get());
-  snprintf(file_name_buffer.get(), kMaxFilenameLength,
-      "coverage/p1-%02d.png", frame->frame_number());
-  std::unique_ptr<vcsmc::BitMap> p1_coverage = player_1.MakeCoverageMap();
-  p1_coverage->Save(file_name_buffer.get());
-
   std::vector<vcsmc::Spec> specs;
   player_0.AppendSpecs(&specs, false);
   player_1.AppendSpecs(&specs, true);
 
-  uint32 pixel_start =
+  // Fit image to 2 colors, one for the background and one for the playfield.
+  uint32 color_values[2];
+  vcsmc::Random random;
+  // Generate random initial colors for each of the classes.
+  color_values[0] = random.next() % vcsmc::kNTSCColors;
+  color_values[1] = random.next() % vcsmc::kNTSCColors;
+  std::unique_ptr<vcsmc::CLBuffer> color_values_buffer(
+      vcsmc::CLDeviceContext::MakeBuffer(sizeof(uint32) * 2));
+  color_values_buffer->EnqueueCopyToDevice(queue.get(), color_values);
+
+  // Since we run k-means on the GPU it is difficult to estimate how many
+  // iterations we should run it until the total error becomes stable. We
+  // therefore run it in batches, copying the error sums for each iteration
+  // within the batch back from the GPU until encounter a stable error value.
+  const uint32 kBatchIterations = 8;
+  float fit_errors[kBatchIterations];
+  std::unique_ptr<vcsmc::CLBuffer> fit_errors_buffer(
+      vcsmc::CLDeviceContext::MakeBuffer(sizeof(float) * kBatchIterations));
+  std::unique_ptr<vcsmc::CLBuffer> color_classes_buffer(
+      vcsmc::CLDeviceContext::MakeBuffer(sizeof(uint32) *
+          vcsmc::kFrameWidthPixels * vcsmc::kFrameHeightPixels));
+  std::unique_ptr<uint32[]> color_classes(
+      new uint32[vcsmc::kFrameWidthPixels * vcsmc::kFrameHeightPixels]);
+  const uint32 kMaxIterations = 64;
+  uint32 total_iterations = 0;
+  bool stable = false;
+  uint32 num_colus = 2;
+  uint32 frame_width = vcsmc::kFrameWidthPixels;
+  uint32 frame_height = vcsmc::kFrameHeightPixels;
+  uint32 scratch_size = sizeof(uint32) * vcsmc::kNTSCColors * 2;
+
+  while (!stable && total_iterations < kMaxIterations) {
+    for (uint32 i = 0; i < kBatchIterations; ++i) {
+      std::unique_ptr<vcsmc::CLKernel> classify(
+          vcsmc::CLDeviceContext::MakeKernel(
+              vcsmc::CLProgram::Programs::kKMeansClassify));
+      classify->SetBufferArgument(0, color_errors.get());
+      classify->SetBufferArgument(1, color_values_buffer.get());
+      classify->SetByteArgument(2, sizeof(uint32), &num_colus);
+      classify->SetBufferArgument(3, color_classes_buffer.get());
+      classify->Enqueue2D(queue.get(),
+          vcsmc::kFrameWidthPixels, vcsmc::kFrameHeightPixels);
+      kernels.push_back(std::move(classify));
+
+      std::unique_ptr<vcsmc::CLKernel> color(vcsmc::CLDeviceContext::MakeKernel(
+          vcsmc::CLProgram::Programs::kKMeansColor));
+      color->SetBufferArgument(0, color_errors.get());
+      color->SetBufferArgument(1, color_classes_buffer.get());
+      color->SetByteArgument(2, sizeof(uint32), &frame_width);
+      color->SetByteArgument(3, sizeof(uint32), &frame_height);
+      color->SetByteArgument(4, sizeof(uint32), &num_colus);
+      color->SetByteArgument(5, sizeof(uint32), &i);
+      color->SetByteArgument(6, scratch_size, nullptr);
+      color->SetByteArgument(7, scratch_size, nullptr);
+      color->SetBufferArgument(8, fit_errors_buffer.get());
+      color->SetBufferArgument(9, color_values_buffer.get());
+      color->Enqueue(queue.get(), vcsmc::kNTSCColors);
+      kernels.push_back(std::move(color));
+    }
+
+    fit_errors_buffer->EnqueueCopyFromDevice(queue.get(), fit_errors);
+    // Optimistically copy back results as well.
+    color_values_buffer->EnqueueCopyFromDevice(queue.get(), color_values);
+    color_classes_buffer->EnqueueCopyFromDevice(queue.get(),
+        color_classes.get());
+    queue->Finish();
+
+    // Check for stable error values within a batch.
+    float last_error = fit_errors[0];
+    for (uint32 i = 1; i < kBatchIterations; ++i) {
+      ++total_iterations;
+      if (fit_errors[i] == last_error) {
+        stable = true;
+        break;
+      }
+      last_error = fit_errors[i];
+    }
+  }
+
+  // Histogram classes on CPU.
+  uint32 color_counts[2] = { 0, 0 };
+  for (uint32 i = 0;
+      i < vcsmc::kFrameWidthPixels * vcsmc::kFrameHeightPixels; ++i) {
+    assert(color_classes[i] == 0 || color_classes[i] == 1);
+    ++color_counts[color_classes[i]];
+  }
+
+  uint32 max_color_index = color_counts[0] > color_counts[1] ? 0 : 1;
+
+  // Issue background spec for the most numerous color, covering entire frame
+  // of pixels, and playfield color for the second most frequent.
+  uint32 colubk = color_values[max_color_index];
+  uint32 colupf = color_values[1 - max_color_index];
+  vcsmc::Range entire_frame(
       ((vcsmc::kVSyncScanLines + vcsmc::kVBlankScanLines) *
-          vcsmc::kScanLineWidthClocks) + vcsmc::kHBlankWidthClocks;
+          vcsmc::kScanLineWidthClocks) + vcsmc::kHBlankWidthClocks,
+      ((vcsmc::kVSyncScanLines + vcsmc::kVBlankScanLines +
+            vcsmc::kFrameHeightPixels) *
+          vcsmc::kScanLineWidthClocks) + 1);
+  specs.push_back(vcsmc::Spec(vcsmc::TIA::COLUBK, (uint8)colubk * 2,
+      entire_frame));
+  specs.push_back(vcsmc::Spec(vcsmc::TIA::COLUPF, (uint8)colupf * 2,
+      entire_frame));
+  // Always asymmetric playfield for now.
+  specs.push_back(vcsmc::Spec(vcsmc::TIA::CTRLPF, 0, entire_frame));
 
-  // Drop image buffer to free up resources on heap and on GPU.
-  queue->Finish();
-  image.reset();
-
-  // Upload Atari colors in Lab format for error distance calculations.
-  std::unique_ptr<vcsmc::CLBuffer> atari_lab_colors(
-      vcsmc::CLDeviceContext::MakeBuffer(
-        sizeof(float) * 4 * vcsmc::kNTSCColors));
-  atari_lab_colors->EnqueueCopyToDevice(queue.get(),
-      vcsmc::kAtariNTSCLabColorTable);
-
-  // Reusable buffers for intermediate and final results.
-  std::unique_ptr<vcsmc::CLBuffer> full_width_errors(
-      vcsmc::CLDeviceContext::MakeBuffer(
-          sizeof(float) * image_width * vcsmc::kNTSCColors));
-  std::unique_ptr<vcsmc::CLBuffer> color_errors(
-      vcsmc::CLDeviceContext::MakeBuffer(
-          sizeof(float) * vcsmc::kFrameWidthPixels * vcsmc::kNTSCColors));
-  std::unique_ptr<uint32[]> playfield(new uint32[vcsmc::kFrameWidthPixels / 4]);
+  // Now we have the two colors in question, issue the playfield fitting shader.
+  std::unique_ptr<uint32[]> playfield(
+      new uint32[vcsmc::kFrameHeightPixels * (vcsmc::kFrameWidthPixels / 4)]);
   std::unique_ptr<vcsmc::CLBuffer> playfield_buffer(
-      vcsmc::CLDeviceContext::MakeBuffer(
-          sizeof(uint32) * vcsmc::kFrameWidthPixels / 4));
+      vcsmc::CLDeviceContext::MakeBuffer(sizeof(uint32) *
+          vcsmc::kFrameHeightPixels * (vcsmc::kFrameWidthPixels / 4)));
+  std::unique_ptr<vcsmc::CLKernel> pf_fit(vcsmc::CLDeviceContext::MakeKernel(
+      vcsmc::CLProgram::Programs::kFitPlayfield));
+  pf_fit->SetBufferArgument(0, color_errors.get());
+  pf_fit->SetByteArgument(1, sizeof(uint32), &colubk);
+  pf_fit->SetByteArgument(2, sizeof(uint32), &colupf);
+  pf_fit->SetBufferArgument(3, playfield_buffer.get());
+  pf_fit->Enqueue2D(queue.get(), vcsmc::kFrameWidthPixels / 4,
+      vcsmc::kFrameHeightPixels);
+  playfield_buffer->EnqueueCopyFromDevice(queue.get(), playfield.get());
+
+  queue->Finish();
+
   std::unique_ptr<vcsmc::CLBuffer> colup0_buffer(
       vcsmc::CLDeviceContext::MakeBuffer(sizeof(uint32)));
   std::unique_ptr<vcsmc::CLBuffer> colup1_buffer(
       vcsmc::CLDeviceContext::MakeBuffer(sizeof(uint32)));
-  std::unique_ptr<vcsmc::CLBuffer> color_values_buffer(
-      vcsmc::CLDeviceContext::MakeBuffer(sizeof(uint32) * 2));
-  std::unique_ptr<vcsmc::CLBuffer> color_classes_buffer(
-      vcsmc::CLDeviceContext::MakeBuffer(
-          sizeof(uint32) * vcsmc::kFrameWidthPixels));
-  std::unique_ptr<vcsmc::CLBuffer> color_counts_buffer(
-      vcsmc::CLDeviceContext::MakeBuffer(sizeof(uint32) * 2));
-  uint32 color_counts[2];
-  uint32 color_values[2];
-
+  uint32 pixel_start =
+      ((vcsmc::kVSyncScanLines + vcsmc::kVBlankScanLines) *
+          vcsmc::kScanLineWidthClocks) + vcsmc::kHBlankWidthClocks;
+  uint32* pf_row = playfield.get();
+  uint32 row_pixel = 0;
   for (uint32 i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
-    // Compute error distances for the ith row of the image.
-    std::unique_ptr<vcsmc::CLKernel> ciede_kernel(
-        vcsmc::CLDeviceContext::MakeKernel(vcsmc::CLProgram::kCiede2k));
-    ciede_kernel->SetBufferArgument(0, image_lab.get());
-    ciede_kernel->SetBufferArgument(1, atari_lab_colors.get());
-    ciede_kernel->SetBufferArgument(2, full_width_errors.get());
-    size_t ciede_sizes[2] = { image_width, vcsmc::kNTSCColors };
-    size_t ciede_offsets[2] = { i * image_width, 0 };
-    ciede_kernel->EnqueueWithOffset(queue.get(), 2, ciede_sizes, ciede_offsets);
-
-    // Downsample errors to Atari image width.
-    std::unique_ptr<vcsmc::CLKernel> downsample_kernel(
-        vcsmc::CLDeviceContext::MakeKernel(
-            vcsmc::CLProgram::kDownsampleErrors));
-    downsample_kernel->SetBufferArgument(0, full_width_errors.get());
-    downsample_kernel->SetByteArgument(1, sizeof(uint32), &image_width);
-    downsample_kernel->SetBufferArgument(2, color_errors.get());
-    downsample_kernel->Enqueue2D(queue.get(), vcsmc::kFrameWidthPixels,
-        vcsmc::kNTSCColors);
-
-    // Fit line to 2 colors, one for the background and to the playfield.
-    BuildPalette(queue.get(),
-                 color_errors.get(),
-                 2,
-                 color_values_buffer.get(),
-                 color_classes_buffer.get(),
-                 color_counts_buffer.get());
-    color_counts_buffer->EnqueueCopyFromDevice(queue.get(), color_counts);
-    color_values_buffer->EnqueueCopyFromDevice(queue.get(), color_values);
-    queue->Finish();
-
-    // We use the most frequent color as the background, in the hopes that this
-    // will help to keep some of the playfield patterns stable from line to line
-    // allowing us to reuse those pf values.
-    uint32 max_color_index = color_counts[0] > color_counts[1] ? 0 : 1;
-
-    // Issue background spec for the most numerous color, covering entire line
-    // of pixels, and playfield color for the second most frequent.
-    uint32 colubk = color_values[max_color_index];
-    uint32 colupf = color_values[1 - max_color_index];
-    specs.push_back(vcsmc::Spec(vcsmc::TIA::COLUBK, (uint8)colubk * 2,
-        vcsmc::Range(pixel_start, pixel_start + vcsmc::kFrameWidthPixels)));
-    specs.push_back(vcsmc::Spec(vcsmc::TIA::COLUPF, (uint8)colupf * 2,
-        vcsmc::Range(pixel_start, pixel_start + vcsmc::kFrameWidthPixels)));
-
-    // Issue playfield fitting and player fitting shaders.
-    std::unique_ptr<vcsmc::CLKernel> pf_fit(vcsmc::CLDeviceContext::MakeKernel(
-        vcsmc::CLProgram::Programs::kFitPlayfield));
-    pf_fit->SetBufferArgument(0, color_errors.get());
-    pf_fit->SetByteArgument(1, sizeof(uint32), &colubk);
-    pf_fit->SetByteArgument(2, sizeof(uint32), &colupf);
-    pf_fit->SetBufferArgument(3, playfield_buffer.get());
-    pf_fit->Enqueue(queue.get(), vcsmc::kFrameWidthPixels / 4);
-    playfield_buffer->EnqueueCopyFromDevice(queue.get(), playfield.get());
-
     // Calculate minimum error color for the pixels in the player bitmask, and
     // set a spec for it, if they are drawn.
     uint32 colup0 = 0;
@@ -328,7 +306,7 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
     if (!player_0.IsLineEmpty(i)) {
       fit_p0 = EnqueuePlayerFit(queue.get(),
                                 color_errors.get(),
-                                player_0.row_offset(i),
+                                row_pixel + player_0.row_offset(i),
                                 (uint32)player_0.row_mask(i),
                                 colup0_buffer.get(),
                                 &colup0);
@@ -339,19 +317,17 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
     if (!player_1.IsLineEmpty(i)) {
       fit_p1 = EnqueuePlayerFit(queue.get(),
                                 color_errors.get(),
-                                player_1.row_offset(i),
+                                row_pixel + player_1.row_offset(i),
                                 (uint32)player_1.row_mask(i),
                                 colup1_buffer.get(),
                                 &colup1);
     }
 
-    queue->Finish();
-
     // PF0 D4 through D7 left to right.
     uint8 pf0 = 0;
     for (uint32 j = 0; j < 4; ++j) {
       pf0 = pf0 >> 1;
-      if (playfield[j])
+      if (pf_row[j])
         pf0 = pf0 | 0x80;
     }
     specs.push_back(vcsmc::Spec(vcsmc::TIA::PF0, pf0,
@@ -361,7 +337,7 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
     uint8 pf1 = 0;
     for (uint32 j = 4; j < 12; ++j) {
       pf1 = pf1 << 1;
-      if (playfield[j])
+      if (pf_row[j])
         pf1 = pf1 | 0x01;
     }
     specs.push_back(vcsmc::Spec(vcsmc::TIA::PF1, pf1,
@@ -371,7 +347,7 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
     uint8 pf2 = 0;
     for (uint32 j = 12; j < 20; ++j) {
       pf2 = pf2 >> 1;
-      if (playfield[j])
+      if (pf_row[j])
         pf2 = pf2 | 0x80;
     }
     specs.push_back(vcsmc::Spec(vcsmc::TIA::PF2, pf2,
@@ -381,7 +357,7 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
     pf0 = 0;
     for (uint32 j = 20; j < 24; ++j) {
       pf0 = pf0 >> 1;
-      if (playfield[j])
+      if (pf_row[j])
         pf0 = pf0 | 0x80;
     }
     specs.push_back(vcsmc::Spec(vcsmc::TIA::PF0, pf0,
@@ -391,7 +367,7 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
     pf1 = 0;
     for (uint32 j = 24; j < 32; ++j) {
       pf1 = pf1 << 1;
-      if (playfield[j])
+      if (pf_row[j])
         pf1 = pf1 | 0x01;
     }
     specs.push_back(vcsmc::Spec(vcsmc::TIA::PF1, pf1,
@@ -401,15 +377,13 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
     pf2 = 0;
     for (uint32 j = 32; j < 40; ++j) {
       pf2 = pf2 >> 1;
-      if (playfield[j])
+      if (pf_row[j])
         pf2 = pf2 | 0x80;
     }
     specs.push_back(vcsmc::Spec(vcsmc::TIA::PF2, pf2,
         vcsmc::Range(pixel_start + 128, pixel_start + 160)));
 
-    // Always asymmetric playfield for now.
-    specs.push_back(vcsmc::Spec(vcsmc::TIA::CTRLPF, 0,
-        vcsmc::Range(pixel_start, pixel_start + vcsmc::kFrameWidthPixels)));
+    queue->Finish();
 
     // Issue specs for player color, if needed.
     if (!player_0.IsLineEmpty(i)) {
@@ -425,6 +399,8 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
     }
 
     pixel_start += vcsmc::kScanLineWidthClocks;
+    pf_row += vcsmc::kFrameWidthPixels / 4;
+    row_pixel += vcsmc::kFrameWidthPixels;
   }
 
   // All player and playfield specs are now in place. Save to a file and return.

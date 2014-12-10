@@ -54,7 +54,6 @@ TEST_OBJ=$(OUTTESTS)/adjacency_map_unittests.o                                 \
          $(OUTTESTS)/ciede2k_unittests.o                                       \
          $(OUTTESTS)/downsample_errors_unittests.o                             \
          $(OUTTESTS)/fft_radix_2_unittests.o                                   \
-         $(OUTTESTS)/histogram_classes_unittests.o                             \
          $(OUTTESTS)/inverse_fft_norm_unittests.o                              \
          $(OUTTESTS)/k_means_unittests.o                                       \
          $(OUTTESTS)/range_unittests.o                                         \
