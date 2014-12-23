@@ -14,7 +14,6 @@
 #include "cl_include.h"
 #include "cl_kernel_impl.h"
 #include "cl_program.h"
-#include "image.h"
 
 namespace vcsmc {
 
@@ -52,8 +51,9 @@ std::unique_ptr<CLCommandQueue> CLDeviceContext::MakeCommandQueue() {
 }
 
 // static
-std::unique_ptr<CLImage> CLDeviceContext::MakeImage(const Image* image) {
-  return instance_->DoMakeImage(image);
+std::unique_ptr<CLImage> CLDeviceContext::MakeImage(uint32 width,
+    uint32 height) {
+  return instance_->DoMakeImage(width, height);
 }
 
 // static
@@ -145,8 +145,9 @@ std::unique_ptr<CLCommandQueue> CLDeviceContext::DoMakeCommandQueue() {
   return std::unique_ptr<CLCommandQueue>(cimpl.release());
 }
 
-std::unique_ptr<CLImage> CLDeviceContext::DoMakeImage(const Image* image) {
-  std::unique_ptr<CLImageImpl> image_impl(new CLImageImpl(image));
+std::unique_ptr<CLImage> CLDeviceContext::DoMakeImage(
+    uint32 width, uint32 height) {
+  std::unique_ptr<CLImageImpl> image_impl(new CLImageImpl(width, height));
   if (!image_impl->Setup(impl_->context))
     return std::unique_ptr<CLImage>();
 

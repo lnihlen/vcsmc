@@ -8,8 +8,8 @@ class Image;
 
 class CLImage {
  public:
-  virtual bool EnqueueCopyToDevice(CLCommandQueue* queue) = 0;
-
+  virtual bool EnqueueCopyToDevice(CLCommandQueue* queue, Image* image) = 0;
+  virtual bool EnqueueCopyFromDevice(CLCommandQueue* queue, Image* image) = 0;
   virtual ~CLImage() {}
 };
 

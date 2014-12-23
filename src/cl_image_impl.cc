@@ -1,16 +1,17 @@
 #include "cl_image_impl.h"
 
+#include <cassert>
+
 #include "cl_command_queue_impl.h"
 #include "cl_include.h"
 #include "image.h"
 
 namespace vcsmc {
 
-CLImageImpl::CLImageImpl(const Image* image)
+CLImageImpl::CLImageImpl(uint32 width, uint32 height)
     : mem_(0),
-      width_(image->width()),
-      height_(image->height()),
-      pixels_(image->pixels()) {
+      width_(width),
+      height_(height) {
 }
 
 CLImageImpl::~CLImageImpl() {
@@ -46,7 +47,7 @@ bool CLImageImpl::Setup(cl_context context) {
   image_desc.buffer = NULL;
 
   mem_ = clCreateImage(context,
-                       CL_MEM_READ_ONLY,
+                       CL_MEM_READ_WRITE,
                        &image_format,
                        &image_desc,
                        NULL,
@@ -56,7 +57,9 @@ bool CLImageImpl::Setup(cl_context context) {
   return mem_ && result == CL_SUCCESS;
 }
 
-bool CLImageImpl::EnqueueCopyToDevice(CLCommandQueue* queue) {
+bool CLImageImpl::EnqueueCopyToDevice(CLCommandQueue* queue, Image* image) {
+  assert(image->width() == width_);
+  assert(image->height() == height_);
   CLCommandQueueImpl* command_queue = static_cast<CLCommandQueueImpl*>(queue);
   size_t origin[3] = { 0, 0, 0 };
   size_t region[3] = { width_, height_, 1 };
@@ -67,10 +70,30 @@ bool CLImageImpl::EnqueueCopyToDevice(CLCommandQueue* queue) {
                                    region,
                                    width_ * 4,
                                    1,
-                                   pixels_,
+                                   image->pixels(),
                                    0,
                                    NULL,
                                    NULL);
+  return result == CL_SUCCESS;
+}
+
+bool CLImageImpl::EnqueueCopyFromDevice(CLCommandQueue* queue, Image* image) {
+  assert(image->width() == width_);
+  assert(image->height() == height_);
+  CLCommandQueueImpl* command_queue = static_cast<CLCommandQueueImpl*>(queue);
+  size_t origin[3] = { 0, 0, 0 };
+  size_t region[3] = { width_, height_, 1 };
+  int result = clEnqueueReadImage(command_queue->get(),
+                                  mem_,
+                                  false,
+                                  origin,
+                                  region,
+                                  width_ * 4,
+                                  1,
+                                  image->pixels_writeable(),
+                                  0,
+                                  NULL,
+                                  NULL);
   return result == CL_SUCCESS;
 }
 

@@ -56,6 +56,7 @@ TEST_OBJ=$(OUTTESTS)/adjacency_map_unittests.o                                 \
          $(OUTTESTS)/fft_radix_2_unittests.o                                   \
          $(OUTTESTS)/inverse_fft_norm_unittests.o                              \
          $(OUTTESTS)/k_means_unittests.o                                       \
+         $(OUTTESTS)/lab_to_rgb_unittests.o                                    \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
          $(OUTTESTS)/state_unittests.o                                         \

@@ -11,12 +11,15 @@ class Image;
 
 class CLImageImpl : public CLImage {
  public:
-  CLImageImpl(const Image* image);
+  CLImageImpl(uint32 width, uint32 height);
   virtual ~CLImageImpl();
 
   bool Setup(cl_context context);
 
-  virtual bool EnqueueCopyToDevice(CLCommandQueue* queue) override;
+  virtual bool EnqueueCopyToDevice(CLCommandQueue* queue, Image* image)
+      override;
+  virtual bool EnqueueCopyFromDevice(CLCommandQueue* queue, Image* image)
+      override;
 
   const cl_mem get() const { return mem_; }
 
@@ -24,8 +27,6 @@ class CLImageImpl : public CLImage {
   cl_mem mem_;
   uint32 width_;
   uint32 height_;
-  // non-owning pointer!
-  const uint32* pixels_;
 };
 
 }  // namespace vcsmc

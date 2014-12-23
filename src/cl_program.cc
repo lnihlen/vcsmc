@@ -35,13 +35,14 @@ std::string CLProgram::GetProgramString(Programs program) {
 // |reference_lab_in|, and stores the distance at the corresponding output
 // float in |delta_e_out|.
 __kernel void ciede2k(__global __read_only float4* pixel_lab_in,
-                      __read_only float4 reference_lab_in,
+                      __global __read_only float4* reference_lab_in,
                       __global __write_only float* delta_e_out) {
-  int col = get_global_id(0);
-  int row = get_global_id(1);
-  int pixel_id = (row * get_global_size(0)) + col;
+  int pixel_id = get_global_id(0);
+  int lab_id = get_global_id(1);
+  int col = pixel_id - get_global_offset(0);
+  int width = get_global_size(0);
   float4 lab_1 = pixel_lab_in[pixel_id];
-  float4 lab_2 = reference_lab_in;
+  float4 lab_2 = reference_lab_in[lab_id];
 
   // Calculate C_1, h_1, and C_2, h_2.
   float C_star_1 = length(lab_1.yz);
@@ -80,7 +81,7 @@ __kernel void ciede2k(__global __read_only float4* pixel_lab_in,
   float del_H = 2.0f * sqrt(C_product) *
                 sin((del_h * (M_PI_F / 180.0f)) / 2.0f);
 
-  // Calculate CIEDE2000 Color-Difference Delta E00:
+  // Calculate CIEDE2000 Color-Difference Delta E:
   float L_mean = (lab_1.x + lab_2.x) / 2.0f;
   float C_mean = (C_1 + C_2) / 2.0f;
   float h_sum = h_1 + h_2;
@@ -111,10 +112,11 @@ __kernel void ciede2k(__global __read_only float4* pixel_lab_in,
   float S_C = 1.0f + 0.045f * C_mean;
   float S_H = 1.0f + 0.015f * C_mean * T;
   float R_T = -1.0f * sin(2.0f * del_theta * (M_PI_F / 180.0f)) * R_c;
-  delta_e_out[pixel_id] = sqrt(pow(del_L / S_L, 2.0f) +
-                               pow(del_C / S_C, 2.0f) +
-                               pow(del_H / S_H, 2.0f) +
-                               R_T * (del_C / S_C) * (del_H / S_H));
+  int output_id = (width * lab_id) + col;
+  delta_e_out[output_id] = sqrt(pow(del_L / S_L, 2.0f) +
+                                pow(del_C / S_C, 2.0f) +
+                                pow(del_H / S_H, 2.0f) +
+                                R_T * (del_C / S_C) * (del_H / S_H));
 }
       );  // end of kCiede2K
 
@@ -158,6 +160,49 @@ __kernel void convolve(__global __read_only float* input,
   output[center_offset] = accum;
 }
       );  // end of kConvolve
+
+//
+// kDownsampleColors ==========================================================
+//
+
+    case kDownsampleColors:
+      return CL_PROGRAM(
+__kernel void downsample_colors(__global __read_only float4* input_colors,
+                                __read_only int input_width,
+                                __global __write_only float4* output_colors) {
+  int output_col = get_global_id(0);
+  int output_row = get_global_id(1);
+  int output_width = get_global_size(0);
+  int input_row_offset = output_row * input_width;
+  float start_pixel = ((float)output_col * (float)input_width) /
+      (float)output_width;
+  float end_pixel = (((float)output_col + 1.0f) * (float)input_width) /
+      (float)output_width;
+  float first_whole_pixel = ceil(start_pixel);
+  int first_whole_pixel_int = (int)first_whole_pixel + input_row_offset;
+  float last_fractional_pixel = floor(end_pixel);
+  int last_fractional_pixel_int = (int)last_fractional_pixel + input_row_offset;
+  float4 color_sum = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+
+  // Calculate whole pixel error
+  for (int i = first_whole_pixel_int; i < last_fractional_pixel_int; ++i)
+    color_sum += input_colors[i];
+
+  // Include left-side fractional error
+  color_sum += input_colors[(int)floor(start_pixel) + input_row_offset] *
+      (first_whole_pixel - start_pixel);
+
+  // Right-side fractional error. It's possible that due to roundoff error the
+  // last_fractional_pixel may equal output_width, if so we ignore.
+  if (last_fractional_pixel_int - input_row_offset < input_width) {
+    color_sum += input_colors[last_fractional_pixel_int] *
+        (end_pixel - last_fractional_pixel);
+  }
+
+  int output_pixel = (output_row * output_width) + output_col;
+  output_colors[output_pixel] = color_sum / (end_pixel - start_pixel);
+}
+      );  // end of kDownsampleColors
 
 //
 // kDownsampleErrors ==========================================================
@@ -474,6 +519,50 @@ __kernel void k_means_color(__global __read_only float* color_errors,
   }
 }
       );  // end of kKMeansColor
+
+//
+// kLabToRGB ==================================================================
+//
+
+    case kLabToRGB:
+      return CL_PROGRAM(
+__kernel void lab_to_rgb(__global __read_only float4* input,
+                         __write_only image2d_t output_image) {
+  int col = get_global_id(0);
+  int row = get_global_id(1);
+  int width = get_global_size(0);
+  float3 Lab = input[(row * width) + col].xyz;
+
+  // Convert Lab to XYZ
+  float f_y = (Lab.x + 16.0f) / 116.0f;
+  float f_z = f_y - (Lab.z / 200.0f);
+  float f_x = (Lab.y / 500.0f) + f_y;
+  float3 f = (float3)(f_x, f_y, f_z);
+  float3 f_above = pown(f, (int3)(3, 3, 3));
+  float3 f_below = ((116.0f * f) - 16.0f) / 903.3f;
+  int3 below = islessequal(f_above, 0.008856f);
+  float3 xyzr = select(f_above, f_below, below);
+  // Xr=0.95047, Yr=1.0, Zr=1.08883, D65 reference white
+  float3 xyz = xyzr * (float3)(0.95047f, 1.0f, 1.08883f);
+
+  // Convert XYZ to RGB
+  // |r|   | 3.2404542 -1.5371385 -0.4985314|   |X|
+  // |g| = |-0.9692660  1.8760108  0.0415560| * |Y|
+  // |b|   | 0.0556434 -0.2040259  1.0572252|   |Z|
+  float3 col_0 = xyz.xxx * (float3)( 3.2404542f, -0.9692660f,  0.0556434f);
+  float3 col_1 = xyz.yyy * (float3)(-1.5371385f,  1.8760108f, -0.2040259f);
+  float3 col_2 = xyz.zzz * (float3)(-0.4985314f,  0.0415560f,  1.0572252f);
+  float3 rgb = col_0 + col_1 + col_2;
+
+  float3 v_below = rgb * 12.92f;
+  float3 v_above = (1.055f * pow(rgb, 1.0f / 2.4f)) - 0.055f;
+  below = islessequal(rgb, 0.0031308f);
+  float3 rgb_norm = select(v_above, v_below, below);
+
+  write_imagef(output_image, (int2)(col, row), (float4)(rgb_norm.xyz, 1.0f));
+}
+      );  // end of kLabToRGB
+
 //
 // kMakeBitmap ================================================================
 //
@@ -535,6 +624,79 @@ __kernel void mean(__global __read_only float* in,
       );  // end of kMean
 
 //
+// kMeanShift =================================================================
+//
+
+    case kMeanShift:
+      return CL_PROGRAM(
+// An implementation of the Mean Shift Filter for image segmentation. Input is
+// in Lab or Luv space and work dimensions should match image size. Uses the
+// Epanechnikov kernel and provided spatial and range bandwidth values.
+// Reference is:
+// D. Comaniciu, P. Meer, “Mean shift: A robust approach toward feature space
+// analysis”, IEEE Trans. on Pattern Analysis and Machine Intelligence, 2002,
+// 24, pp. 603-619
+__kernel void mean_shift(__global __read_only float4* in,
+                         __read_only int spatial_bandwidth,
+                         __read_only int range_bandwidth,
+                         __global __read_only float4* out) {
+  int col = get_global_id(0);
+  int row = get_global_id(1);
+  int width = get_global_size(0);
+  int height = get_global_size(1);
+  int offset = (row * width) + col;
+  float3 in_color = in[offset].xyz;
+  float2 in_pos = (float2)((float)col, (float)row);
+  float h = (float)range_bandwidth;
+
+  float3 top = 0.0f;
+  float bottom = 0.0f;
+  int left_edge = max(0, col - spatial_bandwidth);
+  int right_edge = min(col + spatial_bandwidth, width);
+  int top_edge = max(0, row - spatial_bandwidth);
+  int bottom_edge = min(row + spatial_bandwidth, height);
+  for (int i = top_edge; i < bottom_edge; ++i) {
+    for (int j = left_edge; j < right_edge; ++j) {
+      float3 ji_color = in[(i * width) + j].xyz;
+      float3 diff_color =  ji_color - in_color;
+      float2 diff_pos = (float2)((float)j, (float)i) - in_pos;
+      float x = sqrt(dot(diff_color, diff_color) + dot(diff_pos, diff_pos)) / h;
+      float k = x <= 1.0f ? 0.75f * (1.0f - (x * x)) : 0.0f;
+      top += k * ji_color;
+      bottom += k;
+    }
+  }
+
+  float3 result = top / bottom;
+  out[offset] = (float4)(result.xyz, 1.0f);
+}
+      );  // end of kMeanShift
+
+//
+// kMinErrorColor =============================================================
+//
+
+    case kMinErrorColor:
+      return CL_PROGRAM(
+__kernel void min_error_color(__global __read_only float* color_errors,
+                              __read_only uint num_colors,
+                              __global __write_only uint* min_error_color) {
+  uint col = get_global_id(0);
+  uint width = get_global_size(0);
+  uint current_min_color = 0;
+  float current_min_error = color_errors[col];
+  for (uint i = 1; i < num_colors; ++i) {
+    float current_error = color_errors[(i * width) + col];
+    if (current_error < current_min_error) {
+      current_min_error = current_error;
+      current_min_color = i;
+    }
+  }
+  min_error_color[col] = current_min_color;
+}
+      );  // end of kMinErrorColor
+
+//
 // kPackComplexToReal =========================================================
 //
 
@@ -584,6 +746,7 @@ __kernel void rgb_to_lab(__read_only image2d_t input_image,
   int3 below = islessequal(rgb_in, 0.04045f);
   float3 rgb_norm = select(v_above, v_below, below);
 
+  // sRGB, D65
   // |X|   |0.4124564  0.3575761  0.1804375|   |R|
   // |Y| = |0.2126729  0.7151522  0.0721750| * |G|
   // |Z|   |0.0193339  0.1191920  0.9503041|   |B|
@@ -741,7 +904,7 @@ __kernel void standard_deviation(__global __read_only float* in,
 // zero-padded power-of-two size for FFT, with real values and zero imaginary
 // values interleaved. Should be run with global size of the maximum number of
 // threads the OpenCL API says it can do in a single work group.
-__kernel void unpack_real_to_complex(__global __read_only float* in_real,
+__kernel void unpack_real_to_complex(__global __read_only float4* in_real,
                                      __read_only int input_width,
                                      __read_only int input_height,
                                      __read_only int output_width,
@@ -757,7 +920,7 @@ __kernel void unpack_real_to_complex(__global __read_only float* in_real,
     if (output_row < input_height) {
       if (output_col < input_width) {
         int input_index = (output_row * input_width) + output_col;
-        out_cplx[output_index] = (float2)(in_real[input_index], 0.0f);
+        out_cplx[output_index] = (float2)(in_real[input_index].x, 0.0f);
       } else {
         out_cplx[output_index] = (float2)(0.0f, 0.0f);
       }
@@ -784,6 +947,9 @@ std::string CLProgram::GetProgramName(Programs program) {
     case kConvolve:
       return "convolve";
 
+    case kDownsampleColors:
+      return "downsample_colors";
+
     case kDownsampleErrors:
       return "downsample_errors";
 
@@ -805,11 +971,20 @@ std::string CLProgram::GetProgramName(Programs program) {
     case kKMeansColor:
       return "k_means_color";
 
+    case kLabToRGB:
+      return "lab_to_rgb";
+
     case kMakeBitmap:
       return "make_bitmap";
 
     case kMean:
       return "mean";
+
+    case kMeanShift:
+      return "mean_shift";
+
+    case kMinErrorColor:
+      return "min_error_color";
 
     case kPackComplexToReal:
       return "pack_complex_to_real";

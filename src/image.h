@@ -8,7 +8,6 @@
 namespace vcsmc {
 
 class CLCommandQueue;
-class CLImage;
 class ColuStrip;
 
 // Defines a field of uint32 ABGR colors, has a width and height, etc. On
@@ -21,8 +20,6 @@ class Image {
   Image(uint32 width, uint32 height);
   ~Image();
 
-  bool CopyToDevice(CLCommandQueue* queue);
-
   const uint32 width() const { return width_; }
   const uint32 height() const { return height_; }
   const uint32* pixels() const { return pixels_.get(); }
@@ -30,13 +27,11 @@ class Image {
   const uint32 pixel(uint32 x, uint32 y) const {
     return pixels_[(y * width_) + x];
   }
-  const CLImage* cl_image() const { return cl_image_.get(); }
 
  protected:
   const uint32 width_;
   const uint32 height_;
   std::unique_ptr<uint32[]> pixels_;
-  std::unique_ptr<CLImage> cl_image_;
 
  private:
   // Private default ctor means "don't call me."

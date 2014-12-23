@@ -1294,3 +1294,108 @@ is done in one call.
 
 refactor K means to run on the GPU
 
+===============================================================================
+
+mean shift bg color fitting.
+let's say 8 transitions per scan line, assuming each one takes 5 cpu cycles
+for load/store. Can parameterize, perhaps crank up to 10 later.
+
+* first rgb->lab, then run mean shift on image.
+* for a given scanline:
+  * compute distance from each atari color to each pixel
+  * downsample errors to frame width - q: CIEDE2k distances are nonlinear, but
+    Lab is supposed to be a roughly linear perceptual color space. Perhaps
+    better to downsample image in Lab space first?
+  * in any event, at the end we have an array of width x 128 colors of error
+    distances, copy back from GPU. Might also be good to compute minimum error
+    color at each pixel position and return that as well.
+
+  * dynamic programming fitting:
+  * error array is width * T transitions, coord x,y in error array means total
+    error of switching at that pixel x for the yth transition. coord x,y in
+    color array means minimum error color switched to at that pixel for
+    transition.
+
+  * to fill arrays: find minimum error color for pixel 0, store error in error
+    array at 0,0 and store color value in color array at 0,0. Then for each
+    pixel left in line add error distance, store cumulative total in i,0 error
+    array and store same color in i,0 color array.
+    for next line: there is some minimum distance D between transitions, so the
+    first D pixels can have infinite error or same error and color as line
+    above. On D,1 the error value is the error from D-1,0 plus the error from
+    the minium-error color at that pixel
+
+* reset:
+
+alright, x pixels by y transitions. Error array at x,y is total error for
+approximating _the rest of the line_ with the color stored at color array x,y.
+
+useful input could be minimum-error color for each pixel if using that color
+to approximate rest of line, as well as what that error might be.
+
+* and again:
+
+error array i,j has cumulative error for starting jth color transition at pixel
+i, and color array i,j has the minimum-error color for starting at that pixel.
+
+for first row of pixels at each position compute minimum error color to model
+all previous pixels and that pixel as a given color and store minimum error and
+color.
+
+for subsequent rows j the assumption is that we will transition to a new color
+at that pixel, instead of rendering that pixel (i) at the color in the row
+above. Therefore the cumulative error is going to be the error at the i-1th
+pixel on the j-1th row plus minimum color error to model this ith pixel and
+the next K pixels. K is the minimum number of pixels we can remain on a color
+before a transition, probably 9 since we cannot STA COLUBK any faster than 3
+clock cycles. Or maybe 15 for the load/store pair, will decide later. Cumulative
+error is just the cost of modeling that single pixel as that new color plus
+the prior error at transition.
+
+
+8 pixels of black (B) followed by 7 pixels of white (W), followed by 5 px of B:
+B B B B B B B B W W W W W W W B B B B B
+distances:
+  B W
+B 0 2
+W 2 0
+
+error matrix and color matrix, line-by-line:
+0 0 0 0 0 0 0 0 2 4 6 8 a c e e e e e e
+B B B B B B B B B B B B B B B B B B B B
+
+0 0 0 0 0 0 0 0 0 2 4 6 8 a c e e e e e
+B B B B B B B B W W W W W W W B B B B B
+
+0 0 0 0 0 0 0 0 0 0 2 4 6 8 a c c c c c
+B B B B B B B B W W W W W W W B B B B B
+
+ah, we need a prior line transition point! like some documentation about what
+choice we made on the prior line that lead to this optimal error situation.
+the choice must be to our left, and a minimum of the transition pixel away to
+our left.
+
+ok, so at each subsequent position in the transition matrix we look at the
+previous row for a minimum error and color, in the tie breakers we choose
+?? minima. We then store that position in yet a third matrix, the prior
+matrix p[i, j]. Cumulative error matrix has the sum of modeling previous
+row as the required color + modeling that pixel as the new color.
+
+  B W
+B 1 2
+W 2 1
+
+error matrix, prior matrix (after first row) and color matrix:
+
+   B  B  B  B  B  B  B  B  W  W  W  W  W  W  W  B  B  B  B  B
+
+e: 1  2  3  4  5  6  7  8 10 12 14 16 18 20 22 23 24 25 26 27
+c: B  B  B  B  B  B  B  B  B  B  B  B  B  B  B  B  B  B  B  B
+p:  <-- first row, undefined
+
+e: 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+c: B  B  B  B  B  B  B  B  W  W  W  W  W  W  W
+p: 0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+naw fuck it. Find minimum color error for each pixel, coalesce into adjacent
+values, then issue specs for each line.
