@@ -65,8 +65,11 @@ class State {
 
   //====== Simulation and Scheduling
 
-   // Fill pixels in |image| for all time values within |range_|
+   // Fill pixels in |image| for all time values within |range_|.
   void PaintInto(Image* image) const;
+
+  // Fill bytes in |colus| with _half_ atari color values within |range_|.
+  void ColorInto(uint8* colus) const;
 
   // Returns a color clock value that is the earliest time after which this spec
   // could be added. Returns 0 if it occurs before this State. If this State
@@ -108,6 +111,7 @@ class State {
   State(const State& state);
   void SetTIA(TIA address, uint8 value);
 
+  uint8 ColuForClock(uint32 clock) const;
   bool PlayfieldPaints(uint32 local_clock) const;
   bool PlayerPaints(uint32 global_clock, bool is_player_one) const;
 

@@ -678,18 +678,19 @@ __kernel void mean_shift(__global __read_only float4* in,
 
     case kMinErrorColor:
       return CL_PROGRAM(
-__kernel void min_error_color(__global __read_only float* color_errors,
-                              __read_only uint num_colors,
-                              __global __write_only uint* min_error_color) {
+__kernel void min_error_color(
+    __global __read_only float* color_errors,
+    __read_only uint num_colors,
+    __global __write_only unsigned char* min_error_color) {
   uint col = get_global_id(0);
   uint width = get_global_size(0);
-  uint current_min_color = 0;
+  unsigned char current_min_color = 0;
   float current_min_error = color_errors[col];
   for (uint i = 1; i < num_colors; ++i) {
     float current_error = color_errors[(i * width) + col];
     if (current_error < current_min_error) {
       current_min_error = current_error;
-      current_min_color = i;
+      current_min_color = (unsigned char)i;
     }
   }
   min_error_color[col] = current_min_color;

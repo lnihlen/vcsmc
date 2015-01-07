@@ -1397,5 +1397,7 @@ e: 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
 c: B  B  B  B  B  B  B  B  W  W  W  W  W  W  W
 p: 0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
 
-naw fuck it. Find minimum color error for each pixel, coalesce into adjacent
-values, then issue specs for each line.
+Find minimum color error for each pixel, coalesce into adjacent values, then
+issue specs for each line.
+
+===============================================================================

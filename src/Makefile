@@ -32,7 +32,9 @@ OBJ=$(OUT)/adjacency_map.o                                                     \
     $(OUT)/cl_kernel_impl.o                                                    \
     $(OUT)/cl_program.o                                                        \
     $(OUT)/color.o                                                             \
+    $(OUT)/color_distances_table.o                                             \
     $(OUT)/color_table.o                                                       \
+    $(OUT)/frame_fitter.o                                                      \
     $(OUT)/gray_map.o                                                          \
     $(OUT)/image.o                                                             \
     $(OUT)/image_file.o                                                        \
@@ -61,7 +63,7 @@ TEST_OBJ=$(OUTTESTS)/adjacency_map_unittests.o                                 \
          $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
          $(OUTTESTS)/state_unittests.o                                         \
 
-all: $(OUT)/picc $(OUT)/asm $(OUT)/exty $(OUT)/smap $(OUT)/sim tests
+all: $(OUT)/picc $(OUT)/asm $(OUT)/exty $(OUT)/smap $(OUT)/sim $(OUT)/bed tests
 
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -82,6 +84,9 @@ $(OUT)/smap: $(OBJ) $(OUT)/smap.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/sim: $(OBJ) $(OUT)/sim.o
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/bed: $(OBJ) $(OUT)/bed.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/

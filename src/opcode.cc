@@ -16,6 +16,10 @@ std::unique_ptr<State> LoadImmediate::Transform(State* state) const {
       cycles() * kColorClocksPerCPUCycle, register_, value_);
 }
 
+std::unique_ptr<OpCode> LoadImmediate::Clone() const {
+  return std::unique_ptr<OpCode>(new LoadImmediate(value_, register_));
+}
+
 uint32 LoadImmediate::cycles() const { return kLoadImmediateCPUCycles; }
 
 uint32 LoadImmediate::bytes() const { return 2u; }
@@ -63,6 +67,10 @@ std::unique_ptr<State> StoreZeroPage::Transform(State* state) const {
       cycles() * kColorClocksPerCPUCycle, register_, address_);
 }
 
+std::unique_ptr<OpCode> StoreZeroPage::Clone() const {
+  return std::unique_ptr<OpCode>(new StoreZeroPage(address_, register_));
+}
+
 uint32 StoreZeroPage::cycles() const { return kStoreZeroPageCPUCycles; }
 
 uint32 StoreZeroPage::bytes() const { return 2u; }
@@ -99,6 +107,10 @@ uint32 StoreZeroPage::bytecode(uint8* output) const {
 
 std::unique_ptr<State> NOP::Transform(State* state) const {
   return state->AdvanceTime(cycles() * kColorClocksPerCPUCycle);
+}
+
+std::unique_ptr<OpCode> NOP::Clone() const {
+  return std::unique_ptr<OpCode>(new NOP());
 }
 
 uint32 NOP::cycles() const { return kNoOpCPUCycles; }

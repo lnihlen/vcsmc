@@ -19,9 +19,9 @@
 #include "cl_kernel.h"
 #include "cl_program.h"
 #include "color_table.h"
+#include "frame_fitter.h"
 #include "image.h"
 #include "image_file.h"
-#include "player_fitter.h"
 #include "random.h"
 #include "range.h"
 #include "spec.h"
@@ -33,23 +33,23 @@
 // directory from the current working directory.
 #define SAVE_MEAN_SHIFT 0
 
-std::unique_ptr<uint32[]> FitColors(const char* image_file_name) {
+std::unique_ptr<uint8[]> FitColors(const char* image_file_name) {
   std::unique_ptr<vcsmc::Image> image =
       vcsmc::ImageFile::Load(image_file_name);
   if (!image) {
     fprintf(stderr, "error opening image file %s\n", image_file_name);
-    return false;
+    return nullptr;
   }
 
   if (image->height() != vcsmc::kFrameHeightPixels) {
     fprintf(stderr, "unsupported height %d for image file %s\n",
         image->height(), image_file_name);
-    return false;
+    return nullptr;
   }
 
   uint32 image_width = image->width();
   if (image->height() != vcsmc::kFrameHeightPixels)
-    return false;
+    return nullptr;
 
   // Transfer image to card for conversion to Lab color.
   std::unique_ptr<vcsmc::CLCommandQueue> queue(
@@ -59,7 +59,7 @@ std::unique_ptr<uint32[]> FitColors(const char* image_file_name) {
           image_width, vcsmc::kFrameHeightPixels));
   if (!image_buffer->EnqueueCopyToDevice(queue.get(), image.get())) {
     fprintf(stderr, "error transferring image to OpenCL device.\n");
-    return false;
+    return nullptr;
   }
 
   // Use Mean Shift to segment the image into blobs of color. We then fit
@@ -140,10 +140,9 @@ std::unique_ptr<uint32[]> FitColors(const char* image_file_name) {
       vcsmc::CLDeviceContext::MakeBuffer(
           sizeof(float) * vcsmc::kFrameWidthPixels * vcsmc::kNTSCColors));
   std::unique_ptr<vcsmc::CLBuffer> colors_buffer(
-      vcsmc::CLDeviceContext::MakeBuffer(
-          sizeof(uint32) * vcsmc::kFrameWidthPixels));
-  std::unique_ptr<uint32[]> colors(
-      new uint32[vcsmc::kFrameWidthPixels * vcsmc::kFrameHeightPixels]);
+      vcsmc::CLDeviceContext::MakeBuffer(vcsmc::kFrameWidthPixels));
+  std::unique_ptr<uint8[]> colors(
+      new uint8[vcsmc::kFrameWidthPixels * vcsmc::kFrameHeightPixels]);
   for (uint32 i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
     // Compute error distances for the ith color.
     std::unique_ptr<vcsmc::CLKernel> ciede_kernel(
@@ -182,46 +181,27 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
   snprintf(file_name_buffer.get(), kMaxFilenameLength,
       input_image_path_spec.c_str(), frame->frame_number());
 
-  std::unique_ptr<uint32[]> colors = FitColors(file_name_buffer.get());
+  std::unique_ptr<uint8[]> colors = FitColors(file_name_buffer.get());
+  vcsmc::FrameFitter fit;
+  float error = fit.Fit(colors.get());
+  printf("fit frame %llu with %f error.\n", frame->frame_number(), error);
 
-  std::vector<vcsmc::Spec> specs;
-  // Issue background spec for the most numerous color, covering entire frame
-  // of pixels, and playfield color for the second most frequent.
-  vcsmc::Range entire_frame(
-      ((vcsmc::kVSyncScanLines + vcsmc::kVBlankScanLines) *
-          vcsmc::kScanLineWidthClocks) + vcsmc::kHBlankWidthClocks,
-      ((vcsmc::kVSyncScanLines + vcsmc::kVBlankScanLines +
-            vcsmc::kFrameHeightPixels) *
-          vcsmc::kScanLineWidthClocks) + 1);
-  specs.push_back(vcsmc::Spec(vcsmc::TIA::COLUPF, 0, entire_frame));
-  specs.push_back(vcsmc::Spec(vcsmc::TIA::CTRLPF, 0, entire_frame));
-  specs.push_back(vcsmc::Spec(vcsmc::TIA::PF0, 0, entire_frame));
-  specs.push_back(vcsmc::Spec(vcsmc::TIA::PF1, 0, entire_frame));
-  specs.push_back(vcsmc::Spec(vcsmc::TIA::PF2, 0, entire_frame));
-
-  // TODO: consider refactoring player fitting to render color fields smaller
-  // than 9 pixels wide
-  specs.push_back(vcsmc::Spec(vcsmc::TIA::GRP0, 0, entire_frame));
-  specs.push_back(vcsmc::Spec(vcsmc::TIA::GRP1, 0, entire_frame));
-
-  // All specs are now in place. Save to a file and return.
-  uint32 spec_buffer_size = 10 * specs.size();
-  std::unique_ptr<uint8[]> spec_buffer(new uint8[spec_buffer_size]);
-  uint8* buffer_ptr = spec_buffer.get();
-  for (uint32 i = 0; i < specs.size(); ++i)
-    buffer_ptr += specs[i].Serialize(buffer_ptr);
   snprintf(file_name_buffer.get(), kMaxFilenameLength, output_path_spec.c_str(),
       frame->frame_number());
-  int spec_fd = open(file_name_buffer.get(), O_WRONLY | O_CREAT | O_TRUNC,
+  std::unique_ptr<vcsmc::Image> sim = fit.SimulateToImage();
+  vcsmc::ImageFile::Save(sim.get(), file_name_buffer.get());
+/*
+  int bin_fd = open(file_name_buffer.get(), O_WRONLY | O_CREAT | O_TRUNC,
       S_IRUSR | S_IWUSR);
-  if (spec_fd < 0) {
-    fprintf(stderr, "error opening output spec file %s\n",
+  if (bin_fd < 0) {
+    fprintf(stderr, "error opening output bin file %s\n",
         file_name_buffer.get());
     return false;
   }
-  write(spec_fd, spec_buffer.get(), spec_buffer_size);
-  close(spec_fd);
 
+  write(bin_fd, spec_buffer.get(), spec_buffer_size);
+  close(bin_fd);
+*/
   return true;
 }
 
@@ -232,7 +212,7 @@ int main(int argc, char* argv[]) {
         "picc usage:\n"
         "  picc <frame_data.csv> <input_image_file_spec> <output_file_spec>\n"
         "picc example:\n"
-        "  picc frame_data.csv frames/frame-%%05d.png specs/frame-%%05d.spec\n"
+        "  picc frame_data.csv frames/frame-%%05d.png specs/frame-%%05d.bin\n"
         );
     return -1;
   }
@@ -244,8 +224,7 @@ int main(int argc, char* argv[]) {
   }
 
   std::string input_image_path_spec(argv[2]);
-  std::string input_saliency_map_path_spec(argv[3]);
-  std::string output_path_spec(argv[4]);
+  std::string output_path_spec(argv[3]);
 
   if (!vcsmc::CLDeviceContext::Setup()) {
     fprintf(stderr, "OpenCL setup failed!\n");
@@ -253,15 +232,21 @@ int main(int argc, char* argv[]) {
   }
 
   std::unique_ptr<vcsmc::VideoFrameDataParser::Frames> frames;
+
+  frames = parser.GetNextFrameSet();
+  vcsmc::VideoFrameData* frame = frames->at(0).get();
+  FitFrame(frame, input_image_path_spec, output_path_spec);
+
+/*
   while (nullptr != (frames = parser.GetNextFrameSet())) {
     for (uint32 i = 0; i < frames->size(); ++i) {
       vcsmc::VideoFrameData* frame = frames->at(i).get();
-      if (!FitFrame(frame, input_image_path_spec, input_saliency_map_path_spec,
-          output_path_spec)) {
+      if (!FitFrame(frame, input_image_path_spec, output_path_spec)) {
         return -1;
       }
     }
   }
+*/
 
   vcsmc::CLDeviceContext::Teardown();
   return 0;

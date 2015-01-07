@@ -18,9 +18,12 @@ namespace op {
 // Abstract base class for simple polymorphism.
 class OpCode {
  public:
+  virtual ~OpCode() {}
   // Given input State, apply this OpCode to it and return the resultant output
   // state.
   virtual std::unique_ptr<State> Transform(State* state) const = 0;
+
+  virtual std::unique_ptr<OpCode> Clone() const = 0;
 
   // Returns the number of CPU cycles this opcode takes.
   virtual uint32 cycles() const = 0;
@@ -39,7 +42,9 @@ class OpCode {
 class LoadImmediate : public OpCode {
  public:
   LoadImmediate(uint8 value, Register reg);
+  virtual ~LoadImmediate() {}
   virtual std::unique_ptr<State> Transform(State* state) const override;
+  virtual std::unique_ptr<OpCode> Clone() const override;
   virtual uint32 cycles() const override;
   virtual uint32 bytes() const override;
   virtual const std::string assembler() const override;
@@ -71,7 +76,9 @@ class LDY : public LoadImmediate {
 class StoreZeroPage : public OpCode {
  public:
   StoreZeroPage(TIA address, Register reg);
+  virtual ~StoreZeroPage() {}
   virtual std::unique_ptr<State> Transform(State* state) const override;
+  virtual std::unique_ptr<OpCode> Clone() const override;
   virtual uint32 cycles() const override;
   virtual uint32 bytes() const override;
   virtual const std::string assembler() const override;
@@ -103,7 +110,9 @@ class STY : public StoreZeroPage {
 class NOP : public OpCode {
  public:
   NOP() {}
+  virtual ~NOP() {}
   virtual std::unique_ptr<State> Transform(State* state) const override;
+  virtual std::unique_ptr<OpCode> Clone() const override;
   virtual uint32 cycles() const override;
   virtual uint32 bytes() const override;
   virtual const std::string assembler() const override;

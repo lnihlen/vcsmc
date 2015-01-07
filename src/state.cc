@@ -106,6 +106,10 @@ std::unique_ptr<State> State::AdvanceTimeAndSetRegister(
 
 std::unique_ptr<State> State::AdvanceTimeAndCopyRegisterToTIA(
     uint32 delta, Register axy, TIA address) {
+  if (address == TIA::WSYNC) {
+    delta = (((range_.start_time() / kScanLineWidthClocks) + 1) *
+        kScanLineWidthClocks) - range_.start_time();
+  }
   std::unique_ptr<State> state(AdvanceTime(delta));
   uint8 reg_value = state->reg(axy);
   state->SetTIA(address, reg_value);
@@ -146,24 +150,31 @@ void State::PaintInto(Image* image) const {
     uint32 clock = i % kScanLineWidthClocks;
     if (clock < kHBlankWidthClocks)
       continue;
-    uint8 colu = tia(TIA::COLUBK);
-    if (PlayerPaints(i, false)) {
-      colu = tia(TIA::COLUP0);
-    } else if (PlayerPaints(i, true)) {
-      colu = tia(TIA::COLUP1);
-    } else if (PlayfieldPaints(clock)) {
-      // If D1 of CTRLPF is set the playfield paints with COLUP0 on the left
-      // side and COLUP1 on the right side.
-      if (tia(TIA::CTRLPF) & 0x02) {
-        colu = clock < kPFMidline ? tia(TIA::COLUP0) : tia(TIA::COLUP1);
-      } else {
-        colu = tia(TIA::COLUPF);
-      }
-    }
+    uint8 colu = ColuForClock(clock);
     uint32 x = clock - kHBlankWidthClocks;
     uint32 y = (i / kScanLineWidthClocks) - kVSyncScanLines - kVBlankScanLines;
     *(image->pixels_writeable() + (y * kFrameWidthPixels) + x) =
         Color::AtariColorToABGR(colu);
+  }
+}
+
+void State::ColorInto(uint8* colus) const {
+  // Cull any states outside of the range of painting scan lines.
+  Range paint_range = Range::IntersectRanges(Range(
+      (kVSyncScanLines + kVBlankScanLines) * kScanLineWidthClocks,
+      (kVSyncScanLines + kVBlankScanLines + kFrameHeightPixels)
+          * kScanLineWidthClocks), range_);
+  if (paint_range.IsEmpty())
+    return;
+
+  for (uint32 i = paint_range.start_time(); i < paint_range.end_time(); ++i) {
+    uint32 clock = i % kScanLineWidthClocks;
+    if (clock < kHBlankWidthClocks)
+      continue;
+    uint8 colu = ColuForClock(clock) / 2;
+    uint32 x = clock - kHBlankWidthClocks;
+    uint32 y = (i / kScanLineWidthClocks) - kVSyncScanLines - kVBlankScanLines;
+    *(colus + (y * kFrameWidthPixels) + x) = colu;
   }
 }
 
@@ -345,6 +356,25 @@ void State::SetTIA(TIA address, uint8 value) {
       tia_[address] = value;
       break;
   }
+}
+
+uint8 State::ColuForClock(uint32 clock) const {
+  uint8 colu = tia(TIA::COLUBK);
+  uint32 local_clock = clock % kScanLineWidthClocks;
+  if (PlayerPaints(clock, false)) {
+    colu = tia(TIA::COLUP0);
+  } else if (PlayerPaints(clock, true)) {
+    colu = tia(TIA::COLUP1);
+  } else if (PlayfieldPaints(local_clock)) {
+    // If D1 of CTRLPF is set the playfield paints with COLUP0 on the left
+    // side and COLUP1 on the right side.
+    if (tia(TIA::CTRLPF) & 0x02) {
+      colu = clock < kPFMidline ? tia(TIA::COLUP0) : tia(TIA::COLUP1);
+    } else {
+      colu = tia(TIA::COLUPF);
+    }
+  }
+  return colu;
 }
 
 bool State::PlayfieldPaints(uint32 local_clock) const {
