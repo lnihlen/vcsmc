@@ -190,6 +190,11 @@ bool FitFrame(const vcsmc::VideoFrameData* frame,
       frame->frame_number());
   std::unique_ptr<vcsmc::Image> sim = fit.SimulateToImage();
   vcsmc::ImageFile::Save(sim.get(), file_name_buffer.get());
+
+  snprintf(file_name_buffer.get(), kMaxFilenameLength, "bin/frame-%llu.bin",
+      frame->frame_number());
+  fit.SaveBinary(file_name_buffer.get());
+
 /*
   int bin_fd = open(file_name_buffer.get(), O_WRONLY | O_CREAT | O_TRUNC,
       S_IRUSR | S_IWUSR);

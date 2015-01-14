@@ -25,7 +25,7 @@ Random::Random() : index_(0) {
 
 // See http://www.lomont.org/Math/Papers/2008/Lomont_PRNG_2008.pdf
 //
-uint32 Random::next() {
+uint32 Random::Next() {
   uint32 a, b, c, d;
   a = state_[index_];
   c = state_[(index_ + 13) & 15];
@@ -38,6 +38,11 @@ uint32 Random::next() {
   a = state_[index_];
   state_[index_] = a ^ b ^ d ^ (a << 2) ^ (b << 18) ^ (c << 28);
   return state_[index_];
+}
+
+float Random::NextFloat() {
+  uint32 n = Next();
+  return (float)n / (float)(0xffffffff);
 }
 
 }  // namespace vcsmc

@@ -38,6 +38,8 @@ OBJ=$(OUT)/adjacency_map.o                                                     \
     $(OUT)/gray_map.o                                                          \
     $(OUT)/image.o                                                             \
     $(OUT)/image_file.o                                                        \
+    $(OUT)/line_fitter.o                                                       \
+    $(OUT)/line_kernel.o                                                       \
     $(OUT)/opcode.o                                                            \
     $(OUT)/player_fitter.o                                                     \
     $(OUT)/random.o                                                            \
@@ -47,7 +49,7 @@ OBJ=$(OUT)/adjacency_map.o                                                     \
     $(OUT)/state.o                                                             \
     $(OUT)/value_map.o                                                         \
     $(OUT)/video_frame_data.o                                                  \
-    $(OUT)/video_frame_data_parser.o
+    $(OUT)/video_frame_data_parser.o                                           \
 
 TEST_OBJ=$(OUTTESTS)/adjacency_map_unittests.o                                 \
          $(OUTTESTS)/assembler_unittests.o                                     \

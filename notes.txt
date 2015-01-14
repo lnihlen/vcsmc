@@ -1401,3 +1401,29 @@ Find minimum color error for each pixel, coalesce into adjacent values, then
 issue specs for each line.
 
 ===============================================================================
+
+The problem with dp is that there's no optimal substructure. Perhaps it's time
+to consider the Evolutionary Programming approach.
+
+Evaluate each scanline in turn, starting with the one right before pixel output.
+At each scanline evaluate that one and the next one. Score is total error
+distance between that scanline and the next one and the ideal image.
+
+First check - if we do nothing for the entire line is the error 0? If so just
+issue a STA WSYNC and move on with life :).
+
+Build histogram of color values used in that scanline and next. Program is 14
+load/store combinations. Load values are chosen based on store address type.
+e.g. if it's a color then we do a weighted probability choice of color based
+on histogram of colors. If it's PF0 we only choose from values within lower
+nybble. Etc. If it's a strobe it's a coin toss, to see if the load or the store
+comes first.
+
+===============================================================================
+
+Streaming Cart Layout
+
+4K cart. First K contains jump instruction to jump to second cart, streaming
+binary code already loaded there. middle 2K used for streaming, each one issues
+jump to other section, which should already be loaded, and hw in background
+loads over the old K. Binary looks like a typical 4K ROM. JMPs take 3 cycles.

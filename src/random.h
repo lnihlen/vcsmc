@@ -15,7 +15,11 @@ class Random {
   Random();
 
   // Returns the next random number in the sequence.
-  uint32 next();
+  uint32 Next();
+
+  // Returns floating point number uniformly distributed between [0..1].
+  float NextFloat();
+
   // Returns pointer to 16 uint32s
   const uint32* state() const { return state_; }
 

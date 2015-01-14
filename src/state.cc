@@ -61,10 +61,6 @@ State::State(const uint8* tia_values)
 
 std::unique_ptr<State> State::Clone() const {
   std::unique_ptr<State> state(new State(*this));
-  state->p0_clock_ = p0_clock_;
-  state->p0_bit_ = p0_bit_;
-  state->p1_clock_ = p1_clock_;
-  state->p1_bit_ = p1_bit_;
   return state;
 }
 
@@ -150,7 +146,7 @@ void State::PaintInto(Image* image) const {
     uint32 clock = i % kScanLineWidthClocks;
     if (clock < kHBlankWidthClocks)
       continue;
-    uint8 colu = ColuForClock(clock);
+    uint8 colu = ColuForClock(i);
     uint32 x = clock - kHBlankWidthClocks;
     uint32 y = (i / kScanLineWidthClocks) - kVSyncScanLines - kVBlankScanLines;
     *(image->pixels_writeable() + (y * kFrameWidthPixels) + x) =
@@ -158,12 +154,13 @@ void State::PaintInto(Image* image) const {
   }
 }
 
-void State::ColorInto(uint8* colus) const {
-  // Cull any states outside of the range of painting scan lines.
-  Range paint_range = Range::IntersectRanges(Range(
+void State::ColorInto(uint8* colus, const Range& range) const {
+  // Cull any states outside of the range provided.
+  Range paint_range = Range::IntersectRanges(range, range_);
+  paint_range = Range::IntersectRanges(paint_range, Range(
       (kVSyncScanLines + kVBlankScanLines) * kScanLineWidthClocks,
       (kVSyncScanLines + kVBlankScanLines + kFrameHeightPixels)
-          * kScanLineWidthClocks), range_);
+          * kScanLineWidthClocks));
   if (paint_range.IsEmpty())
     return;
 
@@ -171,7 +168,7 @@ void State::ColorInto(uint8* colus) const {
     uint32 clock = i % kScanLineWidthClocks;
     if (clock < kHBlankWidthClocks)
       continue;
-    uint8 colu = ColuForClock(clock) / 2;
+    uint8 colu = ColuForClock(i) / 2;
     uint32 x = clock - kHBlankWidthClocks;
     uint32 y = (i / kScanLineWidthClocks) - kVSyncScanLines - kVBlankScanLines;
     *(colus + (y * kFrameWidthPixels) + x) = colu;
@@ -324,6 +321,10 @@ State::State(const State& state) {
   tia_known_ = state.tia_known_;
   registers_known_ = state.registers_known_;
   range_ = state.range_;
+  p0_clock_ = state.p0_clock_;
+  p0_bit_ = state.p0_bit_;
+  p1_clock_ = state.p1_clock_;
+  p1_bit_ = state.p1_bit_;
 }
 
 void State::SetTIA(TIA address, uint8 value) {

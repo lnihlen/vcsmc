@@ -68,8 +68,8 @@ class State {
    // Fill pixels in |image| for all time values within |range_|.
   void PaintInto(Image* image) const;
 
-  // Fill bytes in |colus| with _half_ atari color values within |range_|.
-  void ColorInto(uint8* colus) const;
+  // Fill bytes in |colus| with _half_ atari color values within |range|.
+  void ColorInto(uint8* colus, const Range& range) const;
 
   // Returns a color clock value that is the earliest time after which this spec
   // could be added. Returns 0 if it occurs before this State. If this State
@@ -108,7 +108,7 @@ class State {
   const Range& range() const { return range_; }
 
  private:
-  State(const State& state);
+  State(const State& s);
   void SetTIA(TIA address, uint8 value);
 
   uint8 ColuForClock(uint32 clock) const;
