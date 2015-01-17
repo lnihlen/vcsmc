@@ -42,6 +42,7 @@ class Assembler {
   // Really only here because the other things are here. Given 0xfe will return
   // the string "$fe".
   static std::string ByteToHexString(const uint8 value);
+  static std::string ShortToHexString(const uint16 value);
 
  private:
   typedef std::unordered_map<std::string, uint8> TiaMap;

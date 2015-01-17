@@ -10,8 +10,9 @@ namespace vcsmc {
 
 LineKernel::LineKernel()
       : total_cycles_(0),
+        total_bytes_(0),
         sim_error_(std::numeric_limits<float>::max()),
-        simulated_(false) {
+        victories_(0) {
 }
 
 LineKernel::~LineKernel() {
@@ -25,18 +26,20 @@ std::unique_ptr<LineKernel> LineKernel::Clone() {
   for (uint32 i = 0; i < opcodes_.size(); ++i)
     lk->opcodes_.push_back(opcodes_[i]->Clone());
   lk->total_cycles_ = total_cycles_;
+  lk->total_bytes_ = total_bytes_;
   return std::move(lk);
 }
 
 // Assumed called on an empty LineKernel, generates a set of load/store pairs
 // sufficient to fill one line of CPU time.
 void LineKernel::Randomize(Random* random) {
-  total_cycles_ = 0;
+  assert(opcodes_.size() == 0);
 
-  while (total_cycles_ < kScanLineWidthCycles - 3) {
+  while (total_cycles_ < kScanLineWidthCycles - 5) {
     std::unique_ptr<op::OpCode> op = MakeRandomOpCode(random);
     assert(op);
     total_cycles_ += op->cycles();
+    total_bytes_ += op->bytes();
     opcodes_.push_back(std::move(op));
   }
 
@@ -47,7 +50,6 @@ void LineKernel::Randomize(Random* random) {
 
 void LineKernel::Mutate(Random* random) {
   // Reset simulation status as we are changing our opcodes around.
-  simulated_ = false;
   sim_error_ = std::numeric_limits<float>::max();
 
   switch (random->Next() % 2) {
@@ -70,10 +72,6 @@ void LineKernel::Mutate(Random* random) {
 
 void LineKernel::Simulate(const uint8* half_colus, uint32 scan_line,
     const State* entry_state, uint32 lines_to_score) {
-  victories_ = 0;
-  if (simulated_)
-    return;
-
   assert(lines_to_score >= 1);
   assert(states_.size() == 0);
 
@@ -111,8 +109,6 @@ void LineKernel::Simulate(const uint8* half_colus, uint32 scan_line,
       ++frame_buffer_line;
     }
   }
-
-  simulated_ = true;
 }
 
 void LineKernel::Compete(LineKernel* lk) {
@@ -124,24 +120,6 @@ void LineKernel::Compete(LineKernel* lk) {
   }
 }
 
-void LineKernel::Terminate() {
-  assert(IsAcceptableLength());
-  if (total_cycles_ <= 74) {
-    std::unique_ptr<op::OpCode> term;
-    if (total_cycles_ == 74) {
-      term = makeNOP();
-      total_cycles_ += term->cycles();
-    } else {
-      term = makeSTA(TIA::WSYNC);
-      total_cycles_ = 76;
-    }
-    assert(term);
-    states_.push_back(term->Transform(states_.rbegin()->get()));
-    opcodes_.push_back(std::move(term));
-  }
-  assert(total_cycles_ == 76);
-}
-
 void LineKernel::Append(std::vector<std::unique_ptr<op::OpCode>>* opcodes,
                         std::vector<std::unique_ptr<State>>* states) {
   for (uint32 i = 0; i < opcodes_.size(); ++i)
@@ -150,6 +128,10 @@ void LineKernel::Append(std::vector<std::unique_ptr<op::OpCode>>* opcodes,
   // Note that we skip the copy of the entry state we made.
   for (uint32 i = 1; i < states_.size(); ++i)
     states->push_back(states_[i]->Clone());
+}
+
+void LineKernel::ResetVictories() {
+  victories_ = 0;
 }
 
 TIA LineKernel::PickRandomAddress(Random* random) {
@@ -213,9 +195,11 @@ void LineKernel::MutateSwapOpCodes(Random* random) {
 void LineKernel::MutateChangeOpCode(Random* random) {
   uint32 index = random->Next() % opcodes_.size();
   total_cycles_ -= opcodes_[index]->cycles();
+  total_bytes_ -= opcodes_[index]->bytes();
   std::unique_ptr<op::OpCode> op = MakeRandomOpCode(random);
   opcodes_[index].swap(op);
   total_cycles_ += opcodes_[index]->cycles();
+  total_bytes_ += opcodes_[index]->bytes();
 }
 
 // A scan line occupies 76 CPU cycles. Any kernel exactly 76 cycles is fine.
@@ -225,9 +209,7 @@ void LineKernel::MutateChangeOpCode(Random* random) {
 // NOP to the end of the kernel to get it to 76. But a 75 cycle kernel is not
 // OK, and anything longer is also not OK.
 bool LineKernel::IsAcceptableLength() const {
-  if (total_cycles_ <= 74 || total_cycles_ == 76)
-    return true;
-  return false;
+  return total_cycles_ == 73 || total_cycles_ <= 71;
 }
 
 }  // namespace vcsmc

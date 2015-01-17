@@ -119,6 +119,13 @@ std::string Assembler::ByteToHexString(const uint8 value) {
 }
 
 // static
+std::string Assembler::ShortToHexString(const uint16 value) {
+  char buf[6];
+  std::snprintf(buf, 6, "$%03x", value);
+  return std::string(buf);
+}
+
+// static
 bool Assembler::ProcessLine(
     const std::string& line,
     std::vector<std::unique_ptr<op::OpCode>>* output_codes) {

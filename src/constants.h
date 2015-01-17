@@ -35,6 +35,7 @@ const uint8 kColuUnpainted = 0xff;
 // 0001 1100 0000 0000 0000 0000 0001 1111 0000 0000 0000 1100
 const uint64 kTIAStrobeMask = 0x1c00001f000c;
 
+const uint32 kJumpAbsoluteCPUCycles = 3u;
 const uint32 kLoadImmediateCPUCycles = 2u;
 const uint32 kLoadImmediateColorClocks =
     kLoadImmediateCPUCycles * kColorClocksPerCPUCycle;

@@ -39,6 +39,20 @@ class OpCode {
   virtual uint32 bytecode(uint8* output) const = 0;
 };
 
+class JMP : public OpCode {
+ public:
+  JMP(uint16 address) : address_(address) {}
+  virtual ~JMP() {}
+  virtual std::unique_ptr<State> Transform(State* state) const override;
+  virtual std::unique_ptr<OpCode> Clone() const override;
+  virtual uint32 cycles() const override;
+  virtual uint32 bytes() const override;
+  virtual const std::string assembler() const override;
+  virtual uint32 bytecode(uint8* output) const override;
+ protected:
+  uint16 address_;
+};
+
 class LoadImmediate : public OpCode {
  public:
   LoadImmediate(uint8 value, Register reg);
@@ -123,6 +137,7 @@ class NOP : public OpCode {
 
 // Factory methods in vcsmc namespace
 
+std::unique_ptr<op::OpCode> makeJMP(uint16 address);
 std::unique_ptr<op::OpCode> makeLDA(uint8 value);
 std::unique_ptr<op::OpCode> makeLDX(uint8 value);
 std::unique_ptr<op::OpCode> makeLDY(uint8 value);

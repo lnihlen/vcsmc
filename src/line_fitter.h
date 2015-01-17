@@ -5,6 +5,8 @@
 
 #include <vector>
 
+#error deprecated
+
 namespace vcsmc {
 
 class LineKernel;

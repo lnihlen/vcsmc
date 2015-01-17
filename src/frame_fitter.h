@@ -11,7 +11,7 @@ namespace vcsmc {
 
 class Image;
 class LineKernel;
-class OpCode;
+class Random;
 class State;
 
 namespace op {
@@ -30,10 +30,14 @@ class FrameFitter {
 
  private:
   void AppendFramePrefixOpCodes();
-  void AppendFrameSuffixOpCodes();
+  void AppendFrameSuffixOpCodes(bool bank0);
+  std::unique_ptr<LineKernel> FitLine(Random* random, const uint8* half_colus,
+      uint32 scan_line, const State* entry_state);
+  static bool CompareKernels(const std::unique_ptr<LineKernel>& lk1,
+                             const std::unique_ptr<LineKernel>& lk2);
 
   std::vector<std::unique_ptr<State>> states_;
-  std::vector<std::unique_ptr<op::OpCode>> opcodes_;
+  std::vector<std::unique_ptr<std::vector<std::unique_ptr<op::OpCode>>>> banks_;
 };
 
 

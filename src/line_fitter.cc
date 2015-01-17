@@ -8,6 +8,8 @@
 #include "opcode.h"
 #include "random.h"
 
+#error deprecated
+
 namespace vcsmc {
 
 // When evaluating a Line program, how many scanlines should the program be

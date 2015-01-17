@@ -31,14 +31,15 @@ class LineKernel {
   void Simulate(const uint8* half_colus, uint32 scan_line,
       const State* entry_state, uint32 lines_to_score);
   void Compete(LineKernel* lk);
-  void Terminate();
   void Append(std::vector<std::unique_ptr<op::OpCode>>* opcodes,
               std::vector<std::unique_ptr<State>>* states);
+  void ResetVictories();
 
   uint32 total_cycles() const { return total_cycles_; }
+  uint32 total_bytes() const { return total_bytes_; }
   float sim_error() const { return sim_error_; }
-  bool simulated() const { return simulated_; }
   uint32 victories() const { return victories_; }
+  const State* exit_state() const { return states_.rbegin()->get(); }
 
  private:
   TIA PickRandomAddress(Random* random);
@@ -53,8 +54,8 @@ class LineKernel {
   std::vector<std::unique_ptr<op::OpCode>> opcodes_;
   std::vector<std::unique_ptr<State>> states_;
   uint32 total_cycles_;
+  uint32 total_bytes_;
   float sim_error_;
-  bool simulated_;
   uint32 victories_;
 };
 

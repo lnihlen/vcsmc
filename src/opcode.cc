@@ -7,6 +7,31 @@ namespace vcsmc {
 
 namespace op {
 
+std::unique_ptr<State> JMP::Transform(State* state) const {
+  return state->AdvanceTime(cycles() * kColorClocksPerCPUCycle);
+}
+
+std::unique_ptr<OpCode> JMP::Clone() const {
+  return std::unique_ptr<OpCode>(new JMP(address_));
+}
+
+uint32 JMP::cycles() const { return kJumpAbsoluteCPUCycles; }
+
+uint32 JMP::bytes() const { return 3u; }
+
+const std::string JMP::assembler() const {
+  std::string asm_string("jmp ");
+  asm_string += Assembler::ShortToHexString(address_);
+  return asm_string;
+}
+
+uint32 JMP::bytecode(uint8* output) const {
+  *output = 0x4c;
+  *(output + 1) = (uint8)(address_ & 0x00ff);
+  *(output + 2) = (uint8)(address_ >> 8);
+  return bytes();
+}
+
 LoadImmediate::LoadImmediate(uint8 value, Register reg)
     : value_(value),
       register_(reg) { }
@@ -125,6 +150,10 @@ uint32 NOP::bytecode(uint8* output) const {
 }
 
 }  // namespace op
+
+std::unique_ptr<op::OpCode> makeJMP(uint16 address) {
+  return std::unique_ptr<op::OpCode>(new op::JMP(address));
+}
 
 std::unique_ptr<op::OpCode> makeLDA(uint8 value) {
   return std::unique_ptr<op::OpCode>(new op::LDA(value));
