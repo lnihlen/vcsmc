@@ -25,9 +25,9 @@ namespace vcsmc {
 // scored against? Should be at least 1, to evaluate the line the program is
 // running on, but can be more.
 const uint32 kLinesToScore = 2;
-const uint32 kGenerationSize = 50;
+const uint32 kGenerationSize = 5000;
 const uint32 kBoutSize = kGenerationSize / 10;
-const uint32 kMaxGenerations = 5;
+const uint32 kMaxGenerations = 250;
 const float kMaxError = 100.0f;
 
 // F000 - F400: Preamble code, up to start of frame.
@@ -109,8 +109,8 @@ float FrameFitter::Fit(const uint8* half_colus) {
     if (i == lines.size() - 1 ||
         bank_size + 6 + lines[i + 1]->total_bytes() > kBankSize) {
       // Append a JMP and swap banks.
-      std::unique_ptr<op::OpCode> jmp = makeJMP(
-          bank0 ? kBank0Address : kBank1Address);
+      std::unique_ptr<op::OpCode> jmp = makeJMP(bank0 ?
+          kBank0Address : kBank1Address);
       bank0 = !bank0;
       assert(bank_size + jmp->bytes() < kBankSize);
       states_.push_back(jmp->Transform((*states_.rbegin()).get()));
@@ -160,6 +160,15 @@ void FrameFitter::SaveBinary(const char* file_name) {
     uint8* buf_ptr = bin_buf.get();
     for (uint32 j = 0; j < banks_[i]->size(); ++j)
       buf_ptr += banks_[i]->at(j)->bytecode(buf_ptr);
+    write(bin_fd, bin_buf.get(), kBankSize);
+  }
+
+  // If we wrote an odd number of banks we need to write another bank out,
+  // containing only a jump, so we can jump back to the first back at the start.
+  if (banks_.size() % 2) {
+    std::memset(bin_buf.get(), 0, kBankSize);
+    std::unique_ptr<op::OpCode> jmp(makeJMP(kBank0Address));
+    jmp->bytecode(bin_buf.get());
     write(bin_fd, bin_buf.get(), kBankSize);
   }
 
