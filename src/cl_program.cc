@@ -205,57 +205,6 @@ __kernel void downsample_colors(__global __read_only float4* input_colors,
       );  // end of kDownsampleColors
 
 //
-// kDownsampleErrors ==========================================================
-//
-
-    case kDownsampleErrors:
-      return CL_PROGRAM(
-// Given an input float array of error distances |input_errors| of |input_width|
-// fills an output array with interpolated distances. Width of output is assumed
-// to be equal to the x dimension of the global work group.
-__kernel void downsample_errors(__global __read_only float* input_errors,
-                                __read_only int input_width,
-                                __read_only int output_offset,
-                                __global __write_only float* output_errors) {
-  int output_col = get_global_id(0);
-  int output_row = get_global_id(1);
-  int output_width = get_global_size(0);
-  int input_row_offset = output_row * input_width;
-  // It is possible the work group is of size related to the |input_width| not
-  // the |output_width|, if so we exit.
-  if (output_col >= input_width)
-    return;
-  float start_pixel = ((float)output_col * (float)input_width) /
-      (float)output_width;
-  float end_pixel = (((float)output_col + 1.0f) * (float)input_width) /
-      (float)output_width;
-  float first_whole_pixel = ceil(start_pixel);
-  int first_whole_pixel_int = (int)first_whole_pixel + input_row_offset;
-  float last_fractional_pixel = floor(end_pixel);
-  int last_fractional_pixel_int = (int)last_fractional_pixel + input_row_offset;
-  float total_error = 0.0f;
-
-  // Calculate whole pixel error
-  for (int i = first_whole_pixel_int; i < last_fractional_pixel_int; ++i)
-    total_error += input_errors[i];
-
-  // Include left-side fractional error
-  total_error += input_errors[(int)floor(start_pixel) + input_row_offset] *
-      (first_whole_pixel - start_pixel);
-
-  // Right-side fractional error. It's possible that due to roundoff error the
-  // last_fractional_pixel may equal output_width, if so we ignore.
-  if (last_fractional_pixel_int - input_row_offset < input_width) {
-    total_error += input_errors[last_fractional_pixel_int] *
-        (end_pixel - last_fractional_pixel);
-  }
-
-  int output_pixel = (output_row * output_width) + output_col + output_offset;
-  output_errors[output_pixel] = total_error;
-}
-      );  // end of kDownsampleErrors
-
-//
 // kFFTRadix2 =================================================================
 //
 
@@ -309,91 +258,6 @@ __kernel void fft_radix_2(__global __read_only float2* input_data,
       );  // end of kFFTRadix2
 
 //
-// kFitPlayer =================================================================
-//
-
-    case kFitPlayer:
-      return CL_PROGRAM(
-// One thread per color, goes through that color error and sums the total error
-// in using that color to scratch space. We then reduce all color errors to find
-// the min, and store that index in |player_color|.
-//
-// Both scratch buffers should be number of threads in size.
-__kernel void fit_player(__global __read_only float* color_errors,
-                         __read_only uint start_pixel,
-                         __read_only uint pixel_mask,
-                         __read_only uint image_width,
-                         __read_only uint image_height,
-                         __local float* error_scratch,
-                         __local uint* color_scratch,
-                         __global __write_only uint* player_color) {
-  uint color = get_global_id(0);
-  uint num_colus = get_global_size(0);
-  uint error_offset = (color * image_width * image_height) + start_pixel;
-  float total_error = 0.0f;
-  for (uint i = 0; i < 8; ++i) {
-    if ((pixel_mask & (1 << i)) != 0) {
-      total_error += color_errors[error_offset + i];
-    }
-  }
-
-  error_scratch[color] = total_error;
-  color_scratch[color] = color;
-
-  barrier(CLK_LOCAL_MEM_FENCE);
-
-  for (uint offset = num_colus / 2; offset > 0; offset = offset / 2) {
-    if (color < offset) {
-      float their_error = error_scratch[color + offset];
-      if (their_error < error_scratch[color]) {
-        error_scratch[color] = their_error;
-        color_scratch[color] = color_scratch[color + offset];
-      }
-    }
-    barrier(CLK_LOCAL_MEM_FENCE);
-  }
-
-  if (color == 0)
-    *player_color = color_scratch[0];
-}
-      );  // end of kFitPlayer
-
-//
-// kFitPlayfield ==============================================================
-//
-
-    case kFitPlayfield:
-      return CL_PROGRAM(
-// Should be image_width / 4 x image_height threads, each thread handles four
-// pixels horizontally and computes one bit of playfield fit.
-__kernel void fit_playfield(__global __read_only float* color_errors,
-                            __read_only uint bk_color,
-                            __read_only uint pf_color,
-                            __global __write_only uint* playfield) {
-  uint pf_group = get_global_id(0);
-  uint pf_line = get_global_id(1);
-  uint pf_width = get_global_size(0);
-  uint image_width = pf_width * 4;
-  uint pixel = (pf_line * image_width) + (pf_group * 4);
-  uint image_height = get_global_size(1);
-
-  uint pf_offset = (pf_color * image_width * image_height) + pixel;
-  float pf_error = color_errors[pf_offset];
-  pf_error += color_errors[pf_offset + 1];
-  pf_error += color_errors[pf_offset + 2];
-  pf_error += color_errors[pf_offset + 3];
-
-  uint bk_offset = (bk_color * image_width * image_height) + pixel;
-  float bk_error = color_errors[bk_offset];
-  bk_error += color_errors[bk_offset + 1];
-  bk_error += color_errors[bk_offset + 2];
-  bk_error += color_errors[bk_offset + 3];
-
-  playfield[(pf_line * pf_width) + pf_group] = pf_error < bk_error ? 1 : 0;
-}
-      );  // end of kFitPlayfield
-
-//
 // kInverseFFTNormalize =======================================================
 //
 
@@ -415,110 +279,6 @@ __kernel void inverse_fft_normalize(__global __read_only float4* input_data,
   output_data[i + offset] = oc / norm;
 }
       );  // end of kInverseFFTNormalize
-
-//
-// kKMeansClassify =============================================================
-//
-
-    case kKMeansClassify:
-      return CL_PROGRAM(
-// Given a 3D array of color distances with width global_size(0), height of
-// global_size(1), and depth of kNTSCColors at |color_errors|, and an array of
-// currently selected |colors| of length |num_classes|, this shader will
-// determine the lowest error color at each pixel and store its index into 2D
-// array |classes|.
-__kernel void k_means_classify(__global __read_only float* color_errors,
-                               __global __read_only uint* colors,
-                               __read_only uint num_classes,
-                               __global __write_only uint* classes) {
-  uint col = get_global_id(0);
-  uint row = get_global_id(1);
-  uint width = get_global_size(0);
-  uint height = get_global_size(1);
-  uint pixel = (row * width) + col;
-  float min_error = color_errors[(colors[0] * width * height) + pixel];
-  uint min_error_index = 0;
-  for (uint i = 1; i < num_classes; ++i) {
-    float error = color_errors[(colors[i] * width * height) + pixel];
-    if (error < min_error) {
-      min_error = error;
-      min_error_index = i;
-    }
-  }
-  classes[pixel] = min_error_index;
-}
-      );  // end of kKMeansClassify
-
-//
-// kKMeansColor ===============================================================
-//
-
-    case kKMeansColor:
-      return CL_PROGRAM(
-// Run one thread for each color. |error_scratch| needs to be number of possible
-// colors times |num_classes| in size, and |class_scratch| needs to be
-// the same. Note that the number of possible colors must be a power of 2.
-__kernel void k_means_color(__global __read_only float* color_errors,
-                            __global __read_only uint* classes,
-                            __read_only uint image_width,
-                            __read_only uint image_height,
-                            __read_only uint num_classes,
-                            __read_only uint iteration,
-                            __local float* error_scratch,
-                            __local uint* class_scratch,
-                            __global __write_only float* fit_error,
-                            __global __write_only uint* colors) {
-  uint color_id = get_global_id(0);
-  uint num_colors = get_global_size(0);
-  // The |scratch| arrays are {num_colors| rows of |num_classes| elements.
-  int scratch_index = (num_classes * color_id);
-
-  // Zero out scratch arrays for each class error counter for this color.
-  for (uint i = 0; i < num_classes; ++i) {
-    error_scratch[scratch_index + i] = 0.0f;
-    class_scratch[scratch_index + i] = color_id;
-  }
-
-  // Advance error table pointer to our color.
-  color_errors += image_width * image_height * color_id;
-  // Sum up error for our color for each class of pixel.
-  // TODO: consider breaking up work for multiple threads per color, at the
-  // expense of more storage for a first reduction stage which sums.
-  for (uint i = 0; i < image_width * image_height; ++i)
-    error_scratch[scratch_index + classes[i]] += color_errors[i];
-
-  // Now we reduce to find min error color for each class.
-  barrier(CLK_LOCAL_MEM_FENCE);
-  for (uint offset = num_colors / 2; offset > 0; offset = offset / 2) {
-    uint their_index = scratch_index + (offset * num_classes);
-    if (color_id < offset) {
-      for (uint i = 0; i < num_classes; ++i) {
-        float my_error = error_scratch[scratch_index + i];
-        float their_error = error_scratch[their_index + i];
-        if (their_error < my_error) {
-          error_scratch[scratch_index + i] = their_error;
-          class_scratch[scratch_index + i] = class_scratch[their_index + i];
-        }
-      }
-    }
-    barrier(CLK_LOCAL_MEM_FENCE);
-  }
-
-  // Use the lowest |num_classes| threads to copy final class reductions to
-  // the output.
-  if (color_id < num_classes) {
-    colors[color_id] = class_scratch[color_id];
-  }
-
-  if (color_id == 0) {
-    float total_error = error_scratch[0];
-    for (uint i = 1; i < num_classes; ++i) {
-      total_error += error_scratch[i];
-    }
-    fit_error[iteration] = total_error;
-  }
-}
-      );  // end of kKMeansColor
 
 //
 // kLabToRGB ==================================================================
@@ -951,26 +711,11 @@ std::string CLProgram::GetProgramName(Programs program) {
     case kDownsampleColors:
       return "downsample_colors";
 
-    case kDownsampleErrors:
-      return "downsample_errors";
-
     case kFFTRadix2:
       return "fft_radix_2";
 
-    case kFitPlayer:
-      return "fit_player";
-
-    case kFitPlayfield:
-      return "fit_playfield";
-
     case kInverseFFTNormalize:
       return "inverse_fft_normalize";
-
-    case kKMeansClassify:
-      return "k_means_classify";
-
-    case kKMeansColor:
-      return "k_means_color";
 
     case kLabToRGB:
       return "lab_to_rgb";

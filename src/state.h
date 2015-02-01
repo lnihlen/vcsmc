@@ -71,14 +71,6 @@ class State {
   // Fill bytes in |colus| with _half_ atari color values within |range|.
   void ColorInto(uint8* colus, const Range& range) const;
 
-  // Returns a color clock value that is the earliest time after which this spec
-  // could be added. Returns 0 if it occurs before this State. If this State
-  // cannot permit this spec to be scheduled even after the very last pixel that
-  // it covers it will return kInfinity.
-  uint32 EarliestTimeAfter(const Spec& spec) const;
-
-  uint32 EarliestTimeAfterWithEndTime(const Spec& spec, uint32 end_time) const;
-
   const bool register_known(Register axy) const {
     return registers_known_ & (1 << static_cast<int>(axy));
   }
@@ -114,14 +106,6 @@ class State {
   uint8 ColuForClock(uint32 clock) const;
   bool PlayfieldPaints(uint32 local_clock) const;
   bool PlayerPaints(uint32 global_clock, bool is_player_one) const;
-
-  const uint32 EarliestPlayfieldPaints(const Range& range) const;
-
-  // |pf| should be one of TIA::PF0, TIA::PF1, or TIA::PF2.
-  const uint32 EarliestPFXCouldPaint(TIA pf, const Range& range) const;
-
-  const uint32 EarliestBackgroundPaints(const Range& range) const;
-  const uint32 EarliestTimeInHBlank(const Range& range) const;
 
   uint8 tia_[TIA::TIA_COUNT];
   uint64 tia_known_;

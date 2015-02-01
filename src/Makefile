@@ -21,9 +21,7 @@ LIBS+=-framework OpenCL
 endif
 
 DEPS=constants.h image_file.h types.h
-OBJ=$(OUT)/adjacency_map.o                                                     \
-    $(OUT)/assembler.o                                                         \
-    $(OUT)/block.o                                                             \
+OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/bit_map.o                                                           \
     $(OUT)/cl_buffer_impl.o                                                    \
     $(OUT)/cl_command_queue_impl.o                                             \
@@ -40,25 +38,19 @@ OBJ=$(OUT)/adjacency_map.o                                                     \
     $(OUT)/image_file.o                                                        \
     $(OUT)/line_kernel.o                                                       \
     $(OUT)/opcode.o                                                            \
-    $(OUT)/player_fitter.o                                                     \
     $(OUT)/random.o                                                            \
     $(OUT)/range.o                                                             \
-    $(OUT)/schedule.o                                                          \
     $(OUT)/spec.o                                                              \
     $(OUT)/state.o                                                             \
     $(OUT)/value_map.o                                                         \
     $(OUT)/video_frame_data.o                                                  \
     $(OUT)/video_frame_data_parser.o                                           \
 
-TEST_OBJ=$(OUTTESTS)/adjacency_map_unittests.o                                 \
-         $(OUTTESTS)/assembler_unittests.o                                     \
+TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
-         $(OUTTESTS)/block_unittests.o                                         \
          $(OUTTESTS)/ciede2k_unittests.o                                       \
-         $(OUTTESTS)/downsample_errors_unittests.o                             \
          $(OUTTESTS)/fft_radix_2_unittests.o                                   \
          $(OUTTESTS)/inverse_fft_norm_unittests.o                              \
-         $(OUTTESTS)/k_means_unittests.o                                       \
          $(OUTTESTS)/lab_to_rgb_unittests.o                                    \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
