@@ -1,5 +1,5 @@
 # VCSMC src/ Makefile.
-# Dependencies: libtiff, libpng, clang, OpenCL
+# Dependencies: libtiff, libpng, clang, OpenCL, gflags
 # tools dependencies: python colormath, Wand, ImageMagick
 CFLAGS+=-I. -O2
 LIBS+=-lm -ltiff -lpng

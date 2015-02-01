@@ -217,8 +217,7 @@ int main(int argc, char* argv[]) {
         "picc usage:\n"
         "  picc <frame_data.csv> <input_image_file_spec> <output_file_spec>\n"
         "picc example:\n"
-        "  picc frame_data.csv frames/frame-%%05d.png specs/frame-%%05d.bin\n"
-        );
+        "  picc frame_data.csv frames/frame-%%05d.png specs/frame-%%05d.bin\n");
     return -1;
   }
 

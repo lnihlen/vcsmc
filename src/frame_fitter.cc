@@ -41,7 +41,6 @@ const float kMaxError = 100.0f;
 const uint16 kBank0Address = 0xf400;
 const uint16 kBank1Address = 0xf800;
 // const uint16 kEpilogueAddress = 0xfd00;
-const uint32 kBankSize = 1024;
 
 
 FrameFitter::FrameFitter() {

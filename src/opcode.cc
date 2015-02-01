@@ -183,4 +183,56 @@ std::unique_ptr<op::OpCode> makeNOP() {
   return std::unique_ptr<op::OpCode>(new op::NOP);
 }
 
+std::unique_ptr<op::OpCode> OpCodeFromByteCode(const uint8* byte_code) {
+  uint8 inst = *byte_code;
+  uint16 short_arg;
+  uint8 byte_arg;
+  TIA tia_arg;
+  switch (inst) {
+    // NOP
+    case 0xea:
+      return makeNOP();
+
+    // JMP
+    case 0x4c:
+      short_arg = *(byte_code + 1) | ((uint16)(*(byte_code + 2)) << 8);
+      return makeJMP(short_arg);
+
+    // LDA
+    case 0xa9:
+      byte_arg = *(byte_code + 1);
+      return makeLDA(byte_arg);
+
+    // LDX
+    case 0xa2:
+      byte_arg = *(byte_code + 1);
+      return makeLDX(byte_arg);
+
+    // LDY
+    case 0xa0:
+      byte_arg = *(byte_code + 1);
+      return makeLDY(byte_arg);
+
+    // STA
+    case 0x85:
+      tia_arg = (TIA)*(byte_code + 1);
+      return makeSTA(tia_arg);
+
+    // STX
+    case 0x86:
+      tia_arg = (TIA)*(byte_code + 1);
+      return makeSTX(tia_arg);
+
+    // STY
+    case 0x84:
+      tia_arg = (TIA)*(byte_code + 1);
+      return makeSTY(tia_arg);
+
+    default:
+      return nullptr;
+  }
+
+  return nullptr;
+}
+
 }  // namespace vcsmc

@@ -146,6 +146,9 @@ std::unique_ptr<op::OpCode> makeSTX(TIA address);
 std::unique_ptr<op::OpCode> makeSTY(TIA address);
 std::unique_ptr<op::OpCode> makeNOP();
 
+
+std::unique_ptr<op::OpCode> OpCodeFromByteCode(const uint8* byte_code);
+
 }  // namespace vcsmc
 
 #endif  // SRC_OPCODE_H_

@@ -1,0 +1,151 @@
+<html>
+<head>
+<script src="check.js"></script>
+<style>
+#sim-canvas {
+  float: left;
+}
+#state-list {
+  height: 75%;
+  overflow: scroll;
+}
+#state-detail {
+  height: 25%;
+  overflow: scroll;
+}
+.state-invisible {
+  background-color: #ddd;
+}
+.state-broken {
+  background-color: #faa;
+}
+.state-normal {
+  background-color: #fff;
+}
+</style>
+</head>
+<body>
+<canvas id='sim-canvas'></canvas>
+<div id='state-detail'>
+</div>
+<div id='state-list'></div>
+<script>
+var canvas = document.getElementById('sim-canvas');
+var context = canvas.getContext("2d");
+var sim_image = new Image();
+sim_image.src = "sim_zoomed.png";
+sim_image.onload = function() {
+  canvas.width = sim_image.width;
+  canvas.height = sim_image.height;
+  context.drawImage(sim_image, 0, 0);
+}
+var snap_image = new Image();
+snap_image.src = "snap_zoomed.png";
+
+var populate_state = function(e) {
+  var idx = e.target.id.split('-')[1];
+  var state = states_table[idx];
+  // Redraw the canvas base image.
+  context.drawImage(sim_image, 0, 0);
+  // Draw a box around this state.
+  if (state.visible) {
+    // assumption is that states do not span scan lines.
+    var l = ((state.start_time % clocks_per_row) - clocks_in_hblank)
+        * zoom_factor;
+    var r = ((state.end_time % clocks_per_row) - clocks_in_hblank)
+        * zoom_factor;
+    if (r < l) {
+      r = canvas.width;
+    }
+    var t = (((state.start_time - clocks_to_first_row) / clocks_per_row) | 0)
+        * zoom_factor;
+    var b = t + zoom_factor;
+    context.beginPath();
+    context.moveTo(l, t);
+    context.lineTo(r, t);
+    context.lineTo(r, b);
+    context.lineTo(l, b);
+    context.lineTo(l, t);
+    context.strokeStyle = "#000";
+    context.stroke();
+  }
+
+  // Blow away any detail view data currently there
+  var state_detail = document.getElementById('state-detail');
+  while (state_detail.firstChild) {
+    state_detail.removeChild(state_detail.firstChild);
+  }
+
+  // Fill in basic State reporting.
+  // ....
+
+  if (!state.visible) {
+    return;
+  }
+  // Build a table with the colors of both sim and snapshot for comparison.
+  var table = document.createElement('table');
+  var sim_number_row = document.createElement('tr');
+  var sim_color_row = document.createElement('tr');
+  var snap_color_row = document.createElement('tr');
+  var snap_number_row = document.createElement('tr');
+  for (var i = 0; i < state.sim_colors.length; ++i) {
+    var item = document.createElement('td');
+    item.innerHTML = '&nbsp;';
+    item.style.backgroundColor = state.sim_colors[i];
+    sim_color_row.appendChild(item);
+    item = document.createElement('td');
+    item.innerHTML = state.sim_colors[i] +
+        '(' + (color_table.indexOf(state.sim_colors[i]) * 2) + ')';
+    sim_number_row.appendChild(item);
+
+    item = document.createElement('td');
+    item.innerHTML = '&nbsp;';
+    item.style.backgroundColor = state.snap_colors[i];
+    snap_color_row.appendChild(item);
+    item = document.createElement('td');
+    item.innerHTML = state.snap_colors[i] +
+        '(' + (color_table.indexOf(state.snap_colors[i]) * 2) + ')';
+    snap_number_row.appendChild(item);
+  }
+  table.appendChild(sim_number_row);
+  table.appendChild(sim_color_row);
+  table.appendChild(snap_color_row);
+  table.appendChild(snap_number_row);
+  state_detail.appendChild(table);
+
+  var b = 'colup0: ' + state.colup0;
+  b += ' colup1: ' + state.colup1;
+  b += ' colupf: ' + state.colupf;
+  b += ' colubk: ' + state.colubk;
+  b += ' ctrlpf: ' + state.ctrlpf;
+  b += ' pf0: ' + state.pf0;
+  b += ' pf1: ' + state.pf1;
+  b += ' pf2: ' + state.pf2;
+  b += ' grp0: ' + state.grp0;
+  b += ' grp1: ' + state.grp1;
+  var p = document.createElement('p');
+  p.innerHTML = b;
+  state_detail.appendChild(p);
+}
+
+// populate list of states
+var state_list = document.getElementById('state-list');
+for (var i = 0; i < states_table.length; ++i) {
+  var p = document.createElement('p');
+  p.innerHTML = i + '.  ' + states_table[i].action;
+  p.id = 'state-' + i;
+  if (states_table[i].visible) {
+    if (states_table[i].matches) {
+      p.className = 'state-normal';
+    } else {
+      p.className = 'state-broken';
+    }
+  } else {
+    p.className = 'state-invisible';
+  }
+  p.onclick = populate_state;
+  state_list.appendChild(p);
+}
+</script>
+</body>
+</html>
