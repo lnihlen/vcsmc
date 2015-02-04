@@ -14,7 +14,6 @@ const uint32 kFrameHeightPixels = 192;
 const uint32 kFrameSizeBytes = kFrameWidthPixels * kFrameHeightPixels;
 const uint32 kHBlankWidthClocks = 68;
 const uint32 kScanLineWidthClocks = kFrameWidthPixels + kHBlankWidthClocks;
-const uint32 kFrameSizeClocks = kScanLineWidthClocks * kFrameHeightPixels;
 const uint32 kColorClocksPerCPUCycle = 3;
 const uint32 kScanLineWidthCycles =
     kScanLineWidthClocks / kColorClocksPerCPUCycle;

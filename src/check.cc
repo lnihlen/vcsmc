@@ -195,6 +195,8 @@ int main(int argc, char* argv[]) {
           "    matches: %s,\n"
           "    sim_colors: %s,\n"
           "    snap_colors: %s,\n"
+          "    p0_clock: %d,\n"
+          "    p1_clock: %d,\n"
           "    start_time: %d,\n"
           "    end_time: %d,\n"
           "    action: '%s',\n"
@@ -213,6 +215,8 @@ int main(int argc, char* argv[]) {
           matches ? "true" : "false",
           sim_colors_str.c_str(),
           snap_colors_str.c_str(),
+          state->p0_clock(),
+          state->p1_clock(),
           state->range().start_time(),
           state->range().end_time(),
           i < opcodes.size() ? opcodes[i]->assembler().c_str() : "");

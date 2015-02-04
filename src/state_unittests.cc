@@ -33,11 +33,11 @@ class StateTest : public ::testing::Test {
 TEST_F(StateTest, InitialStateHasFullProgramRange) {
   State state;
   EXPECT_EQ(0, state.range().start_time());
-  EXPECT_EQ(kFrameSizeClocks, state.range().end_time());
+  EXPECT_EQ(kScreenSizeClocks, state.range().end_time());
   uint8 tia_values[TIA::TIA_COUNT];
   State state_value(tia_values);
   EXPECT_EQ(0, state_value.range().start_time());
-  EXPECT_EQ(kFrameSizeClocks, state_value.range().end_time());
+  EXPECT_EQ(kScreenSizeClocks, state_value.range().end_time());
 }
 
 TEST_F(StateTest, InitialStateHasAllRegistersUnknown) {
@@ -183,7 +183,7 @@ TEST_F(StateTest, AdvanceTimeClonesAndSetsRanges) {
   std::unique_ptr<State> state(new State);
   std::unique_ptr<State> advance = state->AdvanceTime(kScanLineWidthClocks);
   EXPECT_EQ(Range(0, kScanLineWidthClocks), state->range());
-  EXPECT_EQ(Range(kScanLineWidthClocks, kFrameSizeClocks), advance->range());
+  EXPECT_EQ(Range(kScanLineWidthClocks, kScreenSizeClocks), advance->range());
   CompareStatesExceptRange(state.get(), advance.get());
 }
 
@@ -203,7 +203,7 @@ TEST_F(StateTest, AdvanceTimeAndSetRegisterClonesAndSetsRegisterValue) {
   EXPECT_EQ(0xcc, advance->x());
 
   EXPECT_EQ(Range(0, 32), state->range());
-  EXPECT_EQ(Range(32, kFrameSizeClocks), advance->range());
+  EXPECT_EQ(Range(32, kScreenSizeClocks), advance->range());
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAClonesAndSetsTIAValue) {
@@ -216,7 +216,7 @@ TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAClonesAndSetsTIAValue) {
   EXPECT_TRUE(advance->tia_known(TIA::COLUP0));
   EXPECT_EQ(0xde, advance->tia(TIA::COLUP0));
   EXPECT_EQ(Range(64, 128), state->range());
-  EXPECT_EQ(Range(128, kFrameSizeClocks), advance->range());
+  EXPECT_EQ(Range(128, kScreenSizeClocks), advance->range());
   for (uint8 i = 0; i < TIA::TIA_COUNT; ++i) {
     TIA tia = static_cast<TIA>(i);
     if (tia == TIA::COLUP0)
@@ -228,12 +228,102 @@ TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAClonesAndSetsTIAValue) {
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeWSYNC) {
-  // TODO
+  std::unique_ptr<State> state(new State);
+  // A strobe to WSYNC on first operation of line should consume entire line.
+  std::unique_ptr<State> whole_line = state->AdvanceTimeAndSetRegister(
+      0, Register::A, 0);
+  state = whole_line->AdvanceTimeAndCopyRegisterToTIA(
+      1, Register::A, TIA::WSYNC);
+  EXPECT_EQ(0, whole_line->range().start_time());
+  EXPECT_EQ(kScanLineWidthClocks, whole_line->range().end_time());
+  EXPECT_EQ(kScanLineWidthClocks, state->range().start_time());
+
+  // Test in HBLANK, in scanout, and on last clock of the line.
+  std::unique_ptr<State> hblank = state->AdvanceTime(10);
+  state = hblank->AdvanceTimeAndCopyRegisterToTIA(
+      kInfinity, Register::A, TIA::WSYNC);
+  EXPECT_EQ(10 + kScanLineWidthClocks, hblank->range().start_time());
+  EXPECT_EQ(2 * kScanLineWidthClocks, hblank->range().end_time());
+
+  std::unique_ptr<State> scanout = state->AdvanceTime(kHBlankWidthClocks + 67);
+  state = scanout->AdvanceTimeAndCopyRegisterToTIA(0, Register::A, TIA::WSYNC);
+  EXPECT_EQ(3 * kScanLineWidthClocks, scanout->range().end_time());
+
+  std::unique_ptr<State> last = state->AdvanceTime(kScanLineWidthClocks - 1);
+  state = last->AdvanceTimeAndCopyRegisterToTIA(2, Register::A, TIA::WSYNC);
+  EXPECT_EQ(4 * kScanLineWidthClocks, last->range().end_time());
 }
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeRSYNC) {
   // TODO
 }
+
+// This lovely table is copied from Andrew Towers, who wrote some very detailed
+// notes about the TIA. I found a copy here:
+// http://www.atarihq.com/danb/files/TIA_HW_Notes.txt
+//
+// CPU  CLK Pixel  Main Close Medium  Far  PF
+//
+// 0      0  -  1    17    33    65    -
+// ...
+// 22    66  -  1    17    33    65    -
+// 22.6 --------------------------------------------------------
+// 23    69     1     6    22    38    70  0.25
+// 24    72     4     9    25    41    73  1
+// 25    75     7    12    28    44    76  1.75
+// 26    78    10    15    31    47    79  2.5
+// 27    81    13    18    34    50    82  3.25
+// 28    84    16    21    37    53    85  3
+// 29    87    19    24    40    56    88
+// 30    90    22    27    43    59    91
+// 31    93    25    30    46    62    94
+// 32    96    28    33    49    65    97
+// 33    99    31    36    52    68   100
+// 34   102    34    39    55    71   103
+// 35   105    37    42    58    74   106
+// 36   108    40    45    61    77   109
+// 37   111    43    48    64    80   112
+// 38   114    46    51    67    83   115
+// 39   117    49    54    70    86   118
+// 40   120    52    57    73    89   121
+// 41   123    55    60    76    92   124
+// 42   126    58    63    79    95   127
+// 43   129    61    66    82    98   130
+// 44   132    64    69    85   101   133
+// 45   135    67    72    88   104   136
+// 46   138    70    75    91   107   139
+// 47   141    73    78    94   110   142
+// 48   144    76    81    97   113   145
+// 49   147    79    84   100   116   148
+// 50   150    82    87   103   119   151
+// 51   153    85    90   106   122   154
+// 52   156    88    93   109   125   157
+// 53   159    91    96   112   128     0
+// 54   162    94    99   115   131     3
+// 55   165    97   102   118   134     6
+// 56   168   100   105   121   137     9
+// 57   171   103   108   124   140    12
+// 58   174   106   111   127   143    15
+// 59   177   109   114   130   146    18
+// 60   180   112   117   133   149    21
+// 61   183   115   120   136   152    24
+// 62   186   118   123   139   155    27
+// 63   189   121   126   142   158    30
+// 64   192   124   129   145     1    33
+// 65   195   127   132   148     4    36
+// 66   198   130   135   151     7    39
+// 67   201   133   138   154    10    42
+// 68   204   136   141   157    13    45
+// 69   207   139   144     0    16    48
+// 70   210   142   147     3    19    51
+// 71   213   145   150     6    22    54
+// 72   216   148   153     9    25    57
+// 73   219   151   156    12    28    60
+// 74   222   154   159    15    31    63
+// 75   225   157     2    18    34    66
+// 76   228     0     5    21    37    69
+// ----------------------------------------------------- Start HBLANK
+//
 
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeRESP0) {
   // TODO
@@ -266,408 +356,6 @@ TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeHMCLR) {
 TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeCXCLR) {
   // TODO
 }
-
-/*
-TEST_F(StateTest, PaintIntoBeforeStateRange) {
-  std::unique_ptr<State> state(new State);
-  state = state->AdvanceTimeAndSetRegister(
-      kScanLineWidthClocks, Register::A, 0x00);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(
-      kScanLineWidthClocks, Register::A, TIA::COLUBK);
-  ColuStrip colu_strip(1);
-  state->PaintInto(&colu_strip);
-  ExpectUnpainted(&colu_strip);
-}
-
-TEST_F(StateTest, PaintIntoAfterStateRange) {
-  std::unique_ptr<State> original_state(new State);
-  original_state->AdvanceTimeAndSetRegister(
-      kScanLineWidthClocks, Register::X, 0xfe);
-  ColuStrip colu_strip(7);
-  original_state->PaintInto(&colu_strip);
-  ExpectUnpainted(&colu_strip);
-}
-
-TEST_F(StateTest, PaintIntoDuringHBlank) {
-  std::unique_ptr<State> state(new State);
-  state->AdvanceTime(kHBlankWidthClocks);
-  ColuStrip colu_strip(0);
-  state->PaintInto(&colu_strip);
-  ExpectUnpainted(&colu_strip);
-}
-
-TEST_F(StateTest, PaintBackgroundPartial) {
-  std::unique_ptr<State> state(new State);
-  state = state->AdvanceTimeAndSetRegister(1, Register::Y, 0x00);
-  state = state->AdvanceTimeAndSetRegister(1, Register::X, 0x02);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::X, TIA::COLUBK);
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, kColuUnpainted);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUPF);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::PF0);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::CTRLPF);
-
-  // should still be in HBlank
-  EXPECT_GT(kHBlankWidthClocks, state->range().start_time());
-  // Advance state to end of HBlank + 5 pixels.
-  uint32 hb_plus_five = kHBlankWidthClocks + 5 - state->range().start_time();
-  state = state->AdvanceTimeAndCopyRegisterToTIA(
-      hb_plus_five, Register::Y, TIA::PF1);
-  // Make and discard a next state, to set this state's upper bound at +13 pix.
-  state->AdvanceTimeAndCopyRegisterToTIA(13, Register::Y, TIA::PF2);
-
-  ColuStrip colu_strip(0);
-  state->PaintInto(&colu_strip);
-  for (uint32 i = 0; i < 5; ++i)
-    EXPECT_EQ(kColuUnpainted, colu_strip.colu(i));
-  for (uint32 i = 5; i < 18; ++i)
-    EXPECT_EQ(0x02, colu_strip.colu(i));
-  for (uint32 i = 18; i < kFrameWidthPixels; ++i)
-    EXPECT_EQ(kColuUnpainted, colu_strip.colu(i));
-}
-
-TEST_F(StateTest, PaintBackgroundEntire) {
-  std::unique_ptr<State> state(new State);
-  state = state->AdvanceTimeAndSetRegister(1, Register::Y, 0x00);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::COLUBK);
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, kColuUnpainted);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUPF);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::PF0);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::PF1);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::PF2);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::CTRLPF);
-
-  // should still be in HBlank
-  EXPECT_GT(kHBlankWidthClocks, state->range().start_time());
-  ColuStrip colu_strip(1);
-  state->PaintInto(&colu_strip);
-  for (uint32 i = 0; i < kFrameWidthPixels; ++i)
-    EXPECT_EQ(0x00, colu_strip.colu(i));
-}
-
-TEST_F(StateTest, PaintPlayfieldEntireRepeatedNoScore) {
-  std::unique_ptr<State> state(new State);
-  // pf0 gets 0x87 = 1000 0111
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x87);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF0);
-  // pf1 gets 0x4b = 0100 1011
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x4b);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF1);
-  // pf2 gets 0x2d = 0010 1101
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x2d);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF2);
-  const uint8 colubk = 0x5e;
-  state = state->AdvanceTimeAndSetRegister(1, Register::X, colubk);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::X, TIA::COLUBK);
-  const uint8 colupf = 0xde;
-  state = state->AdvanceTimeAndSetRegister(1, Register::Y, colupf);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::COLUPF);
-  // disable playfield mirroring and score color mode
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x00);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::CTRLPF);
-
-  // should still be in HBLANK
-  EXPECT_GT(kHBlankWidthClocks, state->range().start_time());
-  ColuStrip colu_strip(0);
-  state->PaintInto(&colu_strip);
-  uint32 col = 0;
-  for (uint32 i = 0; i < 2; ++i) {
-    // pf0 paints bits 4 - 7 left to right at 4 bits per pixel. First 3 bits
-    // are 0, so that's 12 colus of the BG color.
-    for (uint32 j = 0; j < 12; ++j)  // 1 000
-      EXPECT_EQ(colubk, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 1
-      EXPECT_EQ(colupf, colu_strip.colu(col++));
-
-    // pf1 paints bits 7 - 0, 01001011
-    for (uint32 j = 0; j < 4; ++j)  // 0 1001011
-      EXPECT_EQ(colubk, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 1 001011
-      EXPECT_EQ(colupf, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 8; ++j)  // 00 1011
-      EXPECT_EQ(colubk, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 1 011
-      EXPECT_EQ(colupf, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 0 11
-      EXPECT_EQ(colubk, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 8; ++j)  // 11
-      EXPECT_EQ(colupf, colu_strip.colu(col++));
-
-    // pf2 paints bits 0 - 7, 00101101
-    for (uint32 j = 0; j < 4; ++j)  // 0010110 1
-      EXPECT_EQ(colupf, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 001011 0
-      EXPECT_EQ(colubk, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 8; ++j)  // 0010 11
-      EXPECT_EQ(colupf, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 001 0
-      EXPECT_EQ(colubk, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 00 1
-      EXPECT_EQ(colupf, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 8; ++j)  // 00
-      EXPECT_EQ(colubk, colu_strip.colu(col++));
-  }
-
-  EXPECT_EQ(kFrameWidthPixels, col);
-}
-
-TEST_F(StateTest, PaintPlayfieldEntireMirroredNoScore) {
-  std::unique_ptr<State> state(new State);
-  // pf0 gets 0x18 = 0001 1000
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x18);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF0);
-  // pf1 gets 0x2d = 0010 1101
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x2d);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF1);
-  // pf2 gets 0x4b = 0100 1011
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x4b);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF2);
-  const uint8 colubk = 0xfe;
-  state = state->AdvanceTimeAndSetRegister(1, Register::X, colubk);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::X, TIA::COLUBK);
-  const uint8 colupf = 0x0e;
-  state = state->AdvanceTimeAndSetRegister(1, Register::Y, colupf);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::COLUPF);
-  // enable playfield mirroring and disable score color mode
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x01);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::CTRLPF);
-
-  // should still be in HBLANK
-  EXPECT_GT(kHBlankWidthClocks, state->range().start_time());
-  ColuStrip colu_strip(0);
-  state->PaintInto(&colu_strip);
-  uint32 col = 0;
-
-  // left side pf0 paints bits 4 - 7, 0001
-  for (uint32 i = 0; i < 4; ++i)   // 000 1
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 12; ++i)  // 000
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-
-  // left side pf1 paints bits 7 - 0, 00101101
-  for (uint32 i = 0; i < 8; ++i)  // 00 101101
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 1 01101
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 0 1101
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 8; ++i)  // 11 01
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 0 1
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 1
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-
-  // left side pf2 paints bits 0 - 7, 01001011
-  for (uint32 i = 0; i < 8; ++i)  // 010010 11
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 01001 0
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 0100 1
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 8; ++i)  // 01 00
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 0 1
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 0
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-
-  // right side pf2 paints bits 7 - 0, 01001011
-  for (uint32 i = 0; i < 4; ++i)  // 0 1001011
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 1 001011
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 8; ++i)  // 00 1011
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 1 011
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 0 11
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 8; ++i)  // 11
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-
-  // right side pf1 paints bits 0 - 7, 00101101
-  for (uint32 i = 0; i < 4; ++i)  // 0010110 1
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 001011 0
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 8; ++i)  // 0010 11
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 001 0
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 00 1
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 8; ++i)  // 00
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-
-  // right side pf0 paints bits 7 - 4, 0001
-  for (uint32 i = 0; i < 12; ++i)  // 000 1
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 1
-    EXPECT_EQ(colupf, colu_strip.colu(col++));
-
-  EXPECT_EQ(kFrameWidthPixels, col);
-}
-
-TEST_F(StateTest, PaintPlayfieldEntireRepeatedWithScore) {
-  std::unique_ptr<State> state(new State);
-  // pf0 gets 0xb4 = 1011 0100
-  state = state->AdvanceTimeAndSetRegister(1, Register::X, 0xb4);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::X, TIA::PF0);
-  // pf1 gets 0xd2 = 1101 0010
-  state = state->AdvanceTimeAndSetRegister(1, Register::Y, 0xd2);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::PF1);
-  // pf2 gets 0xe1 = 1110 0001
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0xe1);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF2);
-  const uint8 colubk = 0xfe;
-  state = state->AdvanceTimeAndSetRegister(1, Register::X, colubk);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::X, TIA::COLUBK);
-  const uint8 colupf = 0x0e;
-  state = state->AdvanceTimeAndSetRegister(1, Register::Y, colupf);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::Y, TIA::COLUPF);
-  const uint8 colup0 = 0x60;
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, colup0);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUP0);
-  const uint8 colup1 = 0x70;
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, colup1);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUP1);
-  // disable playfield mirroring and enable score color mode
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x02);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::CTRLPF);
-
-  // should still be in HBLANK
-  EXPECT_GT(kHBlankWidthClocks, state->range().start_time());
-  ColuStrip colu_strip(0);
-  state->PaintInto(&colu_strip);
-  uint32 col = 0;
-  for (uint32 i = 0; i < 2; ++i) {
-    uint8 colupx = i == 0 ? colup0 : colup1;
-    // pf0 paints bits 4 - 7, 1011
-    for (uint32 j = 0; j < 8; ++j)  // 10 11
-      EXPECT_EQ(colupx, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 1 0
-      EXPECT_EQ(colubk, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 1
-      EXPECT_EQ(colupx, colu_strip.colu(col++));
-
-    // pf1 paints bits 7 - 0, 11010010
-    for (uint32 j = 0; j < 8; ++j)  // 11 010010
-      EXPECT_EQ(colupx, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 0 10010
-      EXPECT_EQ(colubk, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 1 0010
-      EXPECT_EQ(colupx, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 8; ++j)  // 00 10
-      EXPECT_EQ(colubk, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 1 0
-      EXPECT_EQ(colupx, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 4; ++j)  // 0
-      EXPECT_EQ(colubk, colu_strip.colu(col++));
-
-    // pf2 paints bits 0 - 7, 11100001
-    for (uint32 j = 0; j < 4; ++j)  // 1110000 1
-      EXPECT_EQ(colupx, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 16; ++j)  // 111 0000
-      EXPECT_EQ(colubk, colu_strip.colu(col++));
-    for (uint32 j = 0; j < 12; ++j)  // 111
-      EXPECT_EQ(colupx, colu_strip.colu(col++));
-  }
-
-  EXPECT_EQ(kFrameWidthPixels, col);
-}
-
-TEST_F(StateTest, PaintPlayfieldEntireMirroredWithScore) {
-  std::unique_ptr<State> state(new State);
-  // pf0 gets 0xe7 = 1110 1000
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0xe7);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF0);
-  // pf1 gets 0x75 = 0111 0101
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x75);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF1);
-  // pf2 gets 0x87 = 1000 0111
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x87);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::PF2);
-  const uint8 colubk = 0x40;
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, colubk);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUBK);
-  const uint8 colupf = 0x20;
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, colupf);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUPF);
-  const uint8 colup0 = 0x10;
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, colup0);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUP0);
-  const uint8 colup1 = 0x00;
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, colup1);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::COLUP1);
-  // enable playfield mirroring and enable score color mode
-  state = state->AdvanceTimeAndSetRegister(1, Register::A, 0x03);
-  state = state->AdvanceTimeAndCopyRegisterToTIA(1, Register::A, TIA::CTRLPF);
-
-  // should still be in HBLANK
-  EXPECT_GT(kHBlankWidthClocks, state->range().start_time());
-  ColuStrip colu_strip(0);
-  state->PaintInto(&colu_strip);
-  uint32 col = 0;
-
-  // left side pf0 paints bits 4 - 7, 1110
-  for (uint32 i = 0; i < 4; ++i)   // 111 0
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 12; ++i)  // 111
-    EXPECT_EQ(colup0, colu_strip.colu(col++));
-
-  // left side pf1 paints bits 7 - 0, 01110101
-  for (uint32 i = 0; i < 4; ++i)  // 0 1110101
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 12; ++i)  // 111 0101
-    EXPECT_EQ(colup0, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 0 101
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 1 01
-    EXPECT_EQ(colup0, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 0 1
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 1
-    EXPECT_EQ(colup0, colu_strip.colu(col++));
-
-  // left side pf2 paints bits 0 - 7, 10000111
-  for (uint32 i = 0; i < 12; ++i)  // 10000 111
-    EXPECT_EQ(colup0, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 16; ++i)  // 1 0000
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 1
-    EXPECT_EQ(colup0, colu_strip.colu(col++));
-
-  // right side pf2 paints bits 7 - 0, 10000111
-  for (uint32 i = 0; i < 4; ++i)  // 1 0001111
-    EXPECT_EQ(colup1, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 16; ++i)  // 0000 111
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 12; ++i)  // 111
-    EXPECT_EQ(colup1, colu_strip.colu(col++));
-
-  // right side pf1 paints bits 0 - 7, 01110101
-  for (uint32 i = 0; i < 4; ++i)  // 0111010 1
-    EXPECT_EQ(colup1, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 011101 0
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 01110 1
-    EXPECT_EQ(colup1, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 0111 0
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 12; ++i)  // 0 111
-    EXPECT_EQ(colup1, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 0
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-
-  // right side pf0 paints bits 7 - 4, 1110
-  for (uint32 i = 0; i < 12; ++i)  // 111 0
-    EXPECT_EQ(colup1, colu_strip.colu(col++));
-  for (uint32 i = 0; i < 4; ++i)  // 0
-    EXPECT_EQ(colubk, colu_strip.colu(col++));
-
-  EXPECT_EQ(kFrameWidthPixels, col);
-}
-*/
 
 TEST(StateDeathTest, AdvanceTimeAndCopyRegisterToTIAUnknownRegister) {
   std::unique_ptr<State> state(new State);

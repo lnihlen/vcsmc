@@ -8,6 +8,7 @@
 #include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 #include <vector>
 
@@ -270,6 +271,13 @@ std::unique_ptr<LineKernel> FrameFitter::FitLine(Random* random,
   std::vector<std::unique_ptr<LineKernel>> population;
   population.reserve(2 * kGenerationSize);
 
+  double mutation_time = 0;
+  double sim_time = 0;
+  double compete_time = 0;
+  double sort_time = 0;
+  double stat_time = 0;
+  double gen_time = 0;
+
   // Generate initial generation of programs.
   for (uint32 i = 0; i < kGenerationSize; ++i) {
     std::unique_ptr<LineKernel> lk(new LineKernel());
@@ -282,6 +290,8 @@ std::unique_ptr<LineKernel> FrameFitter::FitLine(Random* random,
   uint32 generation_count = 0;
   while (generation_count < kMaxGenerations &&
       population[best]->sim_error() > kMaxError) {
+    clock_t gen_start_time = clock();
+
     // Each member of current population generates one offspring by cloning
     // followed by mutation.
     for (uint32 i = 0; i < kGenerationSize; ++i) {
@@ -293,11 +303,15 @@ std::unique_ptr<LineKernel> FrameFitter::FitLine(Random* random,
     for (uint32 i = 0; i < kGenerationSize; ++i)
       population[i]->ResetVictories();
 
+    clock_t sim_start_time = clock();
+
     // Simulate all the new offspring.
     for (uint32 i = kGenerationSize; i < population.size(); ++i) {
       population[i]->Simulate(
           half_colus, scan_line, entry_state, kLinesToScore);
     }
+
+    clock_t compete_start_time = clock();
 
     // Compete to survive!
     for (uint32 i = 0; i < population.size(); ++i) {
@@ -307,12 +321,16 @@ std::unique_ptr<LineKernel> FrameFitter::FitLine(Random* random,
       }
     }
 
+    clock_t sort_start_time = clock();
+
     // Sort by victories greatest to least, then remove the lower half of the
     // population.
     std::sort(population.begin(),
               population.end(),
               &FrameFitter::CompareKernels);
     population.erase(population.begin() + kGenerationSize, population.end());
+
+    clock_t stats_start_time = clock();
 
     best = 0;
     uint32 worst = 0;
@@ -327,6 +345,21 @@ std::unique_ptr<LineKernel> FrameFitter::FitLine(Random* random,
 
     float mean = sum / (float)(population.size());
 
+    clock_t gen_end_time = clock();
+
+    mutation_time += ((double)(sim_start_time - gen_start_time)) /
+        CLOCKS_PER_SEC;
+    sim_time += ((double)(compete_start_time - sim_start_time)) /
+        CLOCKS_PER_SEC;
+    compete_time += ((double)(sort_start_time - compete_start_time)) /
+        CLOCKS_PER_SEC;
+    sort_time += ((double)(stats_start_time - sort_start_time)) /
+        CLOCKS_PER_SEC;
+    stat_time += ((double)(gen_end_time - stats_start_time)) /
+        CLOCKS_PER_SEC;
+    gen_time += ((double)(gen_end_time - gen_start_time)) /
+        CLOCKS_PER_SEC;
+
     printf("  gen %d, best: %f, best cycles: %d, mean: %f, worst: %f\n",
         generation_count,
         population[best]->sim_error(),
@@ -335,6 +368,13 @@ std::unique_ptr<LineKernel> FrameFitter::FitLine(Random* random,
         population[worst]->sim_error());
     ++generation_count;
   }
+
+  // Report on all generation timings.
+  printf("** timings: total: %f, mutate: %f (%f), sim: %f (%f), "
+         "compete: %f (%f), sort: %f (%f), stat: %f (%f)\n",
+          gen_time, mutation_time, mutation_time / gen_time,
+          sim_time, sim_time / gen_time, compete_time, compete_time / gen_time,
+          sort_time, sort_time / gen_time, stat_time, stat_time / gen_time);
 
   std::unique_ptr<LineKernel> best_fit;
   // Save the best final fit from the vector, simulation results included.

@@ -79,9 +79,9 @@ var populate_state = function(e) {
   // Fill in basic State reporting.
   // ....
 
-  if (!state.visible) {
+  if (!state.visible)
     return;
-  }
+
   // Build a table with the colors of both sim and snapshot for comparison.
   var table = document.createElement('table');
   var sim_number_row = document.createElement('tr');
@@ -123,6 +123,8 @@ var populate_state = function(e) {
   b += ' pf2: ' + state.pf2;
   b += ' grp0: ' + state.grp0;
   b += ' grp1: ' + state.grp1;
+  b += ' p0_clock: ' + state.p0_clock;
+  b += ' p1_clock: ' + state.p1_clock;
   var p = document.createElement('p');
   p.innerHTML = b;
   state_detail.appendChild(p);

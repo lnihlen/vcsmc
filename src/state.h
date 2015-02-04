@@ -71,33 +71,35 @@ class State {
   // Fill bytes in |colus| with _half_ atari color values within |range|.
   void ColorInto(uint8* colus, const Range& range) const;
 
-  const bool register_known(Register axy) const {
+  bool register_known(Register axy) const {
     return registers_known_ & (1 << static_cast<int>(axy));
   }
-  const bool tia_known(TIA address) const {
+  bool tia_known(TIA address) const {
     return tia_known_ & (1ULL << static_cast<int>(address));
   }
-  const uint8 a() const {
+  uint8 a() const {
     assert(register_known(Register::A));
     return registers_[Register::A];
   }
-  const uint8 x() const {
+  uint8 x() const {
     assert(register_known(Register::X));
     return registers_[Register::X];
   }
-  const uint8 y() const {
+  uint8 y() const {
     assert(register_known(Register::Y));
     return registers_[Register::Y];
   }
-  const uint8 reg(Register axy) const {
+  uint8 reg(Register axy) const {
     assert(register_known(axy));
     return registers_[axy];
   }
-  const uint8 tia(TIA address) const {
+  uint8 tia(TIA address) const {
     assert(tia_known(address));
     return tia_[address];
   }
   const Range& range() const { return range_; }
+  uint32 p0_clock() const { return p0_clock_; }
+  uint32 p1_clock() const { return p1_clock_; }
 
  private:
   State(const State& s);
