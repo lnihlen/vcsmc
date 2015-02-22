@@ -1428,3 +1428,44 @@ binary code already loaded there. middle 2K used for streaming, each one issues
 jump to other section, which should already be loaded, and hw in background
 loads over the old K. Binary looks like a typical 4K ROM. JMPs take 3 cycles.
 
+===============================================================================
+
+Gate-level simulation of the TIA seems useful. Given that the Evolutionary
+Programming algorithms are designed to uncover all sorts of aberrant corner
+cases in TIA behavior rather than relying on steadily increasing the fidelity
+and feature support of an outside-in simulation why not just build one from
+the inside out?
+
+Start with CPU simulation of the Audio Circuits, can compare simulation output
+to the tiasound.c sim code output.
+
+Abstract base class Part. N inputs and M outputs.
+
+===============================================================================
+
+YAML specification language defines graph of Parts and Nets. These objects
+should contain full diagnostic information such as which file and where in the
+file they are defined and referenced. Parts have a predetermined number of
+inputs and outputs which must agree with the ones provided in the file. We can
+run the simulation using Parts and Nets, for test and validation, but ultimately
+we will want to have the code generating OpenCL shaders for hardware-accelerated
+simulation.
+
+Build Graph from YAML description. Things to validate:
+
+a) no cycles - there are lots of cycles in the schematics but they are to make
+latches, to store state. The way around this is we allow storage of state from
+time step to time step and allow components that will expand to contain any
+parts that are in cycles. Will have to see if this will be enough.
+
+b) floating nets - probably a typo, nets with one input or no outputs or stuff
+like that.
+
+c) reachability - given desired output nets, traverse backwards through all
+required parts to all required input nets.
+
+d) completeness - is enough of the schematic modeled to provide a simulation of
+the desired output signals?
+
+e) correctness - does our predicted behavior match that of the other simulators
+out there, for conventional programs?

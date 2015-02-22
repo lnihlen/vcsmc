@@ -1,0 +1,214 @@
+# Naming Conventions:
+# Parts have their type name first, then an underscore, then page number
+# followed by letter and number cell, lastly duplicate parts in the same cell
+# are counted left to right, top to bottom. Example: NOT_1D82 refers to the
+# second inverter in cell D8 on the first page of the schematic.
+#
+# Networks, if anonymous, are named same as parts, or if not then are named
+# according to the schematic.
+#
+# supported types:
+#
+# BLOCK - Special one-off logic identified by schematic location.
+# GATE  - nMOS transistor, output either follows input or is Z.
+# D1    - Block defined on schematic cell 1D1
+# D2    - Block defined on schematic cell 1D1
+# DGNOR - Block like traditional NOR but outputs Z instead of 1.
+# DIR   - Block defined on schematic cell 1D1
+# DL    - Block defined on schematic cell 1C1
+# DXNOR - Dual NOR block with crossed single-input and output lanes.
+# DGNOT - Dual NOT block, outputs either 1 or Z.
+# F1    - Block defined on schematic cell 1C2
+# NOT   - inverter.
+# WAA   - Wired AND array. Adds field "conditions", a list of same length of
+#         outputs of strings of 1s, 0s, and Xs of length of the input list. Any
+#         matching criteria will drive the output high.
+# XOR   - XOR block, typically made with an AND and two NORs.
+#
+#
+# Special Nets:
+# NET_Z - always high impedence
+# NET_1 - always one
+# NET_0 - always zero
+## Page 1 Cell D8 ##############################################################
+---
+name: NOT_1D81
+type: NOT
+in: [ NET_OSC ]
+out: [ NET_1D81 ]
+---
+name: DGNOT_1D81
+type: DGNOT
+in: [ NET_1D81 ]
+out: [ NET_CLK ]
+---
+
+## Page 1 Cell D5 ##############################################################
+name: F1_1D51
+type: F1
+in: [ NET_1D53, NET_1D52, NET_CLK, NET_RSYN ]
+out: [ NET_1D54, NET_1D51 ]
+---
+name: F1_1D52
+type: F1
+in: [ NET_1D51, NET_1D54, NET_CLK, NET_RSYN ]
+out: [ NET_1D53, NET_1D52 ]
+---
+name: DGNOR_1D51
+type: DGNOR
+in: [ NET_1D51, NET_1D52 ]
+out: [ NET_HPHI2 ]
+---
+name: DGNOR_1D52
+type: DGNOR
+in: [ NET_1D54, NET_1D53 ]
+out: [ NET_HPHI1 ]
+---
+name: NOT_1D51
+type: NOT
+in: [ NET_1D52 ]
+out: [ NET_1D55 ]
+---
+name: DXNOR_1D51
+type: DXNOR
+in: [ NET_1D55, NET_RSYN ]
+out: [ NET_RSYNL ]
+---
+name: AND_1D51
+type: AND
+in: [ NET_RSYND, NET_HPHI2 ]
+out: [ NET_RESPHI0 ]
+---
+name: DGNOT_1D51
+type: DGNOT
+in: [ NET_1D44 ]
+out: [ NET_SHB ]
+---
+
+## Page 1 Cell D4 ##############################################################
+name: DIR_1D41
+type: DIR
+in: [ NET_1D41, NET_HPHI1, NET_HPHI2, NET_SHB ]
+out: [ NET_1D42 ]
+---
+name: DIR_1D42
+type: DIR
+in: [ NET_1D42, NET_HPHI1, NET_HPHI2, NET_SHB ]
+out: [ NET_1D43 ]
+---
+name: BLOCK_1D41  # Very similar to D1 but has a tap in the middle.
+type: BLOCK_1D41
+in: [ NET_1D45 ]
+out: [ NET_1D44, NET_RSYND ]
+---
+name: WAA_1D41
+type: WAA
+in: [ NET_1D42, NET_1D43, NET_1D33, NET_1D34, NET_1D32, NET_1D35 ]
+out: [ NET_ERR77,
+       NET_END12,
+       NET_RHS73,
+       NET_CNT15,
+       NET_RCB74,
+       NET_SHS17,
+       NET_LRHB72,
+       NET_RHB16 ]
+conditions: [ 000000, 101011, 001000, 010011, 110000, 000010, 101000, 100011 ]
+---
+
+## Page 1 Cell D3 ##############################################################
+name: XOR_1D31
+type: XOR
+in: [ NET_1D31, NET_1D32 ]
+out: [ NET_1D41 ]
+---
+name: DIR_1D31
+type: DIR
+in: [ NET_1D43, NET_HPHI1, NET_HPHI2, NET_SHB ]
+out: [ NET_1D33 ]
+---
+name: DIR_1D32
+type: DIR
+in: [ NET_1D33, NET_HPHI1, NET_HPHI2, NET_SHB ]
+out: [ NET_1D34 ]
+---
+name: DIR_1D33
+type: DIR
+in: [ NET_1D34, NET_HPHI1, NET_HPHI2, NET_SHB ]
+out: [ NET_1D32 ]
+---
+name: DIR_1D34
+type: DIR
+in: [ NET_1D32, NET_HPHI1, NET_HPHI2, NET_SHB ]
+out: [ NET_1D35 ]
+---
+
+## Page 1 Cell D2 ##############################################################
+name: NOT_1D21
+type: NOT
+in: [ NET_1D35 ]
+out: [ NET_1D31 ]
+---
+
+## Page 1 Cell C8 ##############################################################
+name: NOT_1C81
+type: NOT
+in: [ NET_VSYN ]
+out: [ NET_1C81 ]
+---
+name: L_1C81
+type: L
+in: [ NET_D1, NET_VSYN, NET_1C81 ]
+out: [ NET_VS, NET_Z ]
+---
+name: L_1C82
+type: L
+in: [ NET_D1, NET_VBLK, NET_1C83 ]
+out: [ NET_1C82, NET_Z ]
+---
+name: NOT_1C82
+type: NOT
+in: [ NET_VBLK ]
+out: [ NET_1C83 ]
+---
+
+## Page 1 Cell C6 ##############################################################
+name: BLOCK_1C61
+type: BLOCK_1C61
+in: [ NET_SEC, NET_SHB, NET_RHB16, NET_LRHB72 ]
+out: [ NET_1C61 ]
+---
+name: DL_1C61
+type: DL
+in: [ NET_1C61, NET_HPHI1, NET_HPHI2, NET_SHB ]
+out: [ NET_HB_BAR ]
+---
+
+## Page 1 Cell C5 ##############################################################
+name: DL_1C52
+type: DL
+in: [ NET_RCB74, NET_HPHI1, NET_HPHI2, NET_1C52 ]
+out: [ NET_1C51 ]
+---
+name: DL_1C51
+type: DL
+in: [ NET_SHS17, NET_HPHI1, NET_HPHI2, NET_1C52 ]
+out: [ NET_HS ]
+---
+
+## Page 1 Cell C4 ##############################################################
+name: D2_1C41
+type: D2
+in: [ NET_RHS73, NET_CNT15, NET_HPHI1, NET_HPHI2 ]
+out: [ NET_APHI2 ]
+---
+name: D1_1C51
+type: D1
+in: [ NET_RHS73, NET_HPHI1, NET_HPHI2 ]
+out: [ NET_1C52 ]
+---
+name: D2_1C51
+type: D2
+in: [ NET_SHB, NET_LRHB72, NET_HPHI1, NET_HPHI2 ]
+out: [ NET_APHI1 ]
+---
+

@@ -29,5 +29,6 @@ clean:
 
 $(OUT)/:
 	mkdir -p out/
+	mkdir -p out/parts/
 
 
