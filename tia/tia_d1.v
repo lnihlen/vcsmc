@@ -15,11 +15,11 @@ wire out;
 assign out = s2 ? ~tap : 1;
 
 initial begin
-  tap = 0;
+  tap = 1;
 end
 
-always @(negedge s1) begin
-  tap = ~in;
+always @(posedge s1, in) begin
+  if (s1) tap = ~in;
 end
 
 endmodule  // tia_d1

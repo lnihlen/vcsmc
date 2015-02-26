@@ -10,6 +10,7 @@ reg clock;
 wire d1_out;
 reg rsyn;
 wire rsynl;
+wire tap;
 
 integer cycle_count;
 
@@ -19,7 +20,7 @@ tia_biphase_clock bpc(.clk(clock),
                       .hphi2(s2),
                       .rsynl(rsynl));
 
-tia_d1 d1(.in(d1_in), .s1(s1), .s2(s2), .out(d1_out));
+tia_d1 d1(.in(d1_in), .s1(s1), .s2(s2), .tap(tap), .out(d1_out));
 
 initial begin
   d1_in = 0;
@@ -38,61 +39,61 @@ end
 
 always @(posedge s1) begin
   case (cycle_count)
-    1: begin
-      d1_in = 1;
-    end
     2: begin
-      d1_in = 0;
+      d1_in = 1;
     end
     3: begin
+      d1_in = 0;
+    end
+    4: begin
       d1_in = 1;
     end
-    5: begin
+    6: begin
       d1_in = 0;
     end
   endcase
 end
 
 always @(posedge s2) begin
-  #1
+  #5
   case (cycle_count)
-    1: begin
-      if (d1_out != 1) begin
-        $display("ERROR cycle 1");
-        $finish;
-      end
-    end
     2: begin
-      if (d1_out != 0) begin
-        $display("ERROR cycle 2");
+      if (d1_out != 1 || tap != 0) begin
+        $display("ERROR cycle 1, d1_in: %d, d1_out: %d", d1_in, d1_out);
         $finish;
       end
     end
     3: begin
-      if (d1_out != 1) begin
-        $display("ERROR cycle 3");
+      if (d1_out != 0 || tap != 1) begin
+        $display("ERROR cycle 2");
         $finish;
       end
     end
     4: begin
-      if (d1_out != 1) begin
-        $display("ERROR cycle 4");
+      if (d1_out != 1 || tap != 0) begin
+        $display("ERROR cycle 3");
         $finish;
       end
     end
     5: begin
-      if (d1_out != 0) begin
-        $display("ERROR cycle 5");
+      if (d1_out != 1 || tap != 0) begin
+        $display("ERROR cycle 4");
         $finish;
       end
     end
     6: begin
-      if (d1_out != 0) begin
-        $display("ERROR cycle 6");
+      if (d1_out != 0 || tap != 1) begin
+        $display("ERROR cycle 5");
         $finish;
       end
     end
     7: begin
+      if (d1_out != 0 || tap != 1) begin
+        $display("ERROR cycle 6");
+        $finish;
+      end
+    end
+    8: begin
       $display("OK");
       $finish;
     end

@@ -52,6 +52,7 @@ always #100 begin
 end
 
 always @(posedge hphi1) begin
+  #10
   $display("%d%d%d%d%d%d", a, b, c, d, e, f);
   if (cycle_count > 25) begin
     $display("OK");

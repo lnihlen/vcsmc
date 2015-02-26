@@ -10,7 +10,6 @@ wire in;
 wire s1;
 wire s2;
 wire r;
-reg d;
 wire out;
 wire d1_out;
 

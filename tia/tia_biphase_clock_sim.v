@@ -66,6 +66,10 @@ always @(posedge clock) begin
 end
 
 always @(clock) begin
+  if (hphi1 === 1 && hphi2 === 1) begin
+    $display("ERROR - hphi1 and hphi2 1 at the same time.");
+    $finish;
+  end
   #1
   case (state)
     RESET: begin

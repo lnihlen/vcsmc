@@ -41,51 +41,48 @@ end
 always @(posedge s1) begin
   case (cycle_count)
     1: begin
-      d1_in = 1;
+      reset = 0;
     end
     2: begin
-      d1_in = 0;
-    end
-    3: begin
       d1_in = 1;
     end
-    5: begin
+    3: begin
       d1_in = 0;
     end
-    7: begin
+    4: begin
+      d1_in = 1;
+    end
+    6: begin
+      d1_in = 0;
+    end
+    8: begin
       reset = 1;
       d1_in = 1;
     end
-    8: begin
+    9: begin
       d1_in = 0;
     end
-    9: begin
+    10: begin
       d1_in = 1;
     end
-    11: begin
+    12: begin
       d1_in = 0;
     end
   endcase
 end
 
 always @(posedge s2) begin
-  #1
+  #10
   case (cycle_count)
-    1: begin
-      if (d1_out != 1) begin
-        $display("ERROR cycle 1");
-        $finish;
-      end
-    end
     2: begin
-      if (d1_out != 0) begin
-        $display("ERROR cycle 2");
+      if (d1_out != 1) begin
+        $display("ERROR cycle 2, d1_out: %d", d1_out);
         $finish;
       end
     end
     3: begin
-      if (d1_out != 1) begin
-        $display("ERROR cycle 3");
+      if (d1_out != 0) begin
+        $display("ERROR cycle 3, d1_out: %d", d1_out);
         $finish;
       end
     end
@@ -96,7 +93,7 @@ always @(posedge s2) begin
       end
     end
     5: begin
-      if (d1_out != 0) begin
+      if (d1_out != 1) begin
         $display("ERROR cycle 5");
         $finish;
       end
@@ -107,11 +104,17 @@ always @(posedge s2) begin
         $finish;
       end
     end
+    7: begin
+      if (d1_out != 0) begin
+        $display("ERROR cycle 7");
+        $finish;
+      end
+    end
   endcase
   if (cycle_count > 15) begin
     $display("OK");
     $finish;
-  end else if (cycle_count > 6) begin
+  end else if (cycle_count > 7) begin
     if (d1_out != 0) begin
       $display("ERROR r = 1 but d1_out != 0");
       $finish;

@@ -58,7 +58,6 @@ always @(negedge clock) begin
     end
 
     4: begin  // repeat tests with reset true, should clobber output
-      #1
       reset = 1;
       s = 0;
       r = 1;
@@ -68,7 +67,6 @@ always @(negedge clock) begin
       end
     end
     5: begin  // test holding set value
-      #1;
       reset = 1;
       s = 1;
       r = 1;
@@ -78,7 +76,6 @@ always @(negedge clock) begin
       end
     end
     6: begin  // test reset
-      #1;
       reset = 1;
       s = 1;
       r = 0;
@@ -88,7 +85,6 @@ always @(negedge clock) begin
       end
     end
     7: begin  // test hold reset
-      #1;
       reset = 1;
       s = 1;
       r = 1;
@@ -101,61 +97,53 @@ always @(negedge clock) begin
 end
 
 always @(posedge clock) begin
-  #1
+  #10
   case (cycle_count)
     0: begin  // test set
-      if (q === 1 && q_bar === 0) begin
-        $display("s pass");
-      end else begin
+      if (q != 1 || q_bar != 0) begin
         $display("s FAIL, q = %h, q_bar = %h", q, q_bar);
         $finish;
       end
     end
     1: begin  // test hold set
-      if (q === 1 && q_bar === 0) begin
-        $display("s hold pass.");
-      end else begin
+      if (q != 1 && q_bar != 0) begin
         $display("s hold FAIL, q = %h, q_bar = %h", q, q_bar);
         $finish;
       end
     end
     2: begin  // test reset
-      if (q == 0 && q_bar == 1) begin
-        $display("r pass.");
-      end else begin
+      if (q != 0 || q_bar != 1) begin
         $display("r FAIL, q = %h, q_bar = %h", q, q_bar);
         $finish;
       end
     end
     3: begin  // test hold reset
-      if (q == 0 && q_bar == 1) begin
-        $display("r hold pass.");
-      end else begin
+      if (q != 0 || q_bar != 1) begin
         $display("r hold FAIL, q = %h, q_bar = %h", q, q_bar);
         $finish;
       end
     end
 
     4: begin  // test set
-      if (!(q === 0 && q_bar === 1)) begin
+      if (q != 0 || q_bar != 1) begin
         $display("+ reset FAIL, q: %h, q_bar: %h", q, q_bar);
         $finish;
       end
     end
     5: begin  // test hold set
-      if (!(q === 0 && q_bar === 1)) begin
+      if (q != 0 || q_bar != 1) begin
         $display("+ reset FAIL, q: %h, q_bar: %h", q, q_bar);
         $finish;
       end
     end
     6: begin  // test reset
-      if (!(q === 0 && q_bar === 1)) begin
+      if (q != 0 || q_bar != 1) begin
         $display("+ reset FAIL, q: %h, q_bar: %h", q, q_bar);
         $finish;
       end
     end
     7: begin  // test hold reset
-      if (!(q === 0 && q_bar === 1)) begin
+      if (q != 0 || q_bar != 1) begin
         $display("+ reset FAIL, q: %h, q_bar: %h", q, q_bar);
         $finish;
       end
