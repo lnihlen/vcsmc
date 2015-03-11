@@ -1,3 +1,6 @@
+`ifndef TIA_TIA_D1_V
+`define TIA_TIA_D1_V
+
 // D1 block defined on TIA schematics page 1, section D-1. |tap| is an optional
 // output from the middle (inverted) state.
 module tia_d1(in, s1, s2, tap, out);
@@ -11,15 +14,18 @@ wire s2;
 reg tap;
 wire out;
 
-// If s2 is high then output is stored latch, otherwise it sees a zero.
-assign out = s2 ? ~tap : 1;
+assign out = (s2 === 1) ? ~tap : 1;
 
 initial begin
   tap = 1;
 end
 
 always @(posedge s1, in) begin
-  if (s1) tap = ~in;
+  if (s1 === 1) begin
+    if (in === 1) tap = 0; else tap = 1;
+  end
 end
 
 endmodule  // tia_d1
+
+`endif  // TIA_TIA_D1_V

@@ -2,45 +2,50 @@
 
 // Horizontal Linear Feedback Shift Register, used as a counter for various
 // horizontal timings. Defined on TIA schematics page 1, section D-4 and D-3.
-module tia_horizontal_lfsr(hphi1, hphi2, rsynl, a, b, c, d, e, f, shb, rsynd);
+module tia_horizontal_lfsr(hphi1, hphi2, rsynl, out, shb, rsynd);
 
 input hphi1, hphi2, rsynl;
-output a, b, c, d, e, f, shb, rsynd;
+output[5:0] out;
+output shb, rsynd;
 
 wire hphi1;
 wire hphi2;
 wire rsynl;
-wire a;
-wire b;
-wire c;
-wire d;
-wire e;
-wire f;
 wire shb;
-wire g;
 wire err;
 wire wend;
 wire d1_in;
 wire d1_out;
 wire rsynd;
+reg[5:0] in;
+reg[5:0] out;
 
-tia_d1r d1r_a(.in(g), .s1(hphi1), .s2(hphi2), .r(shb), .out(a));
-tia_d1r d1r_b(.in(a), .s1(hphi1), .s2(hphi2), .r(shb), .out(b));
-tia_d1r d1r_c(.in(b), .s1(hphi1), .s2(hphi2), .r(shb), .out(c));
-tia_d1r d1r_d(.in(c), .s1(hphi1), .s2(hphi2), .r(shb), .out(d));
-tia_d1r d1r_e(.in(d), .s1(hphi1), .s2(hphi2), .r(shb), .out(e));
-tia_d1r d1r_f(.in(e), .s1(hphi1), .s2(hphi2), .r(shb), .out(f));
 tia_d1 d1(.in(d1_in), .s1(hphi1), .s2(hphi2), .tap(rsynd), .out(d1_out));
 
-assign g = e ^ (~f);
-assign err = (~a) & (~b) & (~c) & (~d) & (~e) & (~f);
-assign wend = a & (~b) & c & (~d) & e & f;
+assign err = &(out);
+assign wend = (~out[5]) & out[4] & (~out[3]) & out[2] & (~out[1]) & (~out[0]);
 assign d1_in = ~(wend | err | rsynl);
 assign shb = d1_out ? 1'bz : 1;
 
-always @(hphi1, hphi2, rsynl, a, b, c, d, e, f, g, shb, err, wend, d1_in, d1_out, rsynd) begin
-  $display("hphi1: %d, hphi2: %d, rsynl: %d, a: %d, b: %d, c: %d, d: %d, e: %d, f: %d, g: %d, shb: %d, err: %d, wend: %d, d1_in: %d, d1_out: %d, rsynd: %d",
-      hphi1, hphi2, rsynl, a, b, c, d, e, f, g, shb, err, wend, d1_in, d1_out, rsynd);
+initial begin
+  in[5:0] = 6'b000000;
+  out[5:0] = 6'b000000;
+end
+
+always @(shb) begin
+  if (shb)
+    assign out[5:0] = 6'b000000;
+  else
+    deassign out;
+end
+
+always @(posedge hphi1) begin
+  in[4:0] = out[5:1];
+  in[5] = out[1] ^ (~out[0]);
+end
+
+always @(posedge hphi2) begin
+  out[5:0] = in[5:0];
 end
 
 endmodule  // tia_horizontal_lfsr

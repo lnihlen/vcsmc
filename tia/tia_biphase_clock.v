@@ -38,7 +38,7 @@ tia_f1 f1_b(.s(a_q_bar),
             .q(b_q),
             .q_bar(b_q_bar));
 
-sr rsyn_sr(.s(b_q_bar_bar), .r(rsyn), .q(rsynl));
+sr rsyn_sr(.s(b_q_bar_bar), .r(rsyn), .r2(0), .q(rsynl));
 
 assign hphi1 = (a_q === 1 || b_q === 1) ? 1'bz : 1;
 assign hphi2 = (a_q_bar === 1 || b_q_bar === 1) ? 1'bz : 1;

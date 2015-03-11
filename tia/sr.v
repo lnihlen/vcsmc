@@ -1,11 +1,16 @@
-// SR latch, used throughout the TIA.
-module sr(s, r, q, q_bar);
+`ifndef TIA_TIA_SR_V
+`define TIA_TIA_SR_V
 
-input s, r;
+// SR latch, used throughout the TIA. Supports an optional additional reset
+// input.
+module sr(s, r, r2, q, q_bar);
+
+input s, r, r2;
 output q, q_bar;
 
 wire s;
 wire r;
+wire r2;
 reg q;
 wire q_bar;
 
@@ -15,15 +20,16 @@ initial begin
   q = 0;
 end
 
-always @(s, r) begin
-  if (s === 0 && r === 1)
+wire r_int;
+assign r_int = (r === 1 || r2 === 1) ? 1 : 0;
+
+always @(s, r_int) begin
+  if (s === 0 && r_int === 1)
     q = 1;
-  else if (s === 1 && r === 0)
+  else if (s === 1 && r_int === 0)
     q = 0;
-  else if (s === 1 && r === 1) begin
-    $display("ERROR s and r both 1 in SR flip-flip.");
-    $stop;
-  end
 end
 
 endmodule  // sr
+
+`endif  // TIA_TIA_SR_V

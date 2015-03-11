@@ -1,3 +1,6 @@
+`ifndef TIA_TIA_F1_V
+`define TIA_TIA_F1_V
+
 // F1 block defined on TIA schematics page 1, section C-1.
 module tia_f1(s, r, clock, reset, q, q_bar);
 
@@ -69,3 +72,5 @@ always @(posedge clock) begin
 end
 
 endmodule  // tia_f1
+
+`endif  // TIA_TIA_F1_V
