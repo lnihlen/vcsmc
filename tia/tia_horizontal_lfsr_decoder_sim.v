@@ -106,7 +106,6 @@ always @(posedge hphi1) begin
       $finish;
     end
   end
-  $display("%d: %b", cycle_count, out);
   cycle_count = cycle_count + 1;
 end
 

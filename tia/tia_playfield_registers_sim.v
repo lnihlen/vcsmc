@@ -99,6 +99,7 @@ always #100 begin
 end
 
 always @(posedge clock) begin
+  #5
   // First scan line we just set all of the playfield data bits to zero.
   if (cycle_count == 9) begin
     pf0 = 1;
@@ -118,7 +119,7 @@ always @(posedge clock) begin
     pf2 = 0;
   end else if (cycle_count >= 68 && cycle_count < 228) begin
     if (pf != 0) begin
-      $display("ERROR pf != 0, cycle_count: %d", cycle_count);
+      $display("ERROR pf != 0, cycle_count: %d, pf: %d", cycle_count, pf);
       $finish;
     end
 
@@ -167,3 +168,4 @@ always @(posedge clock) begin
 end
 
 endmodule  // tia_playfield_registers_sim
+
