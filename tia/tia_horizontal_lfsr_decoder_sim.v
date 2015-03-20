@@ -58,6 +58,7 @@ always #100 begin
 end
 
 always @(posedge hphi1) begin
+  #1
   // Counter should start with 0 and repeat every 57 cycles.
   if (cycle_count == 4 || cycle_count == (4 + 57)) begin
     if (rhs != 0 || cnt != 0 || rcb != 0 ||

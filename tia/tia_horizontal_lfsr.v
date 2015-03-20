@@ -1,4 +1,4 @@
-`include "tia_d1r.v"
+`include "tia_d1.v"
 
 // Horizontal Linear Feedback Shift Register, used as a counter for various
 // horizontal timings. Defined on TIA schematics page 1, section D-4 and D-3.
@@ -33,10 +33,13 @@ initial begin
 end
 
 always @(shb) begin
-  if (shb)
+  if (shb) begin
+    assign in[5:0] = 6'b000000;
     assign out[5:0] = 6'b000000;
-  else
+  end else begin
+    deassign in;
     deassign out;
+  end
 end
 
 always @(posedge hphi1) begin

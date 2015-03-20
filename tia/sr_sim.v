@@ -10,7 +10,7 @@ reg clock;
 
 integer cycle_count;
 
-sr sr(.s(s), .r(r), .q(q), .q_bar(q_bar));
+sr sr(.s(s), .r(r), .r2(0), .q(q), .q_bar(q_bar));
 
 initial begin
   s = 0;  // set

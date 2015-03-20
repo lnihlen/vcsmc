@@ -19,7 +19,7 @@ wire m1_sr_s, m1_sr_r;
 wire m1, m1_sr_q;
 assign m1_sr_s = ~(log_clk | q2);
 assign m1_sr_r = ~(log_clk | q2_bar);
-sr m1_sr(.s(m1_sr_s), .r(m1_sr_r), .q(m1_sr_q), .q_bar(m1));
+sr m1_sr(.s(m1_sr_s), .r(m1_sr_r), .r2(0), .q(m1_sr_q), .q_bar(m1));
 
 wire pp_in;
 assign pp_in = ~(q2 | m1_sr_q);
@@ -39,7 +39,7 @@ assign m2_sr_s = ~(log_clk | ~(m2_mid));
 wire m2_sr_r;
 assign m2_sr_r = ~(log_clk | m2_mid);
 wire m2, m2_sr_q;
-sr m2_sr(.s(m2_sr_s), .r(m2_sr_r), .q(m2_sr_q), .q_bar(m2));
+sr m2_sr(.s(m2_sr_s), .r(m2_sr_r), .r2(0), .q(m2_sr_q), .q_bar(m2));
 
 assign clkp = (clk === 1) ? 1'bz : 1;
 
