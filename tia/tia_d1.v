@@ -12,14 +12,11 @@ wire in;
 wire s1;
 wire s2;
 reg tap;
-reg out_store;
-wire out;
-
-assign out = (s2 === 1) ? out_store : 1;
+reg out;
 
 initial begin
   tap = 1;
-  out_store = 0;
+  out = 0;
 end
 
 always @(posedge s1, in) begin
@@ -30,7 +27,7 @@ end
 
 
 always @(posedge s2) begin
-  out_store = ~tap;
+  out = ~tap;
 end
 
 endmodule  // tia_d1

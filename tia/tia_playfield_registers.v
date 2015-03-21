@@ -159,21 +159,4 @@ assign pf_bit_f1_r = ~pf_bit_f1_s;
 tia_f1 pf_bit_f1(.s(pf_bit_f1_s), .r(pf_bit_f1_r), .clock(clkp), .reset(0),
     .q(pf));
 
-always @(pf_bit_d1_in, pf_bit_f1_s, pf) begin
-  $display("pf_bit_d1_in: %d, pf_bit_f1_s: %d, pf: %d",
-      pf_bit_d1_in, pf_bit_f1_s, pf);
-end
-
-/*
-always @(posedge hphi2) begin
-  #1
-  $display("%d%d%d%d %d%d%d%d%d%d%d%d %d%d%d%d%d%d%d%d %d",
-      repeat_start, pf0_bit5_so1, pf0_bit6_so1, pf0_bit7_so1,
-      pf1_bit7_so2, pf1_bit6_so2, pf1_bit5_so2, pf1_bit4_so2,
-      pf1_bit3_so2, pf1_bit2_so2, pf1_bit1_so2, pf1_bit0_so2,
-      pf2_bit0_so1, pf2_bit1_so1, pf2_bit2_so1, pf2_bit3_so1,
-      pf2_bit4_so1, pf2_bit5_so1, pf2_bit6_so1, pf2_bit7_so1,
-      pf);
-end
-*/
 endmodule  // tia_playfield_registers

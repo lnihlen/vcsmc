@@ -13,15 +13,11 @@ wire in2;
 wire s1;
 wire s2;
 reg tap;
-wire out;
-reg out_store;
-
-// If s2 is high then output is stored latch, otherwise it sees a zero.
-assign out = (s2 === 1) ? out_store : 1;
+reg out;
 
 initial begin
   tap = 1;
-  out_store = 0;
+  out = 0;
 end
 
 always @(posedge s1, in1, in2) begin
@@ -31,7 +27,7 @@ always @(posedge s1, in1, in2) begin
 end
 
 always @(posedge s2) begin
-  out_store = ~tap;
+  out = ~tap;
 end
 
 endmodule  // tia_d2

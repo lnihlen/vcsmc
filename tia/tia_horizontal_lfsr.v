@@ -32,14 +32,8 @@ initial begin
   out[5:0] = 6'b000000;
 end
 
-always @(shb) begin
-  if (shb) begin
-    assign in[5:0] = 6'b000000;
-    assign out[5:0] = 6'b000000;
-  end else begin
-    deassign in;
-    deassign out;
-  end
+always @(posedge shb) begin
+  out[5:0] = 6'b000000;
 end
 
 always @(posedge hphi1) begin
