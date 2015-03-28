@@ -80,7 +80,7 @@ always @(posedge s2) begin
           cycle_count, dl_in, dl_out, dl_r);
       $finish;
     end
-  end else if (cycle_count < 10) begin
+  end else if (cycle_count < 9) begin
     if (dl_out != 0) begin
       $display("error cycle: %d, in: %d, out: %d, r: %d",
           cycle_count, dl_in, dl_out, dl_r);

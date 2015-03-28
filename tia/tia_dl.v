@@ -12,22 +12,26 @@ wire in;
 wire s1;
 wire s2;
 wire r;
-reg latched;
+reg latched_in;
+reg latched_out;
 wire out;
 
 // If s2 is high then output is stored latch, otherwise it sees a zero.
-assign out = (r === 1) ? 0 : latched;
+assign out = (r === 1) ? 0 : latched_out;
 
 initial begin
-  latched = 0;
-end
-
-always @(r) begin
-  latched = 0;
+  latched_in = 0;
+  latched_out = 0;
 end
 
 always @(posedge s1, in) begin
-  if ((s1 === 1) && (in === 1 || latched === 1)) latched = 1;
+  if (s1 === 1) begin
+    latched_in = ~(in | out);
+  end
+end
+
+always @(posedge s2) begin
+  latched_out = ~latched_in;
 end
 
 endmodule  // tia_d2
