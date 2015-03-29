@@ -14,9 +14,9 @@ def main(argv):
   for sim_name in sims:
     name = sim_name[:-6]
     out_name = os.path.join('out', sim_name[:-2])
-    result = subprocess.call(['iverilog', '-Wall', '-o', out_name, sim_name])
-    if result != 0:
-      print 'error compiling %s' % sim_name
+    build_output = subprocess.check_output(['iverilog', '-Wall', '-o', out_name, sim_name])
+    if build_output:
+      print 'error compiling %s: %s' % (sim_name, build_output)
       return -1
     sim_output = subprocess.check_output(['vvp', out_name])
     if sim_output != 'OK\n':
