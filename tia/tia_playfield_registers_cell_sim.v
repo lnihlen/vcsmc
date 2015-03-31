@@ -66,7 +66,7 @@ tia_playfield_registers_cell lower(.i(d2),
                                    .o(lower_o));
 
 initial begin
-  clock = 1'bz;
+  clock = 0;
   rsyn = 0;
   d0 = 0;
   d1 = 0;
@@ -78,11 +78,7 @@ initial begin
 end
 
 always #100 begin
-  if (clock) begin
-    clock = 1'bz;
-  end else begin
-    clock = 1;
-  end
+  clock = ~clock;
 end
 
 always @(posedge hphi1) begin

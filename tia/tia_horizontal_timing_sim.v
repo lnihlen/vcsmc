@@ -48,7 +48,7 @@ reg vsyn;
 reg vblk;
 reg hmove;
 wire clkp;
-assign clkp = (clock === 1) ? 1'bz : 1;
+assign clkp = ~clock;
 reg wsyn;
 reg d1;
 wire resphi0;
@@ -85,7 +85,7 @@ tia_horizontal_timing timing(.hphi1(hphi1),
                              .syn(syn));
 
 initial begin
-  clock = 1'bz;
+  clock = 0;
   cc = 0;
   rsyn = 0;
   vsyn = 0;
@@ -96,11 +96,7 @@ initial begin
 end
 
 always #100 begin
-  if (clock) begin
-    clock = 1'bz;
-  end else begin
-    clock = 1;
-  end
+  clock = ~clock;
 end
 
 always @(posedge clock) begin

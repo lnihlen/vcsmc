@@ -20,8 +20,8 @@ initial begin
 end
 
 always @(posedge s1, in) begin
-  if (s1 === 1) begin
-    if (in === 1) tap = 0; else tap = 1;
+  if (s1) begin
+    tap = ~in;
   end
 end
 

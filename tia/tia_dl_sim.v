@@ -30,17 +30,13 @@ tia_dl dl(.in(dl_in),
 initial begin
   dl_in = 0;
   dl_r = 0;
-  clock = 1'bz;
+  clock = 0;
   rsyn = 0;
   cycle_count = 0;
 end
 
 always #100 begin
-  if (clock) begin
-    clock = 1'bz;
-  end else begin
-    clock = 1;
-  end
+  clock = ~clock;
 end
 
 always @(posedge s1) begin

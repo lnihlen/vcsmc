@@ -21,12 +21,12 @@ initial begin
 end
 
 wire r_int;
-assign r_int = (r === 1 || r2 === 1) ? 1 : 0;
+assign r_int = r | r2;
 
 always @(s, r_int) begin
-  if (s === 0 && r_int === 1)
+  if (!s && r_int)
     q = 1;
-  else if (s === 1 && r_int === 0)
+  else if (s && !r_int)
     q = 0;
 end
 

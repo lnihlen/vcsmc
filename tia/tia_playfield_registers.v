@@ -42,7 +42,7 @@ assign repeat_start = (ref_bar & cnt) | rhb;
 wire reflect_start;
 assign reflect_start = ~(ref_bar | (~cnt));
 
-// ==== PF0
+// PF0
 
 wire pf0_bar;
 assign pf0_bar = ~pf0;
@@ -69,7 +69,7 @@ tia_playfield_registers_cell pf0_bit7(.i(d7), .l1(pf0), .l2(pf0_bar),
     .si1(pf0_bit6_so1), .si2(pf1_bit7_so1), .hphi1(hphi1), .hphi2(hphi2),
     .so1(pf0_bit7_so1), .so2(pf0_bit7_so2), .o(pf0_bit7_o));
 
-// ==== PF1
+// PF1
 
 wire pf1_bar;
 assign pf1_bar = ~pf1;
@@ -108,7 +108,7 @@ tia_playfield_registers_cell pf1_bit7(.i(d7), .l1(pf1), .l2(pf1_bar),
     .si1(pf1_bit6_so1), .si2(pf0_bit7_so1), .hphi1(hphi1), .hphi2(hphi2),
     .so1(pf1_bit7_so1), .so2(pf1_bit7_so2), .o(pf1_bit7_o));
 
-// ==== PF2
+// PF2
 
 wire pf2_bar;
 assign pf2_bar = ~pf2;

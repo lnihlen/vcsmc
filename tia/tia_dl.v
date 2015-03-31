@@ -17,7 +17,7 @@ reg latched_out;
 wire out;
 
 // If s2 is high then output is stored latch, otherwise it sees a zero.
-assign out = (r === 1) ? 0 : latched_out;
+assign out = (~r) & latched_out;
 
 initial begin
   latched_in = 0;
@@ -25,7 +25,7 @@ initial begin
 end
 
 always @(posedge s1, in) begin
-  if (s1 === 1) begin
+  if (s1) begin
     latched_in = ~(in | out);
   end
 end

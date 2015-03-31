@@ -51,7 +51,7 @@ reg [7:0] pf2_data;
 reg d0, d1, d2, d3, d4, d5, d6, d7;
 reg pf0, pf1, pf2;
 wire clkp;
-assign clkp = (clock === 1) ? 1'bz : 1;
+assign clkp = ~clock;
 reg ref_bar;
 wire cntd, pf;
 
@@ -76,7 +76,7 @@ tia_playfield_registers pf_reg(.cnt(cnt),
                                .pf(pf));
 
 initial begin
-  clock = 1'bz;
+  clock = 0;
   cc = 0;
   line_count = 0;
   rsyn = 0;
@@ -98,12 +98,8 @@ initial begin
 end
 
 always #100 begin
-  if (clock) begin
-    clock = 1'bz;
-  end else begin
-    clock = 1;
-    cc = cc + 1;
-  end
+  clock = ~clock;
+  if (clock) cc = cc + 1;
 end
 
 always @(posedge clkp) begin
@@ -242,7 +238,7 @@ always @(posedge clkp) begin
       $finish;
     end
   end else if (cc >= 68 + 80 && cc < 68 + 160) begin
-    if (ref_bar === 1) begin
+    if (ref_bar) begin
       if (cc >= 148 +  0 && cc < 148 +  4) begin          // pf0 bit 4
         if (pf != pf0_data[0]) begin
           $display("pf0 bit 4 error! pf: %d, pf0_data[0]: %d", pf, pf0_data[0]);

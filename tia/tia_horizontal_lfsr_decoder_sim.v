@@ -44,17 +44,13 @@ tia_horizontal_lfsr_decoder decode(.in(out),
                                    .rhb(rhb));
 
 initial begin
-  clock = 1'bz;
+  clock = 0;
   cycle_count = 0;
   rsyn = 0;
 end
 
 always #100 begin
-  if (clock) begin
-    clock = 1'bz;
-  end else begin
-    clock = 1;
-  end
+  clock = ~clock;
 end
 
 always @(posedge hphi1) begin

@@ -11,7 +11,7 @@ module tia_motion_registers_cell_a(hphi1, hphi2, sec, in, out);
   tia_d1 cell_a_d1(.in(in), .s1(hphi1), .s2(hphi2), .out(dlr));
   wire dlo;
   tia_dl cell_a_dl(.in(sec), .s1(hphi1), .s2(hphi2), .r(dlr), .out(dlo));
-  assign out = (hphi1 === 1) ? ~dlo : 1;
+  assign out = ~(hphi1 & dlo);
 endmodule  // tia_motion_registers_cell_a
 
 // Cell B is the most numerous cell at 15 places. It stores an individual bit
@@ -27,12 +27,12 @@ module tia_motion_registers_cell_b(d, follow, latch, hmclr, rin, waout, rout);
     mid = 1;
   end
   always @(posedge follow, d) begin
-    if (follow === 1) mid = ~d;
+    if (follow) mid = ~d;
   end
   wire latch_out;
   assign #1 latch_out = ~(hmclr | mid);
   always @(posedge latch, latch_out) begin
-    if (latch === 1) mid = ~latch_out;
+    if (latch) mid = ~latch_out;
   end
   assign rout = ~rin;
   assign waout = ~(mid & rout) & ~(latch_out & rin);
@@ -48,12 +48,12 @@ module tia_motion_registers_cell_c(d, follow, latch, hmclr, rin, waout, rout);
     mid = 1;
   end
   always @(posedge follow, d) begin
-    if (follow === 1) mid = ~d;
+    if (follow) mid = ~d;
   end
   wire latch_out;
   assign #1 latch_out = ~(hmclr | mid);
   always @(posedge latch, latch_out) begin
-    if (latch === 1) mid = ~latch_out;
+    if (latch) mid = ~latch_out;
   end
   assign rout = ~rin;
   assign waout = ~(mid & rin) & ~(latch_out & rout);

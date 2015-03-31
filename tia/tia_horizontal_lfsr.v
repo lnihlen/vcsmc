@@ -25,7 +25,7 @@ tia_d1 d1(.in(d1_in), .s1(hphi1), .s2(hphi2), .tap(rsynd), .out(d1_out));
 assign err = &(out);
 assign wend = (~out[5]) & out[4] & (~out[3]) & out[2] & (~out[1]) & (~out[0]);
 assign d1_in = ~(wend | err | rsynl);
-assign shb = d1_out ? 1'bz : 1;
+assign shb = ~d1_out;
 
 initial begin
   in[5:0] = 6'b000000;

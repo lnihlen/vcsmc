@@ -21,13 +21,13 @@ module tia_playfield_registers_cell(i, l1, l2, si1, si2, hphi1, hphi2,
     so2 = 0;
   end
   always @(posedge hphi1, si1, si2) begin
-    if (hphi1 === 1) begin
+    if (hphi1) begin
       si1_store = si1;
       si2_store = si2;
     end
   end
   always @(posedge hphi2, si1_store, si2_store) begin
-    if (hphi2 === 1) begin
+    if (hphi2) begin
       so1 = si1_store;
       so2 = si2_store;
     end

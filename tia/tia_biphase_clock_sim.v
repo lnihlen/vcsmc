@@ -12,11 +12,10 @@ reg [3:0] state;
 
 parameter[3:0]
   RESET = 0,
-  Z0    = 1,
-  HPHI1 = 2,
-  Z1    = 3,
-  HPHI2 = 4,
-  Z2    = 5;
+  HPHI2 = 1,
+  Z1    = 2,
+  HPHI1 = 3,
+  Z2    = 4;
 
 tia_biphase_clock bpc(.clk(clock),
                       .rsyn(rsyn),
@@ -25,39 +24,33 @@ tia_biphase_clock bpc(.clk(clock),
                       .rsynl(rsynl));
 
 initial begin
-  clock = 1'bz;
+  clock = 0;
   rsyn = 1;
   state = RESET;
 end
 
 always #100 begin
   rsyn = 0;
-  if (clock) begin
-    clock = 1'bz;
-  end else begin
-    clock = 1;
-  end
+  clock = ~clock;
 end
 
 always @(posedge clock) begin
+  #1
   case (state)
     RESET: begin
-      if (rsynl === 0) state = Z0;
+      if (!rsynl) state = HPHI2;
     end
-    Z0: begin
+    HPHI2: begin
+      if (!hphi2) state = Z1;
+    end
+    Z1: begin
       if (hphi1) state = HPHI1;
     end
     HPHI1: begin
-      if (hphi1 === 1'bz) state = Z1;
-    end
-    Z1: begin
-      if (hphi2) state = HPHI2;
-    end
-    HPHI2: begin
-      if (hphi2 === 1'bz) state = Z2;
+      if (!hphi1) state = Z2;
     end
     Z2: begin
-      if (hphi1) begin
+      if (hphi2) begin
         $display("OK");
         $finish;
       end
@@ -65,8 +58,8 @@ always @(posedge clock) begin
   endcase
 end
 
-always @(clock) begin
-  if (hphi1 === 1 && hphi2 === 1) begin
+always @(negedge clock) begin
+  if (hphi1 && hphi2) begin
     $display("ERROR - hphi1 and hphi2 1 at the same time.");
     $finish;
   end
@@ -74,32 +67,26 @@ always @(clock) begin
   case (state)
     RESET: begin
     end
-    Z0: begin
-      if (hphi1 != 1'bz || hphi2 != 1'bz || rsynl != 0) begin
-        $display("ERROR in Z0");
-        $finish;
-      end
-    end
-    HPHI1: begin
-      if (hphi1 != 1 || hphi2 != 1'bz || rsynl != 0) begin
-        $display("ERROR in HPHI1");
+    HPHI2: begin
+      if (hphi1 != 0 || hphi2 != 1 || rsynl != 0) begin
+        $display("ERROR in HPHI2: %d %d %d", hphi1, hphi2, rsynl);
         $finish;
       end
     end
     Z1: begin
-      if (hphi1 != 1'bz || hphi2 != 1'bz || rsynl != 0) begin
+      if (hphi1 != 0 || hphi2 != 0 || rsynl != 0) begin
         $display("ERROR in Z1");
         $finish;
       end
     end
-    HPHI2: begin
-      if (hphi1 != 1'bz || hphi2 != 1 || rsynl != 0) begin
-        $display("ERROR in HPHI2");
+    HPHI1: begin
+      if (hphi1 != 1 || hphi2 != 0 || rsynl != 0) begin
+        $display("ERROR in HPHI1");
         $finish;
       end
     end
     Z2: begin
-      if (hphi1 != 1'bz || hphi2 != 1'bz || rsynl != 0) begin
+      if (hphi1 != 0 || hphi2 != 0 || rsynl != 0) begin
         $display("ERROR in Z2");
         $finish;
       end

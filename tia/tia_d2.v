@@ -21,8 +21,8 @@ initial begin
 end
 
 always @(posedge s1, in1, in2) begin
-  if (s1 === 1) begin
-    if (in1 === 1 || in2 === 1) tap = 0; else tap = 1;
+  if (s1) begin
+    tap = ~(in1 | in2);
   end
 end
 

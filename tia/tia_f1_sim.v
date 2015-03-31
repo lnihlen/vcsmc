@@ -27,11 +27,7 @@ initial begin
 end
 
 always #100 begin
-  if (clock) begin
-    clock = 1'bz;
-  end else begin
-    clock = 1;
-  end
+  clock = ~clock;
 end
 
 always @(negedge clock) begin
@@ -61,7 +57,7 @@ always @(negedge clock) begin
       reset = 1;
       s = 0;
       r = 1;
-      if (!(q === 0 && q_bar === 1)) begin
+      if (!(!q && q_bar)) begin
         $display("- reset FAIL, q: %h, q_bar: %h", q, q_bar);
         $finish;
       end
@@ -70,7 +66,7 @@ always @(negedge clock) begin
       reset = 1;
       s = 1;
       r = 1;
-      if (!(q === 0 && q_bar === 1)) begin
+      if (!(!q && q_bar)) begin
         $display("- reset FAIL, q: %h, q_bar: %h", q, q_bar);
         $finish;
       end
@@ -79,7 +75,7 @@ always @(negedge clock) begin
       reset = 1;
       s = 1;
       r = 0;
-      if (!(q === 0 && q_bar === 1)) begin
+      if (!(!q && q_bar)) begin
         $display("- reset FAIL, q: %h, q_bar: %h", q, q_bar);
         $finish;
       end
@@ -88,7 +84,7 @@ always @(negedge clock) begin
       reset = 1;
       s = 1;
       r = 1;
-      if (!(q === 0 && q_bar === 1)) begin
+      if (!(!q && q_bar)) begin
         $display("- reset FAIL, q: %h, q_bar: %h", q, q_bar);
         $finish;
       end

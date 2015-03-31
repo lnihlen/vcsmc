@@ -49,7 +49,7 @@ tia_motion_registers mr(.d4(d4),
                         .blec_bar(blec_bar));
 
 initial begin
-  clock = 1;
+  clock = 0;
   rsyn = 0;
   sec = 0;
   cc = 0;
@@ -77,11 +77,7 @@ initial begin
 end
 
 always #100 begin
-  if (clock) begin
-    clock = 1'bz;
-  end else begin
-    clock = 1;
-  end
+  clock = ~clock;
 end
 
 always @(posedge clock) begin
@@ -162,19 +158,19 @@ always @(posedge clock) begin
     sec = 0;
   end
 
-  if (p0ec_bar === 0) begin
+  if (!p0ec_bar) begin
     p0ec_count = p0ec_count + 1;
   end
-  if (p1ec_bar === 0) begin
+  if (!p1ec_bar) begin
     p1ec_count = p1ec_count + 1;
   end
-  if (m0ec_bar === 0) begin
+  if (!m0ec_bar) begin
     m0ec_count = m0ec_count + 1;
   end
-  if (m1ec_bar === 0) begin
+  if (!m1ec_bar) begin
     m1ec_count = m1ec_count + 1;
   end
-  if (blec_bar === 0) begin
+  if (!blec_bar) begin
     blec_count = blec_count + 1;
   end
 

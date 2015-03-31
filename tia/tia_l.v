@@ -11,11 +11,11 @@ initial begin
   ltch = 0;
 end
 
-assign out = (follow === 1) ? in : (latch === 1) ? ~ltch : 0;
+assign out = follow ? in : (latch ? ~ltch : 0);
 assign out_bar = ~out;
 
 always @(follow, in) begin
-  if (follow === 1) ltch = ~in;
+  if (follow) ltch = ~in;
 end
 
 endmodule  // tia_l

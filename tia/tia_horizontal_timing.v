@@ -81,7 +81,7 @@ tia_dl dl_hb(.in(hb_dl), .s1(hphi1), .s2(hphi2), .r(rhs_d), .out(hb_bar));
 wire d1_sec_s, d1_sec_in;
 sr sr_sec(.s(d1_sec_s), .r(hmove), .r2(0), .q(d1_sec_in));
 tia_d1 d1_sec(.in(d1_sec_in), .s1(hphi1), .s2(hphi2), .out(sec));
-assign d1_sec_s = (hphi1 === 1) ? sec : 1'bz;
+assign d1_sec_s = hphi1 & sec;
 
 wire comp_sync_bar;
 assign comp_sync_bar = vs ^ hs;
@@ -97,16 +97,16 @@ assign vb_bar = ~vb;
 wire sr_rdy_s;
 // AND symbol is very tiny and has a small spot in the middle of it. Not sure
 // about this notation. Assuming it is an AND for now.
-assign sr_rdy_s = (clk === 1 ? 0 : 1) & shb;
+assign sr_rdy_s = (~clk) & shb;
 wire sr_rdy_r;
-assign sr_rdy_r = (shb === 1) ? 0 : wsyn;
+assign sr_rdy_r = (~shb) & wsyn;
 wire rdy_bar;
 sr sr_rdy(.s(sr_rdy_s), .r(sr_rdy_r), .r2(0), .q(rdy_bar));
 assign rdy = ~rdy_bar;
 
 wire hb;
 assign hb = ~hb_bar;
-assign motck = (hb === 1 || clk === 1) ? 1'bz : 1;
+assign motck = ~(hb | clk);
 
 wire blank_s_bar;
 assign blank_s_bar = ~(vb_bar & hb_bar);

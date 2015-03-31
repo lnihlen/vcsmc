@@ -70,7 +70,7 @@ end
 
 always #100 begin
   phi2 = ~phi2;
-  if (phi2 === 1) a = a + 1;
+  if (phi2) a = a + 1;
   if (a > 44) begin
     $display("OK");
     $finish;
@@ -83,51 +83,51 @@ always @(negedge phi2) begin
   // It turns out that detecting the existence of only a single 1 in an array
   // of bits is a very interesting digital logic problem. Which we skip here
   // entirely and just do something obvious :).
-  if (vsyn  === 1) oc = oc + 1;
-  if (vblk  === 1) oc = oc + 1;
-  if (wsyn  === 1) oc = oc + 1;
-  if (rsyn  === 1) oc = oc + 1;
-  if (nsz0  === 1) oc = oc + 1;
-  if (nsz1  === 1) oc = oc + 1;
-  if (p0ci  === 1) oc = oc + 1;
-  if (p1ci  === 1) oc = oc + 1;
-  if (pfci  === 1) oc = oc + 1;
-  if (bkci  === 1) oc = oc + 1;
-  if (pfct  === 1) oc = oc + 1;
-  if (p0rf  === 1) oc = oc + 1;
-  if (p1rf  === 1) oc = oc + 1;
-  if (pf0   === 1) oc = oc + 1;
-  if (pf1   === 1) oc = oc + 1;
-  if (pf2   === 1) oc = oc + 1;
-  if (p0re  === 1) oc = oc + 1;
-  if (p1re  === 1) oc = oc + 1;
-  if (m0re  === 1) oc = oc + 1;
-  if (m1re  === 1) oc = oc + 1;
-  if (blre  === 1) oc = oc + 1;
-  if (auc0  === 1) oc = oc + 1;
-  if (auc1  === 1) oc = oc + 1;
-  if (auf0  === 1) oc = oc + 1;
-  if (auf1  === 1) oc = oc + 1;
-  if (auv0  === 1) oc = oc + 1;
-  if (auv1  === 1) oc = oc + 1;
-  if (p0cr  === 1) oc = oc + 1;
-  if (p1cr  === 1) oc = oc + 1;
-  if (m0en  === 1) oc = oc + 1;
-  if (m1en  === 1) oc = oc + 1;
-  if (blen  === 1) oc = oc + 1;
-  if (p0hm  === 1) oc = oc + 1;
-  if (p1hm  === 1) oc = oc + 1;
-  if (m0hm  === 1) oc = oc + 1;
-  if (m1hm  === 1) oc = oc + 1;
-  if (blhm  === 1) oc = oc + 1;
-  if (p0vd  === 1) oc = oc + 1;
-  if (p1vd  === 1) oc = oc + 1;
-  if (blvd  === 1) oc = oc + 1;
-  if (m0pre === 1) oc = oc + 1;
-  if (m1pre === 1) oc = oc + 1;
-  if (hmove === 1) oc = oc + 1;
-  if (hmclr === 1) oc = oc + 1;
-  if (cxclr === 1) oc = oc + 1;
+  if (vsyn ) oc = oc + 1;
+  if (vblk ) oc = oc + 1;
+  if (wsyn ) oc = oc + 1;
+  if (rsyn ) oc = oc + 1;
+  if (nsz0 ) oc = oc + 1;
+  if (nsz1 ) oc = oc + 1;
+  if (p0ci ) oc = oc + 1;
+  if (p1ci ) oc = oc + 1;
+  if (pfci ) oc = oc + 1;
+  if (bkci ) oc = oc + 1;
+  if (pfct ) oc = oc + 1;
+  if (p0rf ) oc = oc + 1;
+  if (p1rf ) oc = oc + 1;
+  if (pf0  ) oc = oc + 1;
+  if (pf1  ) oc = oc + 1;
+  if (pf2  ) oc = oc + 1;
+  if (p0re ) oc = oc + 1;
+  if (p1re ) oc = oc + 1;
+  if (m0re ) oc = oc + 1;
+  if (m1re ) oc = oc + 1;
+  if (blre ) oc = oc + 1;
+  if (auc0 ) oc = oc + 1;
+  if (auc1 ) oc = oc + 1;
+  if (auf0 ) oc = oc + 1;
+  if (auf1 ) oc = oc + 1;
+  if (auv0 ) oc = oc + 1;
+  if (auv1 ) oc = oc + 1;
+  if (p0cr ) oc = oc + 1;
+  if (p1cr ) oc = oc + 1;
+  if (m0en ) oc = oc + 1;
+  if (m1en ) oc = oc + 1;
+  if (blen ) oc = oc + 1;
+  if (p0hm ) oc = oc + 1;
+  if (p1hm ) oc = oc + 1;
+  if (m0hm ) oc = oc + 1;
+  if (m1hm ) oc = oc + 1;
+  if (blhm ) oc = oc + 1;
+  if (p0vd ) oc = oc + 1;
+  if (p1vd ) oc = oc + 1;
+  if (blvd ) oc = oc + 1;
+  if (m0pre) oc = oc + 1;
+  if (m1pre) oc = oc + 1;
+  if (hmove) oc = oc + 1;
+  if (hmclr) oc = oc + 1;
+  if (cxclr) oc = oc + 1;
   #1
   if (oc != 1) begin
     $display("%d ones detected on address %b", oc, a);

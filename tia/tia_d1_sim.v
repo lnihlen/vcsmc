@@ -24,17 +24,13 @@ tia_d1 d1(.in(d1_in), .s1(s1), .s2(s2), .tap(tap), .out(d1_out));
 
 initial begin
   d1_in = 0;
-  clock = 1'bz;
+  clock = 1;
   rsyn = 0;
   cycle_count = 0;
 end
 
 always #100 begin
-  if (clock) begin
-    clock = 1'bz;
-  end else begin
-    clock = 1;
-  end
+  clock = ~clock;
 end
 
 always @(posedge s1) begin

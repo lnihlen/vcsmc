@@ -31,17 +31,13 @@ tia_d2 d2(.in1(d2_in1),
 initial begin
   d2_in1 = 0;
   d2_in2 = 0;
-  clock = 1'bz;
+  clock = 0;
   rsyn = 0;
   cycle_count = 0;
 end
 
 always #100 begin
-  if (clock) begin
-    clock = 1'bz;
-  end else begin
-    clock = 1;
-  end
+  clock = ~clock;
 end
 
 always @(posedge s1) begin

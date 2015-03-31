@@ -22,12 +22,9 @@ initial begin
 end
 
 always #100 begin
-  if (clock) begin
-    clock = 1'bz;
-  end else begin
-    clock = 1;
-    cycle_count = cycle_count + 1;
-  end
+  clock = ~clock;
+  #1
+  if (clock) cycle_count = cycle_count + 1;
 end
 
 always @(posedge phi_theta) begin

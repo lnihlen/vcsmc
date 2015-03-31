@@ -28,17 +28,13 @@ tia_horizontal_lfsr lfsr(.hphi1(hphi1),
                          .rsynd(rsynd));
 
 initial begin
-  clock = 1'bz;
+  clock = 0;
   cycle_count = 0;
   rsyn = 0;
 end
 
 always #100 begin
-  if (clock) begin
-    clock = 1'bz;
-  end else begin
-    clock = 1;
-  end
+  clock = ~clock;
 end
 
 always @(posedge hphi1) begin
@@ -62,7 +58,7 @@ always @(posedge hphi1) begin
       $finish;
     end
   end else begin
-    if (out === 0) begin
+    if (!out) begin
       $display("ERROR, zero output out-of-cycle %d.", cycle_count);
       $finish;
     end
