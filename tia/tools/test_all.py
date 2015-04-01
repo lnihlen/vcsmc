@@ -16,11 +16,11 @@ def main(argv):
     out_name = os.path.join('out', sim_name[:-2])
     build_output = subprocess.check_output(['iverilog', '-Wall', '-o', out_name, sim_name])
     if build_output:
-      print 'error compiling %s: %s' % (sim_name, build_output)
+      print 'error compiling %s:\n%s' % (sim_name, build_output)
       continue
     sim_output = subprocess.check_output(['vvp', out_name])
     if sim_output != 'OK\n':
-      print '%s: %s' % (sim_name, sim_output)
+      print '%s:\n%s' % (sim_name, sim_output)
 
 if __name__ == "__main__":
   main(sys.argv)

@@ -25,7 +25,6 @@ always @(posedge s1, in) begin
   end
 end
 
-
 always @(posedge s2) begin
   out = ~tap;
 end
