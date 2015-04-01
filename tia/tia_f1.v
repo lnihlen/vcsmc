@@ -38,23 +38,25 @@ end
 // First NOR gate SR flip-flop will has CK attached to NORs on input with s
 // and r, meaning that ck being 1 will force s and r to 0, rendering the
 // first gate inactive when CK is 1.
-always @(negedge clock) begin
-  if (reset) begin
-    mid_s = 1;
-    mid_r = 0;
-    q = 0;
-  end else if (s && r) begin
-    mid_s = 0;
-    mid_r = 0;
-  end else if (s && !r) begin
-    mid_s = 1;
-    mid_r = 0;
-  end else if (!s && r) begin
-    mid_s = 0;
-    mid_r = 1;
-  end else if (!s && !r) begin
-    $display("ERROR at time %d: s and r both 0 in F1.", $time);
-    $stop;
+always @(negedge clock, s, r) begin
+  if (!clock) begin
+    if (reset) begin
+      mid_s = 1;
+      mid_r = 0;
+      q = 0;
+    end else if (s && r) begin
+      mid_s = 0;
+      mid_r = 0;
+    end else if (s && !r) begin
+      mid_s = 1;
+      mid_r = 0;
+    end else if (!s && r) begin
+      mid_s = 0;
+      mid_r = 1;
+    end else if (!s && !r) begin
+      $display("ERROR at time %d: s and r both 0 in F1.", $time);
+      $stop;
+    end
   end
 end
 
