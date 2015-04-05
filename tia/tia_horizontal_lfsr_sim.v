@@ -15,10 +15,10 @@ wire rsynd;
 integer cycle_count;
 
 tia_biphase_clock bpc(.clk(clock),
-                      .rsyn(rsyn),
-                      .hphi1(hphi1),
-                      .hphi2(hphi2),
-                      .rsynl(rsynl));
+                      .r(rsyn),
+                      .phi1(hphi1),
+                      .phi2(hphi2),
+                      .rl(rsynl));
 
 tia_horizontal_lfsr lfsr(.hphi1(hphi1),
                          .hphi2(hphi2),

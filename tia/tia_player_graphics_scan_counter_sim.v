@@ -43,7 +43,6 @@ always #100 begin
   pck = ~pck;
 end
 
-
 always @(posedge pck) begin
   #1
   case (cc)

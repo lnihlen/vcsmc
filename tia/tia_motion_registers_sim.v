@@ -24,10 +24,10 @@ reg[3:0] bld;
 wire p0ec_bar, p1ec_bar, m0ec_bar, m1ec_bar, blec_bar;
 
 tia_biphase_clock bpc(.clk(clock),
-                      .rsyn(rsyn),
-                      .hphi1(hphi1),
-                      .hphi2(hphi2),
-                      .rsynl(rsynl));
+                      .r(rsyn),
+                      .phi1(hphi1),
+                      .phi2(hphi2),
+                      .rl(rsynl));
 
 tia_motion_registers mr(.d4(d4),
                         .d5(d5),

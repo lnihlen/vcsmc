@@ -16,10 +16,10 @@ wire tap;
 integer cycle_count;
 
 tia_biphase_clock bpc(.clk(clock),
-                      .rsyn(rsyn),
-                      .hphi1(s1),
-                      .hphi2(s2),
-                      .rsynl(rsynl));
+                      .r(rsyn),
+                      .phi1(s1),
+                      .phi2(s2),
+                      .rl(rsynl));
 
 tia_d2 d2(.in1(d2_in1),
           .in2(d2_in2),

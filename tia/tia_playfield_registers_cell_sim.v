@@ -27,10 +27,10 @@ assign out = (upper_o | middle_o | lower_o);
 integer cycle_count;
 
 tia_biphase_clock bpc(.clk(clock),
-                      .rsyn(rsyn),
-                      .hphi1(hphi1),
-                      .hphi2(hphi2),
-                      .rsynl(rsynl));
+                      .r(rsyn),
+                      .phi1(hphi1),
+                      .phi2(hphi2),
+                      .rl(rsynl));
 
 tia_playfield_registers_cell upper(.i(d0),
                                    .l1(follow),

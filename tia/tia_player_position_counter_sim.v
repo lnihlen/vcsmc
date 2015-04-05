@@ -5,14 +5,20 @@ module tia_player_position_counter_sim();
 reg motck, p0ec_bar, p0re, nz0, nz1, nz2;
 wire start_bar, fstob, pck, pphi1, pphi2, count_bar;
 
+wire nz0_bar, nz1_bar, nz2_bar;
+assign nz0_bar = ~nz0;
+assign nz1_bar = ~nz1;
+assign nz2_bar = ~nz2;
+
 integer cc;
+integer line_count;
 
 tia_player_position_counter c(.motck(motck),
-                              .p0ec_bar(p0ec_bar),
-                              .p0re(p0re),
-                              .nz0(nz0),
-                              .nz1(nz1),
-                              .nz2(nz2),
+                              .pec_bar(p0ec_bar),
+                              .pre(p0re),
+                              .nz0_bar(nz0_bar),
+                              .nz1_bar(nz1_bar),
+                              .nz2_bar(nz2_bar),
                               .start_bar(start_bar),
                               .fstob(fstob),
                               .pck(pck),
@@ -24,56 +30,96 @@ initial begin
   motck = 0;
   p0ec_bar = 1;
   p0re = 1;
-  nz0 = 1;
-  nz1 = 1;
-  nz2 = 1;
+  nz0 = 0;
+  nz1 = 0;
+  nz2 = 0;
   cc = 0;
+  line_count = 0;
 end
 
 always #100 begin
   motck = ~motck;
-  #1
-  if (motck) cc = cc + 1;
 end
 
 always @(posedge motck) begin
-  #3
+  #2
   if (cc >= 0 && cc < 4) begin
-    if (cc == 2) begin
+    if (cc == 2 && line_count == 0) begin
       p0re = 0;
     end
     if (start_bar != 0) begin
       $display("missing first start_bar at cc: %d", cc);
       $finish;
     end
-  end else if (cc >= 16 && cc < 20) begin
+  end else if ((line_count == 1 || line_count == 3) &&
+               (cc >= 16 && cc < 20)) begin
     if (start_bar != 0) begin
       $display("missing close start_bar at cc: %d", cc);
       $finish;
     end
-  end else if (cc >= 32 && cc < 36) begin
+  end else if ((line_count == 2 || line_count == 3 || line_count == 6) &&
+               (cc >= 32 && cc < 36)) begin
     if (start_bar != 0) begin
       $display("missing medium start_bar at cc: %d", cc);
       $finish;
     end
-  end else if (cc >= 64 && cc < 68) begin
+  end else if ((line_count == 4 || line_count == 6) &&
+               (cc >= 64 && cc < 68)) begin
     if (start_bar != 0) begin
       $display("missing far start_bar at cc: %d", cc);
       $finish;
     end
-  end else if (cc >= 160 && cc < 164) begin
-    if (start_bar != 0) begin
-      $display("missing restart start_bar at cc: %d", cc);
-      $finish;
-    end
-  end else if (cc > 165) begin
-    $display("OK");
-    $finish;
   end else begin
     if (start_bar != 1) begin
       $display("extraneous start_bar at cc: %d", cc);
       $finish;
     end
+  end
+  cc = cc + 1;
+  if (cc > 159) begin
+    cc = 0;
+    line_count = line_count + 1;
+    case (line_count)
+      1: begin
+        nz0 = 1;
+        nz1 = 0;
+        nz2 = 0;
+      end
+      2: begin
+        nz0 = 0;
+        nz1 = 1;
+        nz2 = 0;
+      end
+      3: begin
+        nz0 = 1;
+        nz1 = 1;
+        nz2 = 0;
+      end
+      4: begin
+        nz0 = 0;
+        nz1 = 0;
+        nz2 = 1;
+      end
+      5: begin
+        nz0 = 1;
+        nz1 = 0;
+        nz2 = 1;
+      end
+      6: begin
+        nz0 = 0;
+        nz1 = 1;
+        nz2 = 1;
+      end
+      7: begin
+        nz0 = 1;
+        nz1 = 1;
+        nz2 = 1;
+      end
+      8: begin
+        $display("OK");
+        $finish;
+      end
+    endcase
   end
 end
 
