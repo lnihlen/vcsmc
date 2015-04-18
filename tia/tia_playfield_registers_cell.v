@@ -1,5 +1,5 @@
-`ifndef TIA_TIA_PLAYFIELD_REGISTERS_CELL_V_
-`define TIA_TIA_PLAYFIELD_REGISTERS_CELL_V_
+`ifndef TIA_TIA_PLAYFIELD_REGISTERS_CELL_V
+`define TIA_TIA_PLAYFIELD_REGISTERS_CELL_V
 
 `include "tia_l.v"
 
@@ -35,4 +35,4 @@ module tia_playfield_registers_cell(i, l1, l2, si1, si2, hphi1, hphi2,
   assign o = l_val & (so1 | so2);
 endmodule  // tia_playfield_registers_cell
 
-`endif  // TIA_TIA_PLAYFIELD_REGISTERS_CELL_V_
+`endif  // TIA_TIA_PLAYFIELD_REGISTERS_CELL_V

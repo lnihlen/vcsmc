@@ -1,3 +1,6 @@
+`ifndef TIA_TIA_BIPHASE_CLOCK_V
+`define TIA_TIA_BIPHASE_CLOCK_V
+
 // Biphase clock splits input clock into two output clocks, used throughout TIA
 // circuitry. Circuit block is defined on page 1 of TIA schematics, section D-5.
 `include "sr.v"
@@ -36,3 +39,5 @@ assign b_q_bar_bar = ~b_q_bar;
 assign bqb = b_q_bar;
 
 endmodule  // tia_biphase_clock
+
+`endif  // TIA_TIA_BIPHASE_CLOCK_V

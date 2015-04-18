@@ -7,7 +7,7 @@ reg phi2;
 reg w_bar;
 wire vsyn, vblk, wsyn, rsyn, nsz0, nsz1, p0ci, p1ci, pfci, bkci, pfct, p0rf,
   p1rf, pf0, pf1, pf2, p0re, p1re, m0re, m1re, blre, auc0, auc1, auf0, auf1,
-  auv0, auv1, p0cr, p1cr, m0en, m1en, blen, p0hm, p1hm, m0hm, m1hm, blhm, p0vd,
+  auv0, auv1, p0gr, p1gr, m0en, m1en, blen, p0hm, p1hm, m0hm, m1hm, blhm, p0vd,
   p1vd, blvd, m0pre, m1pre, hmove, hmclr, cxclr;
 
 integer oc;
@@ -43,8 +43,8 @@ tia_write_address_decodes decode(
   .auf1(auf1),
   .auv0(auv0),
   .auv1(auv1),
-  .p0cr(p0cr),
-  .p1cr(p1cr),
+  .p0gr(p0gr),
+  .p1gr(p1gr),
   .m0en(m0en),
   .m1en(m1en),
   .blen(blen),
@@ -110,8 +110,8 @@ always @(negedge phi2) begin
   if (auf1 ) oc = oc + 1;
   if (auv0 ) oc = oc + 1;
   if (auv1 ) oc = oc + 1;
-  if (p0cr ) oc = oc + 1;
-  if (p1cr ) oc = oc + 1;
+  if (p0gr ) oc = oc + 1;
+  if (p1gr ) oc = oc + 1;
   if (m0en ) oc = oc + 1;
   if (m1en ) oc = oc + 1;
   if (blen ) oc = oc + 1;
@@ -297,14 +297,14 @@ always @(negedge phi2) begin
       end
     end
     27: begin
-      if (p0cr != 1) begin
-        $display("p0cr: %d, a: %b", vsyn, a);
+      if (p0gr != 1) begin
+        $display("p0gr: %d, a: %b", vsyn, a);
         $finish;
       end
     end
     28: begin
-      if (p1cr != 1) begin
-        $display("p1cr: %d, a: %b", vsyn, a);
+      if (p1gr != 1) begin
+        $display("p1gr: %d, a: %b", vsyn, a);
         $finish;
       end
     end

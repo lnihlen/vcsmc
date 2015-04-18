@@ -1,3 +1,6 @@
+`ifndef TIA_TIA_HORIZONTAL_LFSR_DECODER_V
+`define TIA_TIA_HORIZONTAL_LFSR_DECODER_V
+
 module tia_horizontal_lfsr_decoder(in, rhs, cnt, rcb, shs, lrhb, rhb);
 
 input[5:0] in;
@@ -19,3 +22,5 @@ assign lrhb = (~in[5]) &   in[4]  & (~in[3]) &   in[2]  &   in[1]  &   in[0];
 assign rhb  = (~in[5]) &   in[4]  &   in[3]  &   in[2]  & (~in[1]) & (~in[0]);
 
 endmodule  // tia_horizontal_lfsr_decoder
+
+`endif  // TIA_TIA_HORIZONTAL_LFSR_DECODER_V

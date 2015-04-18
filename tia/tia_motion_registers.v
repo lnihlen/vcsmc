@@ -1,3 +1,6 @@
+`ifndef TIA_TIA_MOTION_REGISTERS_V
+`define TIA_TIA_MOTION_REGISTERS_V
+
 `include "tia_d1.v"
 `include "tia_d2.v"
 `include "tia_dl.v"
@@ -209,3 +212,5 @@ tia_motion_registers_cell_d d4_ripple(.lin(d4_lin), .hphi1(hphi1),
     .botout(d4_botout));
 
 endmodule  // tia_motion_registers
+
+`endif  // TIA_TIA_MOTION_REGISTERS

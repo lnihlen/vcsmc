@@ -1,67 +1,69 @@
+`ifndef TIA_TIA_WRITE_ADDRESS_DECODES_V
+`define TIA_TIA_WRITE_ADDRESS_DECODES_V
+
 module tia_write_address_decodes(
-  a,
-  phi2,
-  w_bar,
-  vsyn,
-  vblk,
-  wsyn,
-  rsyn,
-  nsz0,
-  nsz1,
-  p0ci,
-  p1ci,
-  pfci,
-  bkci,
-  pfct,
-  p0rf,
-  p1rf,
-  pf0,
-  pf1,
-  pf2,
-  p0re,
-  p1re,
-  m0re,
-  m1re,
-  blre,
-  auc0,
-  auc1,
-  auf0,
-  auf1,
-  auv0,
-  auv1,
-  p0cr,
-  p1cr,
-  m0en,
-  m1en,
-  blen,
-  p0hm,
-  p1hm,
-  m0hm,
-  m1hm,
-  blhm,
-  p0vd,
-  p1vd,
-  blvd,
-  m0pre,
-  m1pre,
-  hmove,
-  hmclr,
-  cxclr);
+    a,  // in the schematic a is inverted but not here.
+    phi2,
+    w_bar,
+    vsyn,
+    vblk,
+    wsyn,
+    rsyn,
+    nsz0,
+    nsz1,
+    p0ci,
+    p1ci,
+    pfci,
+    bkci,
+    pfct,
+    p0rf,
+    p1rf,
+    pf0,
+    pf1,
+    pf2,
+    p0re,
+    p1re,
+    m0re,
+    m1re,
+    blre,
+    auc0,
+    auc1,
+    auf0,
+    auf1,
+    auv0,
+    auv1,
+    p0gr,
+    p1gr,
+    m0en,
+    m1en,
+    blen,
+    p0hm,
+    p1hm,
+    m0hm,
+    m1hm,
+    blhm,
+    p0vd,
+    p1vd,
+    blvd,
+    m0pre,
+    m1pre,
+    hmove,
+    hmclr,
+    cxclr);
 
 input[5:0] a;
 input phi2, w_bar;
 output vsyn, vblk, wsyn, rsyn, nsz0, nsz1, p0ci, p1ci, pfci, bkci, pfct, p0rf,
   p1rf, pf0, pf1, pf2, p0re, p1re, m0re, m1re, blre, auc0, auc1, auf0, auf1,
-  auv0, auv1, p0cr, p1cr, m0en, m1en, blen, p0hm, p1hm, m0hm, m1hm, blhm, p0vd,
+  auv0, auv1, p0gr, p1gr, m0en, m1en, blen, p0hm, p1hm, m0hm, m1hm, blhm, p0vd,
   p1vd, blvd, m0pre, m1pre, hmove, hmclr, cxclr;
 
 wire[5:0] a;
 wire phi2, w_bar;
 wire vsyn, vblk, wsyn, rsyn, nsz0, nsz1, p0ci, p1ci, pfci, bkci, pfct, p0rf,
   p1rf, pf0, pf1, pf2, p0re, p1re, m0re, m1re, blre, auc0, auc1, auf0, auf1,
-  auv0, auv1, p0cr, p1cr, m0en, m1en, blen, p0hm, p1hm, m0hm, m1hm, blhm, p0vd,
+  auv0, auv1, p0gr, p1gr, m0en, m1en, blen, p0hm, p1hm, m0hm, m1hm, blhm, p0vd,
   p1vd, blvd, m0pre, m1pre, hmove, hmclr, cxclr;
-
 
 wire[5:0] n;
 assign n = ~a;
@@ -95,8 +97,8 @@ assign auf0  = p & n[5] & a[4] & n[3] & a[2] & a[1] & a[0];  // 17
 assign auf1  = p & n[5] & a[4] & a[3] & n[2] & n[1] & n[0];  // 18
 assign auv0  = p & n[5] & a[4] & a[3] & n[2] & n[1] & a[0];  // 19
 assign auv1  = p & n[5] & a[4] & a[3] & n[2] & a[1] & n[0];  // 1a
-assign p0cr  = p & n[5] & a[4] & a[3] & n[2] & a[1] & a[0];  // 1b
-assign p1cr  = p & n[5] & a[4] & a[3] & a[2] & n[1] & n[0];  // 1c
+assign p0gr  = p & n[5] & a[4] & a[3] & n[2] & a[1] & a[0];  // 1b
+assign p1gr  = p & n[5] & a[4] & a[3] & a[2] & n[1] & n[0];  // 1c
 assign m0en  = p & n[5] & a[4] & a[3] & a[2] & n[1] & a[0];  // 1d
 assign m1en  = p & n[5] & a[4] & a[3] & a[2] & a[1] & n[0];  // 1e
 assign blen  = p & n[5] & a[4] & a[3] & a[2] & a[1] & a[0];  // 1f
@@ -115,3 +117,5 @@ assign hmclr = p & a[5] & n[4] & a[3] & n[2] & a[1] & a[0];  // 2b
 assign cxclr = p & a[5] & n[4] & a[3] & a[2] & n[1] & n[0];  // 2c
 
 endmodule  // tia_write_address_decodes
+
+`endif  // TIA_TIA_WRITE_ADDRESS_DECODES_V

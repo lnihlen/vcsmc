@@ -4,19 +4,16 @@ module tia_divide_by_three_sim();
 
 reg clock;
 reg resphi0;
-reg rsyn;
-wire phi_theta, clkp, rsyn_gated;
+wire phi_theta;
 
 integer cycle_count;
 integer last_positive_edge;
 
-tia_divide_by_three d3(.clk(clock), .resphi0(resphi0), .rsyn(rsyn),
-    .phi_theta(phi_theta), .clkp(clkp), .rsyn_gated(rsyn_gated));
+tia_divide_by_three d3(.clk(clock), .resphi0(resphi0), .phi_theta(phi_theta));
 
 initial begin
   clock = 1;
   resphi0 = 0;
-  rsyn = 0;
   cycle_count = 0;
   last_positive_edge = 0;
 end

@@ -1,5 +1,5 @@
-`ifndef TIA_TIA_LFSR
-`define TIA_TIA_LFSR
+`ifndef TIA_TIA_LFSR_V
+`define TIA_TIA_LFSR_V
 
 // Linear Feedback Shift Register, used as a counter for various horizontal
 // timings.
@@ -32,4 +32,4 @@ end
 
 endmodule  // tia_horizontal_lfsr
 
-`endif  // TIA_TIA_LFSR
+`endif  // TIA_TIA_LFSR_V

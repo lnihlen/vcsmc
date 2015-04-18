@@ -1,3 +1,6 @@
+`ifndef TIA_TIA_PLAYFIELD_REGISTERS_V
+`define TIA_TIA_PLAYFIELD_REGISTERS_V
+
 `include "sr.v"
 `include "tia_d1.v"
 `include "tia_f1.v"
@@ -160,3 +163,5 @@ tia_f1 pf_bit_f1(.s(pf_bit_f1_s), .r(pf_bit_f1_r), .clock(clkp), .reset(0),
     .q(pf));
 
 endmodule  // tia_playfield_registers
+
+`endif  // TIA_TIA_PLAYFIELD_REGISTERS_V

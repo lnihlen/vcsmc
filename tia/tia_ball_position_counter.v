@@ -1,3 +1,6 @@
+`ifndef TIA_TIA_BALL_POSITION_COUNTER_V
+`define TIA_TIA_BALL_POSITION_COUNTER_V
+
 `include "tia_biphase_clock.v"
 `include "tia_d1.v"
 `include "tia_l.v"
@@ -74,3 +77,5 @@ assign bf2in_bar = ~bf2in;
 tia_f1 bf1(.s(bf2in), .r(bf2in_bar), .clock(clkp), .reset(0), .q(bl));
 
 endmodule  // tia_ball_position_counter
+
+`endif  // TIA_TIA_BALL_POSITION_COUNTER_V

@@ -1,3 +1,6 @@
+`ifndef TIA_TIA_HORIZONTAL_LFSR_V
+`define TIA_TIA_HORIZONTAL_LFSR_V
+
 `include "tia_d1.v"
 `include "tia_lfsr.v"
 
@@ -29,3 +32,5 @@ assign d1_in = ~(wend | err | rsynl);
 assign shb = ~d1_out;
 
 endmodule  // tia_horizontal_lfsr
+
+`endif  // TIA_TIA_HORIZONTAL_LFSR_V

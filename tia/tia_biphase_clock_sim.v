@@ -11,11 +11,11 @@ wire rsynl;
 reg [3:0] state;
 
 parameter[3:0]
-  RESET = 0,
-  HPHI2 = 1,
-  Z1    = 2,
-  HPHI1 = 3,
-  Z2    = 4;
+    RESET = 0,
+    HPHI2 = 1,
+    Z1    = 2,
+    HPHI1 = 3,
+    Z2    = 4;
 
 tia_biphase_clock bpc(.clk(clock),
                       .r(rsyn),

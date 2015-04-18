@@ -1,12 +1,14 @@
+`ifndef TIA_TIA_DIVIDE_BY_THREE_V
+`define TIA_TIA_DIVIDE_BY_THREE_V
 `include "sr.v"
 
-module tia_divide_by_three(clk, resphi0, rsyn, phi_theta, clkp, rsyn_gated);
+module tia_divide_by_three(clk, resphi0, phi_theta);
 
-input clk, resphi0, rsyn;
-output phi_theta, clkp, rsyn_gated;
+input clk, resphi0;
+output phi_theta;
 
-wire clk, resphi0, rsyn;
-wire phi_theta, clkp, rsyn_gated;
+wire clk, resphi0;
+wire phi_theta;
 
 wire q2;
 wire q2_bar;
@@ -34,14 +36,12 @@ assign m2_sr_r = ~(clk | m2_mid);
 wire m2, m2_sr_q;
 sr m2_sr(.s(m2_sr_s), .r(m2_sr_r), .r2(0), .q(m2_sr_q), .q_bar(m2));
 
-assign clkp = ~clk;
-
 wire q2_sr_s;
 assign q2_sr_s = m2_sr_q & clk;
 wire q2_sr_r;
 assign q2_sr_r = m2 & clk;
 sr q2_sr(.s(q2_sr_s), .r(q2_sr_r), .r2(resphi0), .q(q2), .q_bar(q2_bar));
 
-assign rsyn_gated = (~phi_theta) & rsyn;
-
 endmodule  // tia_divide_by_three
+
+`endif  // TIA_TIA_DIVIDE_BY_THREE_V

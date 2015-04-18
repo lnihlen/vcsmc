@@ -55,7 +55,7 @@ always @(negedge clock, s, r) begin
       mid_r = 1;
     end else if (!s && !r) begin
       $display("ERROR at time %d: s and r both 0 in F1.", $time);
-      $stop;
+      $finish;
     end
   end
 end
