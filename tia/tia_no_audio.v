@@ -22,6 +22,7 @@ module tia_no_audio(
     a,     // 5:0 address
     osc,   // clock
     phi2,  // i/o clock drives latches on d and a
+    rw,    // read, w_bar
     // output
     blk_bar,
     l,      // 2:0 luminosity
@@ -33,7 +34,7 @@ module tia_no_audio(
 
   input[7:0] d;
   input[5:0] a;
-  input osc, phi2;
+  input osc, phi2, rw;
   output blk_bar;
   output[2:0] l;
   output[3:0] c;
@@ -41,7 +42,7 @@ module tia_no_audio(
 
   wire[7:0] d;
   wire[5:0] a;
-  wire osc, phi2;
+  wire osc, phi2, rw;
   wire blk_bar;
   wire[2:0] l;
   wire[3:0] c;
@@ -75,10 +76,14 @@ module tia_no_audio(
       auv0, auv1, p0gr, p1gr, m0en, m1en, blen, p0hm, p1hm, m0hm, m1hm, blhm,
       p0vd, p1vd, blvd, m0pre, m1pre, hmove, hmclr, cxclr;
 
+  always @(a, d) begin
+    $display("d: %b, a: %x", d, a);
+  end
+
   tia_write_address_decodes write_address_decodes(
       .a(al),
       .phi2(phi2),
-      .w_bar(0),  // always writing
+      .w_bar(rw),
       .vsyn(vsyn),
       .vblk(vblk),
       .wsyn(wsyn),

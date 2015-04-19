@@ -31,7 +31,7 @@ module build_frame();
 
   reg[7:0] d;
   reg[5:0] a;
-  reg phi2;
+  reg rw;
   wire blk_bar;
   wire[2:0] l;
   wire[3:0] c;
@@ -41,7 +41,8 @@ module build_frame();
   tia_no_audio no_audio(.d(d),
                         .a(a),
                         .osc(clock),
-                        .phi2(phi2),
+                        .phi2(clock),
+                        .rw(rw),
                         .blk_bar(blk_bar),
                         .l(l),
                         .c(c),
@@ -62,10 +63,10 @@ module build_frame();
   initial begin
     address = 0;
     clock = 0;
+    rw = 1;
     state = LOAD;
     d = 0;
     a = 0;
-    phi2 = 0;
 
     if (!$value$plusargs("input_file=%s", infile)) begin
       $display("no input file specified with +input_file=");
@@ -91,66 +92,78 @@ module build_frame();
 
   always #100 begin
     clock = ~clock;
-    if (clock) $fwrite(fdout, "%u", out_color);
+    if (~clock) $fwrite(fdout, "%u", out_color);
   end
 
   always @(posedge phi_theta) begin
-    if (state == LOAD) begin
-      op = rom[address];
-      address = address + 1;
-      if (op == LDA || op == LDX || op == LDY || op == NOP) begin
-        state = EXECUTE;
-      end else if (op == JMP || op == STA || op == STX || op == STY) begin
-        state = WAIT;
+    if (rdy) begin
+      if (state == LOAD) begin
+        op = rom[address];
+        address = address + 1;
+        rw = 1;
+        if (op == LDA || op == LDX || op == LDY || op == NOP) begin
+          state = EXECUTE;
+        end else if (op == JMP || op == STA || op == STX || op == STY) begin
+          state = WAIT;
+        end
+      end else if (state == WAIT) begin
+          state = EXECUTE;
+      end else if (state == EXECUTE) begin
+        rw = 0;
+        case (op)
+          JMP: begin
+            $display("jmp");
+            address = address + 1023;
+            address = address & 32'hfffffc00;
+          end
+          LDA: begin
+            $display("lda %x", rom[address]);
+            reg_a = rom[address];
+            address = address + 1;
+          end
+          LDX: begin
+            $display("ldx %x", rom[address]);
+            reg_x = rom[address];
+            address = address + 1;
+          end
+          LDY: begin
+            $display("ldy %x", rom[address]);
+            reg_y = rom[address];
+            address = address + 1;
+          end
+          STA: begin
+            $display("sta %x", rom[address]);
+            a = rom[address];
+            d = reg_a;
+            address = address + 1;
+          end
+          STX: begin
+            $display("stx %x", rom[address]);
+            a = rom[address];
+            d = reg_x;
+            address = address + 1;
+          end
+          STY: begin
+            $display("sty %x", rom[address]);
+            a = rom[address];
+            d = reg_y;
+            address = address + 1;
+          end
+          NOP: begin
+            $display("nop");
+          end
+          default: begin
+            $display("unknown opcode %x at address %d", rom[address], address);
+            $finish;
+          end
+        endcase
+        state = LOAD;
       end
-    end else if (state == WAIT) begin
-        state = EXECUTE;
-    end else if (state == EXECUTE) begin
-      case (op)
-        8'h4c: begin  // jmp
-          address = address + 1023;
-          address = address & 32'hfffffc00;
-        end
-        8'ha9: begin  // lda
-          reg_a = rom[address];
-          address = address + 1;
-        end
-        8'ha2: begin  // ldx
-          reg_x = rom[address];
-          address = address + 1;
-        end
-        8'ha0: begin  // ldy
-          reg_y = rom[address];
-          address = address + 1;
-        end
-        8'h85: begin  // sta
-          a = rom[address];
-          d = reg_a;
-          address = address + 1;
-        end
-        8'h86: begin  // stx
-          a = rom[address];
-          d = reg_x;
-          address = address + 1;
-        end
-        8'h84: begin  // sty
-          a = rom[address];
-          d = reg_y;
-          address = address + 1;
-        end
-        8'hea: begin  // nop
-        end
-        default: begin
-          $display("unknown opcode %x at address %d", rom[address], address);
-          $finish;
-        end
-      endcase
-      state = LOAD;
-    end
 
-    if (address >= rom_size) begin
-      $fclose(fdout);
-      $finish;
+      if (address >= rom_size) begin
+        $fclose(fdout);
+        $finish;
+      end
     end
   end
 endmodule  // build_frame
