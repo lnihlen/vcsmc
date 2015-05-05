@@ -9,15 +9,18 @@
 module tia_biphase_clock(clk, r, phi1, phi2, bqb, rl);
 
 input clk, r;
-
 output phi1, phi2, bqb, rl;
 
 wire clk, r;
 wire phi1, phi2, rl;
 wire a_q, a_q_bar, b_q, b_q_bar, b_q_bar_bar;
+wire b_q_return;
+assign #1 b_q_return = b_q;
+wire b_q_bar_return;
+assign #1 b_q_bar_return = b_q_bar;
 
-tia_f1 f1_a(.s(b_q),
-            .r(b_q_bar),
+tia_f1 f1_a(.s(b_q_return),
+            .r(b_q_bar_return),
             .clock(clk),
             .reset(r),
             .q(a_q),
@@ -32,11 +35,11 @@ tia_f1 f1_b(.s(a_q_bar),
 
 sr rsyn_sr(.s(b_q_bar_bar), .r(r), .r2(0), .q(rl));
 
-assign phi1 = ~(a_q | b_q);
-assign phi2 = ~(a_q_bar | b_q_bar);
-assign b_q_bar_bar = ~b_q_bar;
+assign #1 phi1 = ~(a_q | b_q_return);
+assign #1 phi2 = ~(a_q_bar | b_q_bar_return);
+assign #1 b_q_bar_bar = ~b_q_bar;
 // |bqb| is optional output, used only in missile position counter.
-assign bqb = b_q_bar;
+assign #1 bqb = b_q_bar;
 
 endmodule  // tia_biphase_clock
 

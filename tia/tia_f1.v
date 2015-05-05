@@ -21,7 +21,7 @@ reg mid_r;
 reg q;
 wire q_bar;
 
-assign q_bar = ~q;
+assign #1 q_bar = ~q;
 
 initial begin
   mid_s = 1;
@@ -30,6 +30,7 @@ initial begin
 end
 
 always @(posedge reset) begin
+  #1
   mid_s = 1;
   mid_r = 0;
   q = 0;
@@ -39,6 +40,7 @@ end
 // and r, meaning that ck being 1 will force s and r to 0, rendering the
 // first gate inactive when CK is 1.
 always @(negedge clock, s, r) begin
+  #1
   if (!clock) begin
     if (reset) begin
       mid_s = 1;
@@ -53,15 +55,16 @@ always @(negedge clock, s, r) begin
     end else if (!s && r) begin
       mid_s = 0;
       mid_r = 1;
-    end else if (!s && !r) begin
-      $display("ERROR at time %d: s and r both 0 in F1.", $time);
-      $finish;
+//    end else if (!s && !r) begin
+//      $display("ERROR at time %d: s and r both 0 in F1.", $time);
+//      $finish;
     end
   end
 end
 
 // Second NOR gate SR flip flop is AND gate with clock on inputs.
 always @(posedge clock) begin
+  #1
   if (reset) begin
     mid_s = 1;
     mid_r = 0;

@@ -76,10 +76,6 @@ module tia_no_audio(
       auv0, auv1, p0gr, p1gr, m0en, m1en, blen, p0hm, p1hm, m0hm, m1hm, blhm,
       p0vd, p1vd, blvd, m0pre, m1pre, hmove, hmclr, cxclr;
 
-  always @(a, d) begin
-    $display("d: %b, a: %x", d, a);
-  end
-
   tia_write_address_decodes write_address_decodes(
       .a(al),
       .phi2(phi2),

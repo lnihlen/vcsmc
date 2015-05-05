@@ -91,7 +91,7 @@ initial begin
   vsyn = 0;
   vblk = 0;
   hmove = 0;
-  wsyn = 0;
+  wsyn = 1;
   d1 = 0;
 end
 
@@ -99,9 +99,21 @@ always #100 begin
   clock = ~clock;
 end
 
+always @(rdy) begin
+  $display("%d: %d", cc, rdy);
+end
+
+// 228
+
 always @(posedge clock) begin
+  if (cc == 4) wsyn = 0;
+  if (cc == 227) wsyn = 1;
+  if (cc == 250) wsyn = 0;
+  if (cc == 453) wsyn = 1;
+  if (cc == 460) wsyn = 0;
+  // TODO: actually test something here!
   cc = cc + 1;
-  if (cc > 10) begin
+  if (cc > 1000) begin
     $display("OK");
     $finish;
   end

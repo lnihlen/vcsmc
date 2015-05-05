@@ -28,7 +28,7 @@ always @(posedge phi_theta) begin
   // Wait for the first cycle to pass for the hardware to be in a correct state.
   if (cycle_count > 0 && last_positive_edge == 0) begin
     last_positive_edge = cycle_count;
-  end else if (cycle_count > 30) begin
+  end else if (cycle_count > 300) begin
     $display("OK");
     $finish;
   end else if (last_positive_edge > 0) begin

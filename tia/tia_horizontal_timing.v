@@ -95,9 +95,7 @@ tia_l l_vb(.in(d1), .follow(vblk), .latch(vblk_bar), .out(vb));
 assign vb_bar = ~vb;
 
 wire sr_rdy_s;
-// AND symbol is very tiny and has a small spot in the middle of it. Not sure
-// about this notation. Assuming it is an AND for now.
-assign sr_rdy_s = (~clk) & shb;
+assign sr_rdy_s = clkp & shb;
 wire sr_rdy_r;
 assign sr_rdy_r = (~shb) & wsyn;
 wire rdy_bar;

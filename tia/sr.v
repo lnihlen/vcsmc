@@ -24,6 +24,7 @@ wire r_int;
 assign r_int = r | r2;
 
 always @(s, r_int) begin
+  #1
   if (!s && r_int)
     q = 1;
   else if (s && !r_int)
