@@ -99,12 +99,6 @@ always #100 begin
   clock = ~clock;
 end
 
-always @(rdy) begin
-  $display("%d: %d", cc, rdy);
-end
-
-// 228
-
 always @(posedge clock) begin
   if (cc == 4) wsyn = 0;
   if (cc == 227) wsyn = 1;

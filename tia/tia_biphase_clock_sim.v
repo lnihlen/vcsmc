@@ -35,7 +35,7 @@ always #100 begin
 end
 
 always @(posedge clock) begin
-  #1
+  #5
   case (state)
     RESET: begin
       if (!rsynl) state = HPHI2;
@@ -63,7 +63,7 @@ always @(negedge clock) begin
     $display("ERROR - hphi1 and hphi2 1 at the same time.");
     $finish;
   end
-  #1
+  #5
   case (state)
     RESET: begin
     end

@@ -97,7 +97,7 @@ always @(negedge clock) begin
 end
 
 always @(posedge clock) begin
-  #1
+  #5
   case (cycle_count)
     0: begin  // test set
       if (q != 1 || q_bar != 0) begin

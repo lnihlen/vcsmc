@@ -1,80 +1,29 @@
 `ifndef TIA_TIA_F1_V
 `define TIA_TIA_F1_V
 
+`include "sr.v"
+
 // F1 block defined on TIA schematics page 1, section C-1.
 module tia_f1(s, r, clock, reset, q, q_bar);
 
-input s;
-input r;
-input clock;
-input reset;
+input s, r, clock, reset;
+output q, q_bar;
 
-output q;
-output q_bar;
+wire s, r, clock, reset;
+wire q, q_bar;
 
-wire s;
-wire r;
-wire clock;
-wire reset;
-reg mid_s;  // storage for first SR flip-flop
-reg mid_r;
-reg q;
-wire q_bar;
+wire sr_a_s;
+assign #1 sr_a_s = ~(s | clock);
+wire sr_a_r;
+assign #1 sr_a_r = ~(r | clock);
+wire sr_a_q, sr_a_q_bar;
+sr sr_a(.s(sr_a_s), .r(sr_a_r), .r2(reset), .q(sr_a_q), .q_bar(sr_a_q_bar));
 
-assign #1 q_bar = ~q;
-
-initial begin
-  mid_s = 1;
-  mid_r = 0;
-  q = 0;
-end
-
-always @(posedge reset) begin
-  #1
-  mid_s = 1;
-  mid_r = 0;
-  q = 0;
-end
-
-// First NOR gate SR flip-flop will has CK attached to NORs on input with s
-// and r, meaning that ck being 1 will force s and r to 0, rendering the
-// first gate inactive when CK is 1.
-always @(negedge clock, s, r) begin
-  #1
-  if (!clock) begin
-    if (reset) begin
-      mid_s = 1;
-      mid_r = 0;
-      q = 0;
-    end else if (s && r) begin
-      mid_s = 0;
-      mid_r = 0;
-    end else if (s && !r) begin
-      mid_s = 1;
-      mid_r = 0;
-    end else if (!s && r) begin
-      mid_s = 0;
-      mid_r = 1;
-//    end else if (!s && !r) begin
-//      $display("ERROR at time %d: s and r both 0 in F1.", $time);
-//      $finish;
-    end
-  end
-end
-
-// Second NOR gate SR flip flop is AND gate with clock on inputs.
-always @(posedge clock) begin
-  #1
-  if (reset) begin
-    mid_s = 1;
-    mid_r = 0;
-    q = 0;
-  end else if (!mid_s && mid_r) begin
-    q = 1;
-  end else if (mid_s && !mid_r) begin
-    q = 0;
-  end
-end
+wire sr_b_r;
+assign #1 sr_b_r = clock & sr_a_q;
+wire sr_b_s;
+assign #1 sr_b_s = clock & sr_a_q_bar;
+sr sr_b(.s(sr_b_s), .r(sr_b_r), .r2(reset), .q(q_bar), .q_bar(q));
 
 endmodule  // tia_f1
 

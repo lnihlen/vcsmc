@@ -21,18 +21,20 @@ module tia_playfield_registers_cell(i, l1, l2, si1, si2, hphi1, hphi2,
     so2 = 0;
   end
   always @(posedge hphi1, si1, si2) begin
+    #1
     if (hphi1) begin
       si1_store = si1;
       si2_store = si2;
     end
   end
   always @(posedge hphi2, si1_store, si2_store) begin
+    #1
     if (hphi2) begin
       so1 = si1_store;
       so2 = si2_store;
     end
   end
-  assign o = l_val & (so1 | so2);
+  assign #1 o = l_val & (so1 | so2);
 endmodule  // tia_playfield_registers_cell
 
 `endif  // TIA_TIA_PLAYFIELD_REGISTERS_CELL_V
