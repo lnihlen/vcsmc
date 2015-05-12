@@ -9,6 +9,7 @@ module build_frame();
   reg[7:0] rom[0:16383];
   integer fdin, fdout, rom_size, address, count, start_count;
   reg clock;
+  wire phi2;
   reg[3:0] state;
   parameter[3:0]
       INIT = 4,
@@ -43,7 +44,7 @@ module build_frame();
   tia_no_audio no_audio(.d(d),
                         .a(a),
                         .osc(clock),
-                        .phi2(clock),
+                        .phi2(phi2),
                         .rw(rw),
                         .blk_bar(blk_bar),
                         .l(l),
@@ -62,11 +63,13 @@ module build_frame();
   assign out_color[6] = c[2];
   assign out_color[7] = c[3];
 
+  assign #10 phi2 = clock;
+
   initial begin
     address = 0;
     clock = 1;
     count = -1;
-    rw = 0;
+    rw = 1;
     state = INIT;
     d = 0;
     a = 6'b111111;
@@ -98,8 +101,10 @@ module build_frame();
 
   always #100 begin
     clock = ~clock;
-    if (!clock) $fwrite(fdout, "%x", out_color);
-    else count = count + 1;
+    if (!clock) begin
+      $fwrite(fdout, "%x", out_color);
+      count = count + 1;
+    end
   end
 
   always @(posedge phi_theta) begin
@@ -107,12 +112,12 @@ module build_frame();
     if (state == INIT) begin
       state = LOAD;
     end else if (state == WSYNC && (rdy === 0)) begin
-      rw = 0;
+      rw = 1;
     end else if (state == LOAD || (state == WSYNC && rdy === 1)) begin
       op = rom[address];
       address = address + 1;
       start_count = count;
-      rw = 0;
+      rw = 1;
       if (op == LDA || op == LDX || op == LDY || op == NOP) begin
         state = EXECUTE;
       end else if (op == JMP || op == STA || op == STX || op == STY) begin
@@ -123,7 +128,7 @@ module build_frame();
     end else if (state == EXECUTE) begin
       case (op)
         JMP: begin
-          $display("%d %x: jmp", count, address);
+          $display("%d %x: jmp", start_count, address);
           address = address + 1023;
           address = address & 32'hfffffc00;
         end
@@ -164,7 +169,7 @@ module build_frame();
       endcase
       #1
       if (op == STA || op == STX || op == STY) begin
-        rw = 1;
+        rw = 0;
         if (a == 8'h02) state = WSYNC;
         else state = LOAD;
       end else state = LOAD;

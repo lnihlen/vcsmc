@@ -13,33 +13,38 @@ output phi1, phi2, bqb, rl;
 
 wire clk, r;
 wire phi1, phi2, rl;
-wire a_q, a_q_bar, b_q, b_q_bar, b_q_bar_bar;
-wire b_q_return;
-assign #1 b_q_return = b_q;
-wire b_q_bar_return;
-assign #1 b_q_bar_return = b_q_bar;
 
-tia_f1 f1_a(.s(b_q_return),
-            .r(b_q_bar_return),
-            .clock(clk),
-            .reset(r),
-            .q(a_q),
-            .q_bar(a_q_bar));
+parameter[2:0]
+  RESET = 0,
+  PHI1_ON = 1,
+  PHI1_OFF = 2,
+  PHI2_ON = 3,
+  PHI2_OFF = 4;
 
-tia_f1 f1_b(.s(a_q_bar),
-            .r(a_q),
-            .clock(clk),
-            .reset(r),
-            .q(b_q),
-            .q_bar(b_q_bar));
+reg[2:0] state;
 
-sr rsyn_sr(.s(b_q_bar_bar), .r(r), .r2(0), .q(rl));
+initial begin
+  state = RESET;
+end
 
-assign #1 phi1 = ~(a_q | b_q_return);
-assign #1 phi2 = ~(a_q_bar | b_q_bar_return);
-assign #1 b_q_bar_bar = ~b_q_bar;
-// |bqb| is optional output, used only in missile position counter.
-assign #1 bqb = b_q_bar;
+always @(posedge r) begin
+  state = RESET;
+end
+
+always @(posedge clk) begin
+  if (state == RESET && r === 0) state = PHI1_ON;
+  else if (state == PHI1_ON) state = PHI1_OFF;
+  else if (state == PHI1_OFF) state = PHI2_ON;
+  else if (state == PHI2_ON) state = PHI2_OFF;
+  else if (state == PHI2_OFF) state = PHI1_ON;
+end
+
+assign phi1 = state == PHI1_ON ? 1 : 0;
+assign phi2 = state == PHI2_ON ? 1 : 0;
+assign bqb = (state == PHI1_ON || state == PHI1_OFF) ? 1: 0;
+
+wire bqb_n = ~bqb;
+sr rlsr(.s(bqb_n), .r(r), .r2(0), .q(rl));
 
 endmodule  // tia_biphase_clock
 

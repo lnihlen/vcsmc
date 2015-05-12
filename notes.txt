@@ -1469,3 +1469,12 @@ the desired output signals?
 
 e) correctness - does our predicted behavior match that of the other simulators
 out there, for conventional programs?
+
+===============================================================================
+
+Alright, seems our frame-1.bin has some bugs.
+at address 0x400 there's an sta 02 with only 6 clocks left in the scanline.
+at address 0x800 the same thing, an sta 02 with only 6 clocks left.
+at address 0x2803 same thing
+at address 0x3000 same thing
+** note that all of these are RIGHT AFTER A JUMP
