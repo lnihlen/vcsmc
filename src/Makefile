@@ -2,7 +2,7 @@
 # Dependencies: libtiff, libpng, clang, OpenCL, gflags
 # tools dependencies: python colormath, Wand, ImageMagick
 CFLAGS+=-I. -g -O0
-LIBS+=-lm -ltiff -lpng
+LIBS+=-lm -ltiff -lpng -lyaml
 OUTTESTS=$(OUT)/tests
 
 UNAME:=$(shell uname)
@@ -46,23 +46,6 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/video_frame_data.o                                                  \
     $(OUT)/video_frame_data_parser.o                                           \
 
-PARTS_OBJ=$(OUT)/parts/and.o                                                   \
-          $(OUT)/parts/block.o                                                 \
-          $(OUT)/parts/d1.o                                                    \
-          $(OUT)/parts/d2.o                                                    \
-          $(OUT)/parts/dgnor.o                                                 \
-          $(OUT)/parts/dgnot.o                                                 \
-          $(OUT)/parts/dir.o                                                   \
-          $(OUT)/parts/dl.o                                                    \
-          $(OUT)/parts/dxnor.o                                                 \
-          $(OUT)/parts/f1.o                                                    \
-          $(OUT)/parts/l.o                                                     \
-          $(OUT)/parts/net.o                                                   \
-          $(OUT)/parts/not.o                                                   \
-          $(OUT)/parts/part.o                                                  \
-          $(OUT)/parts/waa.o                                                   \
-          $(OUT)/parts/xor.o
-
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
          $(OUTTESTS)/ciede2k_unittests.o                                       \
@@ -79,7 +62,6 @@ all: tests                                                                     \
      $(OUT)/check                                                              \
      $(OUT)/exty                                                               \
      $(OUT)/picc                                                               \
-     $(OUT)/sim                                                                \
      $(OUT)/smap
 
 $(OUT)/%.o: %.cc $(DEPS)
@@ -102,9 +84,6 @@ $(OUT)/exty: $(OBJ) $(OUT)/exty.o
 
 $(OUT)/smap: $(OBJ) $(OUT)/smap.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
-
-$(OUT)/sim: $(OBJ) $(PARTS_OBJ) $(OUT)/sim.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS) -lyaml
 
 $(OUT)/bed: $(OBJ) $(OUT)/bed.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
