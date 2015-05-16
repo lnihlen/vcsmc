@@ -10,11 +10,10 @@ module tia_l(in, follow, latch, out, out_bar);
     ltch = 0;
   end
 
-  assign #1 out = follow ? in : (latch ? ~ltch : 0);
-  assign #1 out_bar = ~out;
+  assign out = follow ? in : (latch ? ~ltch : 0);
+  assign out_bar = ~out;
 
   always @(follow, in) begin
-    #1
     if (follow) ltch = ~in;
   end
 endmodule  // tia_l

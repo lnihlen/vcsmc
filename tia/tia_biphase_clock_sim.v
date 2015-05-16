@@ -38,19 +38,19 @@ always @(posedge clock) begin
   #5
   case (state)
     RESET: begin
-      if (!rsynl) state = HPHI2;
-    end
-    HPHI2: begin
-      if (!hphi2) state = Z1;
-    end
-    Z1: begin
-      if (hphi1) state = HPHI1;
+      if (!rsynl) state = HPHI1;
     end
     HPHI1: begin
-      if (!hphi1) state = Z2;
+      if (!hphi1) state = Z1;
+    end
+    Z1: begin
+      if (hphi2) state = HPHI2;
+    end
+    HPHI2: begin
+      if (!hphi2) state = Z2;
     end
     Z2: begin
-      if (hphi2) begin
+      if (hphi1) begin
         $display("OK");
         $finish;
       end

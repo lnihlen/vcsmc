@@ -49,117 +49,117 @@ always @(posedge pck) begin
     2: start_bar = 0;
     3: start_bar = 1;
     // TODO: note unusual counting order, double-back to verify this is sane
-    4: begin
-      if (gs2 != 0 || gs1 != 0 || gs0 != 1) begin
-        $display("error cycle %d", cc);
-        $finish;
-      end
-    end
     5: begin
-      if (gs2 != 0 || gs1 != 1 || gs0 != 0) begin
+      if (gs2 != 0 || gs1 != 0 || gs0 != 1) begin
         $display("error cycle %d", cc);
         $finish;
       end
     end
     6: begin
-      if (gs2 != 0 || gs1 != 1 || gs0 != 1) begin
-        $display("error cycle %d", cc);
-        $finish;
-      end
-    end
-    7: begin
-      if (gs2 != 1 || gs1 != 0 || gs0 != 0) begin
-        $display("error cycle %d", cc);
-        $finish;
-      end
-    end
-    8: begin
-      if (gs2 != 1 || gs1 != 0 || gs0 != 1) begin
-        $display("error cycle %d", cc);
-        $finish;
-      end
-    end
-    9: begin
-      if (gs2 != 1 || gs1 != 1 || gs0 != 0) begin
-        $display("error cycle %d", cc);
-        $finish;
-      end
-    end
-    10: begin
-      if (gs2 != 1 || gs1 != 1 || gs0 != 1) begin
-        $display("error cycle %d", cc);
-        $finish;
-      end
-    end
-    11: begin
-      if (gs2 != 0 || gs1 != 0 || gs0 != 0) begin
-        $display("error cycle %d", cc);
-        $finish;
-      end
-    end
-    12: player_reflect_bar = 1;
-    13: start_bar = 0;
-    14: start_bar = 1;
-    15: begin
-      if (gs2 != 1 || gs1 != 1 || gs0 != 0) begin
-        $display("error cycle %d", cc);
-        $finish;
-      end
-    end
-    16: begin
-      if (gs2 != 1 || gs1 != 0 || gs0 != 1) begin
-        $display("error cycle %d", cc);
-        $finish;
-      end
-    end
-    17: begin
-      if (gs2 != 1 || gs1 != 0 || gs0 != 0) begin
-        $display("error cycle %d", cc);
-        $finish;
-      end
-    end
-    18: begin
-      if (gs2 != 0 || gs1 != 1 || gs0 != 1) begin
-        $display("error cycle %d", cc);
-        $finish;
-      end
-    end
-    19: begin
       if (gs2 != 0 || gs1 != 1 || gs0 != 0) begin
         $display("error cycle %d", cc);
         $finish;
       end
     end
-    20: begin
-      if (gs2 != 0 || gs1 != 0 || gs0 != 1) begin
+    7: begin
+      if (gs2 != 0 || gs1 != 1 || gs0 != 1) begin
         $display("error cycle %d", cc);
         $finish;
       end
     end
-    21: begin
-      if (gs2 != 0 || gs1 != 0 || gs0 != 0) begin
+    8: begin
+      if (gs2 != 1 || gs1 != 0 || gs0 != 0) begin
         $display("error cycle %d", cc);
         $finish;
       end
     end
-    22: begin
+    9: begin
+      if (gs2 != 1 || gs1 != 0 || gs0 != 1) begin
+        $display("error cycle %d", cc);
+        $finish;
+      end
+    end
+    10: begin
+      if (gs2 != 1 || gs1 != 1 || gs0 != 0) begin
+        $display("error cycle %d", cc);
+        $finish;
+      end
+    end
+    11: begin
       if (gs2 != 1 || gs1 != 1 || gs0 != 1) begin
         $display("error cycle %d", cc);
         $finish;
       end
     end
+    12: begin
+      if (gs2 != 0 || gs1 != 0 || gs0 != 0) begin
+        $display("error cycle %d", cc);
+        $finish;
+      end
+    end
+    13: player_reflect_bar = 1;
+    14: start_bar = 0;
+    15: start_bar = 1;
+    17: begin
+      if (gs2 != 1 || gs1 != 1 || gs0 != 0) begin
+        $display("error cycle %d", cc);
+        $finish;
+      end
+    end
+    18: begin
+      if (gs2 != 1 || gs1 != 0 || gs0 != 1) begin
+        $display("error cycle %d", cc);
+        $finish;
+      end
+    end
+    19: begin
+      if (gs2 != 1 || gs1 != 0 || gs0 != 0) begin
+        $display("error cycle %d", cc);
+        $finish;
+      end
+    end
+    20: begin
+      if (gs2 != 0 || gs1 != 1 || gs0 != 1) begin
+        $display("error cycle %d", cc);
+        $finish;
+      end
+    end
+    21: begin
+      if (gs2 != 0 || gs1 != 1 || gs0 != 0) begin
+        $display("error cycle %d", cc);
+        $finish;
+      end
+    end
+    22: begin
+      if (gs2 != 0 || gs1 != 0 || gs0 != 1) begin
+        $display("error cycle %d", cc);
+        $finish;
+      end
+    end
     23: begin
+      if (gs2 != 0 || gs1 != 0 || gs0 != 0) begin
+        $display("error cycle %d", cc);
+        $finish;
+      end
+    end
+    24: begin
+      if (gs2 != 1 || gs1 != 1 || gs0 != 1) begin
+        $display("error cycle %d", cc);
+        $finish;
+      end
+    end
+    26: begin
       $display("OK");
       $finish;
     end
   endcase
 
-  if ((cc >= 4 && cc < 12) || (cc >= 15 && cc < 23)) begin
+  if ((cc >= 5 && cc < 13) || (cc >= 17 && cc < 25)) begin
     if (p != 1) begin
       $display("missing player activation: %d", cc);
       $finish;
     end
-  end else begin
+  end else if (cc > 1) begin
     if (p != 0) begin
       $display("extraneous player activation: %d", cc);
       $finish;

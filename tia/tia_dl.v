@@ -17,7 +17,7 @@ reg latched_out;
 wire out;
 
 // If s2 is high then output is stored latch, otherwise it sees a zero.
-assign #1 out = (~r) & latched_out;
+assign out = (~r) & latched_out;
 
 initial begin
   latched_in = 0;

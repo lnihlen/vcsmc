@@ -61,7 +61,7 @@ always #100 begin
 end
 
 always @(posedge clkp) begin
-  #1
+  #5
   case (cc)
     0: begin
       bkci = 1;

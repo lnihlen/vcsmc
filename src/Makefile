@@ -1,7 +1,7 @@
 # VCSMC src/ Makefile.
-# Dependencies: libtiff, libpng, clang, OpenCL, gflags
+# Dependencies: libtiff, libpng, clang, OpenCL, gflags, libyaml
 # tools dependencies: python colormath, Wand, ImageMagick
-CFLAGS+=-I. -g -O0
+CFLAGS+=-I. -O2
 LIBS+=-lm -ltiff -lpng -lyaml
 OUTTESTS=$(OUT)/tests
 
@@ -60,6 +60,7 @@ all: tests                                                                     \
      $(OUT)/asm                                                                \
      $(OUT)/bed                                                                \
      $(OUT)/check                                                              \
+     $(OUT)/conv                                                               \
      $(OUT)/exty                                                               \
      $(OUT)/picc                                                               \
      $(OUT)/smap
@@ -67,28 +68,28 @@ all: tests                                                                     \
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-$(OUT)/parts/%.o: parts/%.cc $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
-
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CC) -c -o $@ $< $(CFLAGS) -I$(GTEST_INCLUDE)
 
-$(OUT)/picc: $(OBJ) $(OUT)/picc.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
-
 $(OUT)/asm: $(OBJ) $(OUT)/asm.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
-
-$(OUT)/exty: $(OBJ) $(OUT)/exty.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
-
-$(OUT)/smap: $(OBJ) $(OUT)/smap.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/bed: $(OBJ) $(OUT)/bed.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/check: $(OBJ) $(OUT)/check.o
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/conv: $(OBJ) $(OUT)/conv.o
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/exty: $(OBJ) $(OUT)/exty.o
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/picc: $(OBJ) $(OUT)/picc.o
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/smap: $(OBJ) $(OUT)/smap.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/

@@ -8,12 +8,9 @@ export OUT=$(CURDIR)/out
 export GTEST_INCLUDE=$(CURDIR)/third_party/gtest-1.7.0/include
 export GTEST_LIB=$(OUT)/gtest/gtest.a
 
-all: picc asm gtest tests
+all: gtest tests picc
 
 picc: | $(OUT)/
-	$(MAKE) -C src/
-
-asm: | $(OUT)/
 	$(MAKE) -C src/
 
 tests: gtest

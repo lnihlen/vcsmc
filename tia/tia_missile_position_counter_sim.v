@@ -42,7 +42,7 @@ initial begin
   missile_to_player_reset_bar = 1;
   nz4 = 0;
   nz5 = 0;
-  missile_reset = 1;
+  missile_reset = 0;
   missile_to_player_reset = 0;
   cc = 0;
   line_count = 0;
@@ -56,29 +56,29 @@ end
 always @(posedge motck) begin
   #1
   // TODO: test nz4, nz5
-  if (line_count == 0 && cc == 1) begin
-    missile_reset = 0;
-  end else if (line_count > 0 && cc == 0) begin
+  if (cc == 0) begin
     if (m != 1) begin
-      $display("missing startup missile");
+      $display("missing startup missile line: %d", line_count);
       $finish;
     end
   end else if ((line_count == 2 || line_count == 4) && cc == 16) begin
     if (m != 1) begin
-      $display("missing close missile");
+      $display("missing close missile at 16 line: %d", line_count);
       $finish;
     end
   end else if ((line_count == 3 || line_count == 4 || line_count == 7) &&
                cc == 32) begin
     if (m != 1) begin
-      $display("missing medium missile line: %d", line_count);
+      $display("missing medium missile at 32 line: %d", line_count);
       $finish;
     end
   end else if ((line_count == 5 || line_count == 7) && cc == 64) begin
     if (m != 1) begin
-      $display("missing far missile line: %d", line_count);
+      $display("missing far missile at 64 line: %d", line_count);
       $finish;
     end
+  end else if (m != 0) begin
+    $display("extra missile activation, line: %d, cc: %d", line_count, cc);
   end
 
   cc = cc + 1;
