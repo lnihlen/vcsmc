@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
       vcsmc::kFrameHeightPixels);
   const char* input_ptr = input_buffer.get() +
       (2 * vcsmc::kScanLineWidthClocks *
-          (vcsmc::kVSyncScanLines + vcsmc::kVBlankScanLines));
+          (vcsmc::kVSyncScanLines + vcsmc::kVBlankScanLines)) + 2;
   uint32* pixel_ptr = output_image.pixels_writeable();
   for (uint32 i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
     // Skip HBlank region of scanline.

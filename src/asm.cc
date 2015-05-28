@@ -12,7 +12,7 @@
 #include "opcode.h"
 #include "types.h"
 
-static const size_t kFileBufferSize = 16384;
+static const size_t kFileBufferSize = 16384 * 1024;
 
 int main(int argc, char* argv[]) {
   if (argc != 3) {
@@ -39,15 +39,20 @@ int main(int argc, char* argv[]) {
     std::vector<std::unique_ptr<vcsmc::op::OpCode>> opcodes;
     // Assemble a whole line from any fragment remaining from prior chunk of
     // data loaded.
-    char* chunk_start = input_buffer.get();
+    const char* chunk_start = input_buffer.get();
     if (line_fragment.length()) {
-      int line_end = 0;
-      for (; line_end < bytes_read; ++line_end)
+      size_t line_end = 0;
+      for (; line_end < bytes_read; ++line_end) {
         if (input_buffer[line_end] == '\n')
           break;
+      }
+      // TODO: this is *not* working on my laptop right now, for some reason,
+      // so I bump the buffer size up so it won't be a problem.
       line_fragment += std::string(chunk_start, line_end);
-      if (!vcsmc::Assembler::AssembleString(line_fragment, &opcodes))
+      if (!vcsmc::Assembler::AssembleString(line_fragment, &opcodes)) {
+        fprintf(stderr, "error assembling fragment: %s\n", line_fragment.c_str());
         break;
+      }
       if (line_end >= bytes_read)
         break;
       chunk_start += line_end;
@@ -57,9 +62,10 @@ int main(int argc, char* argv[]) {
     // necessary if bytes_read == kFileBufferSize) and save in line_fragment.
     int chunk_end = bytes_read;
     if (bytes_read == kFileBufferSize) {
-      for (; chunk_end >= 0; --chunk_end)
+      for (; chunk_end >= 0; --chunk_end) {
         if (input_buffer[chunk_end] == '\n')
           break;
+      }
       line_fragment = std::string(input_buffer.get() + chunk_end + 1,
           bytes_read - chunk_end);
     }
@@ -67,8 +73,10 @@ int main(int argc, char* argv[]) {
     // Pass giant substring to assembler with fresh output opcode vector. If
     // this fails we break out of the loop.
     const std::string chunk(chunk_start, chunk_end);
-    if (!vcsmc::Assembler::AssembleString(chunk, &opcodes))
+    if (!vcsmc::Assembler::AssembleString(chunk, &opcodes)) {
+      fprintf(stderr, "error assembling chunk: %s\n", chunk.c_str());
       break;
+    }
 
     // Traverse vector generating bytecode from each opcode to fill output
     // buffer.

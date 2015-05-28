@@ -36,6 +36,9 @@ initial begin
   player_reflect_bar = 0;
   clkp = 0;
   cc = 0;
+
+  $dumpfile("out/tia_player_graphics_scan_counter_sim.vcd");
+  $dumpvars(0, tia_player_graphics_scan_counter_sim);
 end
 
 always #100 begin

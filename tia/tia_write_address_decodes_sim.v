@@ -66,6 +66,9 @@ initial begin
   a = 6'b000000;
   phi2 = 0;
   w_bar = 0;
+
+  $dumpfile("out/tia_write_address_decodes_sim.vcd");
+  $dumpvars(0, tia_write_address_decodes_sim);
 end
 
 always #100 begin

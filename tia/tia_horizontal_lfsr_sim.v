@@ -31,6 +31,9 @@ initial begin
   clock = 0;
   cycle_count = 0;
   rsyn = 0;
+
+  $dumpfile("out/tia_horizontal_lfsr_sim.vcd");
+  $dumpvars(0, tia_horizontal_lfsr_sim);
 end
 
 always #100 begin

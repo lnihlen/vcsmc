@@ -16,6 +16,9 @@ initial begin
   resphi0 = 0;
   cycle_count = 0;
   last_positive_edge = 0;
+
+  $dumpfile("out/tia_divide_by_three_sim.vcd");
+  $dumpvars(0, tia_divide_by_three_sim);
 end
 
 always #100 begin

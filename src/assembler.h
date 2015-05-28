@@ -18,7 +18,7 @@ namespace op {
 // b) Comments are semi-colons (;), ignore rest of line until end.
 // c) TIA addresses are built-in, they are all upcase like VSYNC.
 // d) OpCodes are case-insensitive, not all OpCodes are supported. Currently
-//    only load immediate, store zero page, and nop are supported :).
+//    only load immediate, store zero page, jmp, and nop are supported :).
 // e) Immediate constants are prefaced with a hash mark (#)
 // f) Hex numbers are proceeded by a dollar sign ($)
 // g) Hex immediate get the hash first, so #$af not $#af
@@ -62,6 +62,7 @@ class Assembler {
 
   // Parses a value, if starting with $ is hex.
   static bool ParseByte(const std::string& token, uint8* byte_out);
+  static bool ParseShort(const std::string& token, uint16* short_out);
 };
 
 }  // namespace vcsmc

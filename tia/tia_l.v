@@ -4,17 +4,17 @@
 module tia_l(in, follow, latch, out, out_bar);
   input in, follow, latch;
   output out, out_bar;
-  reg ltch;
+  reg latch_reg;
 
   initial begin
-    ltch = 0;
+    latch_reg = 0;
   end
 
-  assign out = follow ? in : (latch ? ~ltch : 0);
+  assign #1 out = follow ? in : latch_reg;
   assign out_bar = ~out;
 
   always @(follow, in) begin
-    if (follow) ltch = ~in;
+    if (follow === 1) latch_reg = in;
   end
 endmodule  // tia_l
 

@@ -77,8 +77,8 @@ module build_frame();
     d = 0;
     a = 6'b111111;
 
-//    $dumpfile("foo.lxt");
-//    $dumpvars(0, build_frame);
+    $dumpfile("out/build_frame.lxt");
+    $dumpvars(0, build_frame);
 
     if (!$value$plusargs("input_file=%s", infile)) begin
       $display("no input file specified with +input_file=");
@@ -105,8 +105,9 @@ module build_frame();
   always #100 begin
     clock = ~clock;
     if (!clock) begin
-      $fwrite(fdout, "%x", out_color);
       count = count + 1;
+      #1
+      $fwrite(fdout, "%02x", out_color);
     end
   end
 
@@ -117,6 +118,11 @@ module build_frame();
     end else if (state == WSYNC && (rdy === 0)) begin
       rw = 1;
     end else if (state == LOAD || (state == WSYNC && rdy === 1)) begin
+      if (address >= rom_size) begin
+        $fclose(fdout);
+        $dumpflush;
+        $finish;
+      end
       op = rom[address];
       address = address + 1;
       start_count = count;
@@ -178,14 +184,6 @@ module build_frame();
       end else state = LOAD;
 
       if (op != JMP && op != NOP) address = address + 1;
-    end
-
-    // Count should be 59736 at the end.
-
-    if (address >= rom_size) begin
-      $fclose(fdout);
-//      $dumpflush;
-      $finish;
     end
   end
 

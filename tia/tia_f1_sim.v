@@ -24,6 +24,9 @@ initial begin
   s = 0;
   r = 1;
   cycle_count = 0;
+
+  $dumpfile("out/tia_f1_sim.vcd");
+  $dumpvars(0, tia_f1_sim);
 end
 
 always #100 begin

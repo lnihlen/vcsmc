@@ -39,6 +39,8 @@ initial begin
 
   cc = 0;
   line_count = 0;
+  $dumpfile("out/tia_ball_position_counter_sim.vcd");
+  $dumpvars(0, tia_ball_position_counter_sim);
 end
 
 always #100 begin
@@ -58,11 +60,13 @@ always @(posedge motck) begin
       (line_count == 4 && cc < 8)) begin
     if (bl != 1) begin
       $display("missing ball pixel %d on line %d", cc, line_count);
+      $dumpflush;
       $finish;
     end
   end else if (line_count > 0) begin
     if (bl != 0) begin
       $display("spurious ball graphics, cc: %d, line: %d", cc, line_count);
+      $dumpflush;
       $finish;
     end
   end

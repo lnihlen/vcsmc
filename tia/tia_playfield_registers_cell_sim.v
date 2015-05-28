@@ -75,6 +75,9 @@ initial begin
   cycle_count = 0;
   upper_si1 = 0;
   lower_si2 = 0;
+
+  $dumpfile("out/tia_playfield_registers_cell_sim.vcd");
+  $dumpvars(0, tia_playfield_registers_cell_sim);
 end
 
 always #100 begin

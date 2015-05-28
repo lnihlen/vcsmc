@@ -27,6 +27,9 @@ initial begin
   clock = 0;
   rsyn = 1;
   state = RESET;
+
+  $dumpfile("out/tia_biphase_clock_sim.vcd");
+  $dumpvars(0, tia_biphase_clock_sim);
 end
 
 always #100 begin

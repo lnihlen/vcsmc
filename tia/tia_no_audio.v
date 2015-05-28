@@ -280,8 +280,8 @@ module tia_no_audio(
                                         .d5(d5),
                                         .d6(d6),
                                         .d7(d7),
-                                        .px(p0),
-                                        .mx(m0));
+                                        .px(p1),
+                                        .mx(m1));
 
   // === Page 5
 

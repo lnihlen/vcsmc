@@ -93,6 +93,9 @@ initial begin
   hmove = 0;
   wsyn = 1;
   d1 = 0;
+
+  $dumpfile("out/tia_horizontal_timing_sim.vcd");
+  $dumpvars(0, tia_horizontal_timing_sim);
 end
 
 always #100 begin

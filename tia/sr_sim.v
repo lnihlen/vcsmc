@@ -17,6 +17,8 @@ initial begin
   r = 1;
   cycle_count = 0;
   clock = 0;
+  $dumpfile("out/sr_sim.vcd");
+  $dumpvars(0, sr_sim);
 end
 
 always #10 clock = ~clock;

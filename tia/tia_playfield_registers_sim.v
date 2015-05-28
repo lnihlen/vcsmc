@@ -3,7 +3,7 @@
 `include "tia_horizontal_lfsr_decoder.v"
 `include "tia_playfield_registers.v"
 
-module tia_horizontal_lfsr_decoder_sim();
+module tia_playfield_registers_sim();
 
 reg clock;
 reg rsyn;
@@ -95,6 +95,9 @@ initial begin
   pf1 = 0;
   pf2 = 0;
   ref_bar = 1;
+
+  $dumpfile("out/tia_playfield_registers_sim.vcd");
+  $dumpvars(0, tia_playfield_registers_sim);
 end
 
 always #100 begin

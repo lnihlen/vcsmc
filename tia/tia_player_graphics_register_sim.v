@@ -35,6 +35,8 @@ initial begin
   p1gr = 0;
 
   up = 1;
+  $dumpfile("out/tia_player_graphics_register_sim.vcd");
+  $dumpvars(0, tia_player_graphics_register_sim);
 end
 
 always #100 begin

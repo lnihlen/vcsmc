@@ -35,6 +35,9 @@ initial begin
   nz2 = 0;
   cc = 0;
   line_count = 0;
+
+  $dumpfile("out/tia_player_position_counter_sim.vcd");
+  $dumpvars(0, tia_player_position_counter_sim);
 end
 
 always #100 begin
@@ -49,30 +52,30 @@ always @(posedge motck) begin
     end
     if (start_bar != 0) begin
       $display("missing first start_bar at cc: %d, line: %d", cc, line_count);
-//      $finish;
+      $finish;
     end
   end else if ((line_count == 1 || line_count == 3) &&
                (cc >= 16 && cc < 20)) begin
     if (start_bar != 0) begin
       $display("missing close start_bar at cc: %d, line: %d", cc, line_count);
-//      $finish;
+      $finish;
     end
   end else if ((line_count == 2 || line_count == 3 || line_count == 6) &&
                (cc >= 32 && cc < 36)) begin
     if (start_bar != 0) begin
       $display("missing medium start_bar at cc: %d, line: %d", cc, line_count);
-//      $finish;
+      $finish;
     end
   end else if ((line_count == 4 || line_count == 6) &&
                (cc >= 64 && cc < 68)) begin
     if (start_bar != 0) begin
       $display("missing far start_bar at cc: %d, line: %d", cc, line_count);
-//      $finish;
+      $finish;
     end
   end else begin
     if (start_bar != 1) begin
       $display("extraneous start_bar at cc: %d, line: %d", cc, line_count);
-//      $finish;
+      $finish;
     end
   end
   cc = cc + 1;

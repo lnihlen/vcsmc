@@ -46,6 +46,8 @@ initial begin
   clkp = 0;
 
   cc = 0;
+  $dumpfile("out/tia_color_lum_registers_sim.vcd");
+  $dumpvars(0, tia_color_lum_registers_sim);
 end
 
 assign d1 = d[1];

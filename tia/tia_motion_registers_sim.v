@@ -1,7 +1,7 @@
 `include "tia_motion_registers.v"
 `include "tia_biphase_clock.v"
 
-module tia_motion_registers_cell_a_sim();
+module tia_motion_registers_sim();
 
 reg clock;
 reg rsyn;
@@ -74,6 +74,9 @@ initial begin
   m0hm = 1;
   m1hm = 1;
   blhm = 1;
+
+  $dumpfile("out/tia_motion_registers_sim.vcd");
+  $dumpvars(0, tia_motion_registers_sim);
 end
 
 always #100 begin

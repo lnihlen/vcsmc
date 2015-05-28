@@ -151,10 +151,12 @@ bool Assembler::ProcessLine(
   // Whitespace-or-comment-only lines are easy, just bail.
   if (!tokens.size()) return true;
 
-  //for (int i = 0; i < tokens.size(); ++i) {
-  //  printf("token %d: '%s' ", i, tokens[i].c_str());
-  //}
-  //printf("\n");
+/*
+  for (int i = 0; i < tokens.size(); ++i) {
+    printf("token %d: '%s' ", i, tokens[i].c_str());
+  }
+  printf("\n");
+*/
 
   // First token is now assumed to be an opcode, force it to lower case.
   std::string opcode_str = tokens[0];
@@ -165,7 +167,15 @@ bool Assembler::ProcessLine(
 
   std::unique_ptr<op::OpCode> opcode;
   // Homebrew DFA FTW. Probably stupid.
-  if (opcode_str[0] == 'l') {
+  if (opcode_str == "jmp") {
+    // jmp needs a short argument
+    if (tokens.size() != 2)
+      return false;
+    uint16 address = 0;
+    if (!ParseShort(tokens[1], &address))
+      return false;
+    opcode = makeJMP(address);
+  } else if (opcode_str[0] == 'l') {
     if (opcode_str[1] == 'd') {  // lda, ldx, ldy
       // Loads require a value argument.
       if (tokens.size() != 2)
@@ -274,26 +284,52 @@ bool Assembler::ParseZeroPageAddress(
 
 // static
 bool Assembler::ParseByte(const std::string& token, uint8* byte_out) {
+  if (!token.length()) return false;
   // First character could be a dollar sign $ to indicate hex, if not decimal.
   bool is_hex = token[0] == '$';
   if (is_hex) {
     // Rest of token should consist of either 1 or 2 hex digits.
-    if (token.length() < 3 || token.length() > 4)
+    if (token.length() < 2 || token.length() > 3)
       return false;
-    if (token.find_first_not_of("0123456789abcdef", 2) != std::string::npos)
+    if (token.find_first_not_of("0123456789abcdef", 1) != std::string::npos)
       return false;
     uint32 parsed = strtoul(token.c_str() + 1, NULL, 16);
     *byte_out = static_cast<uint8>(parsed);
   } else {
     // Rest of token should consist of either 1, 2, or 3 decimal digits.
-    if (token.length() < 3 || token.length() > 5)
+    if (token.length() > 3)
       return false;
-    if (token.find_first_not_of("0123456789", 1) != std::string::npos)
+    if (token.find_first_not_of("0123456789") != std::string::npos)
       return false;
     uint32 parsed = strtoul(token.c_str(), NULL, 10);
     if (parsed > 255)
       return false;
     *byte_out = static_cast<uint8>(parsed);
+  }
+  return true;
+}
+
+// static
+bool Assembler::ParseShort(const std::string& token, uint16* short_out) {
+  if (!token.length()) return false;
+  bool is_hex = token[0] == '$';
+  if (is_hex) {
+    // number should consist of 1-4 hex digits
+    if (token.length() < 2 || token.length() > 5)
+      return false;
+    if (token.find_first_not_of("0123456789abcdef", 1) != std::string::npos)
+      return false;
+    uint32 parsed = strtoul(token.c_str() + 1, NULL, 16);
+    *short_out = static_cast<uint16>(parsed);
+  } else {
+    if (token.length() > 5)
+      return false;
+    if (token.find_first_not_of("0123456789") != std::string::npos)
+      return false;
+    uint32 parsed = strtoul(token.c_str(), NULL, 10);
+    if (parsed > 65536)
+      return false;
+    *short_out = static_cast<uint16>(parsed);
   }
   return true;
 }

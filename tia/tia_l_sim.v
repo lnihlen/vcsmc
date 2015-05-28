@@ -19,6 +19,9 @@ initial begin
   in = 0;
   clock = 0;
   cycle_count = 0;
+
+  $dumpfile("out/tia_l_sim.vcd");
+  $dumpvars(0, tia_l_sim);
 end
 
 always #100 begin
@@ -28,7 +31,7 @@ end
 always @(posedge clock) begin
   case (cycle_count)
     1: begin
-      #1
+      #2
       if (out != 0 || out_bar != 1) begin
         $display("ERROR cycle_count: %d", cycle_count);
         $finish;
@@ -36,7 +39,7 @@ always @(posedge clock) begin
     end
     2: begin
       in = 1;
-      #1
+      #2
       if (out != 1 || out_bar != 0) begin
         $display("ERROR cycle_count: %d", cycle_count);
         $finish;
@@ -45,7 +48,7 @@ always @(posedge clock) begin
     3: begin
       f = 0;
       l = 1;
-      #1
+      #2
       if (out != 1 || out_bar != 0) begin
         $display("ERROR cycle_count: %d", cycle_count);
         $finish;
@@ -53,7 +56,7 @@ always @(posedge clock) begin
     end
     4: begin
       in = 0;
-      #1
+      #2
       if (out != 1 || out_bar != 0) begin
         $display("ERROR cycle_count: %d", cycle_count);
         $finish;
@@ -62,7 +65,7 @@ always @(posedge clock) begin
     5: begin
       f = 1;
       l = 0;
-      #1
+      #2
       if (out != 0 || out_bar != 1) begin
         $display("ERROR cycle_count: %d", cycle_count);
         $finish;
@@ -71,7 +74,7 @@ always @(posedge clock) begin
     6: begin
       f = 0;
       l = 1;
-      #1
+      #2
       if (out != 0 || out_bar != 1) begin
         $display("ERROR cycle_count: %d", cycle_count);
         $finish;
@@ -79,7 +82,7 @@ always @(posedge clock) begin
     end
     6: begin
       in = 1;
-      #1
+      #2
       if (out != 0 || out_bar != 1) begin
         $display("ERROR cycle_count: %d", cycle_count);
         $finish;

@@ -34,6 +34,9 @@ initial begin
   clock = 0;
   rsyn = 0;
   cycle_count = 0;
+
+  $dumpfile("out/tia_d2_sim.vcd");
+  $dumpvars(0, tia_d2_sim);
 end
 
 always #100 begin

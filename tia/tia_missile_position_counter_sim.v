@@ -46,6 +46,9 @@ initial begin
   missile_to_player_reset = 0;
   cc = 0;
   line_count = 0;
+
+  $dumpfile("out/tia_missile_position_counter_sim.vcd");
+  $dumpvars(0, tia_missile_position_counter_sim);
 end
 
 always #100 begin

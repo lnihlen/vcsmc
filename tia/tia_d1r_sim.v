@@ -28,6 +28,9 @@ initial begin
   rsyn = 0;
   cycle_count = 0;
   reset = 0;
+
+  $dumpfile("out/tia_d1r_sim.vcd");
+  $dumpvars(0, tia_d1r_sim);
 end
 
 always #100 begin

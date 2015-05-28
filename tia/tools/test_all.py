@@ -19,8 +19,9 @@ def main(argv):
       print 'error compiling %s:\n%s' % (sim_name, build_output)
       continue
     sim_output = subprocess.check_output(['vvp', out_name])
-    if sim_output != 'OK\n':
-      print '%s:\n%s' % (sim_name, sim_output)
+    expected_out = 'VCD info: dumpfile out/%s opened for output.\nOK\n' % (sim_name[:-2] + '.vcd')
+    if sim_output != expected_out:
+      print '%s:\n%s\n' % (sim_name, sim_output)
 
 if __name__ == "__main__":
   main(sys.argv)

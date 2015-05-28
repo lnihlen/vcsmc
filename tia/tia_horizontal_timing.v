@@ -87,12 +87,14 @@ wire comp_sync_bar;
 assign comp_sync_bar = vs ^ hs;
 assign syn = ~comp_sync_bar;
 
-wire vsyn_bar = ~vsyn;
+wire vsyn_bar;
+assign vsyn_bar = ~vsyn;
 wire vs;
 tia_l l_vs(.in(d1), .follow(vsyn), .latch(vsyn_bar), .out(vs));
-wire vblk_bar = ~vblk;
-tia_l l_vb(.in(d1), .follow(vblk), .latch(vblk_bar), .out(vb));
-assign vb_bar = ~vb;
+wire vblk_bar;
+assign vblk_bar = ~vblk;
+tia_l l_vb(.in(d1), .follow(vblk), .latch(vblk_bar), .out(vb),
+    .out_bar(vb_bar));
 
 wire sr_rdy_s;
 assign sr_rdy_s = clkp & shb;
