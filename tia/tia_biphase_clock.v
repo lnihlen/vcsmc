@@ -24,19 +24,19 @@ parameter[2:0]
 reg[2:0] state;
 
 initial begin
-  state = RESET;
+  state <= RESET;
 end
 
 always @(posedge r) begin
-  state = RESET;
+  state <= RESET;
 end
 
 always @(posedge clk) begin
-  if (state == RESET && r === 0) state = PHI1_ON;
-  else if (state == PHI1_ON) state = PHI1_OFF;
-  else if (state == PHI1_OFF) state = PHI2_ON;
-  else if (state == PHI2_ON) state = PHI2_OFF;
-  else if (state == PHI2_OFF) state = PHI1_ON;
+  if (state == RESET && r === 0) state <= PHI1_ON;
+  else if (state == PHI1_ON) state <= PHI1_OFF;
+  else if (state == PHI1_OFF) state <= PHI2_ON;
+  else if (state == PHI2_ON) state <= PHI2_OFF;
+  else if (state == PHI2_OFF) state <= PHI1_ON;
 end
 
 assign phi1 = state == PHI1_ON ? 1 : 0;

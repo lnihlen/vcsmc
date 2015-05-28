@@ -13,8 +13,8 @@ module tia_l(in, follow, latch, out, out_bar);
   assign #1 out = follow ? in : latch_reg;
   assign out_bar = ~out;
 
-  always @(follow, in) begin
-    if (follow === 1) latch_reg = in;
+  always @(follow or in) begin
+    if (follow) latch_reg <= in;
   end
 endmodule  // tia_l
 

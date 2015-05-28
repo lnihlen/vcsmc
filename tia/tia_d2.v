@@ -20,14 +20,14 @@ initial begin
   out = 0;
 end
 
-always @(posedge s1, in1, in2) begin
+always @(posedge s1 or in1 or in2) begin
   if (s1) begin
-    tap = ~(in1 | in2);
+    tap <= ~(in1 | in2);
   end
 end
 
 always @(posedge s2) begin
-  out = ~tap;
+  out <= ~tap;
 end
 
 endmodule  // tia_d2

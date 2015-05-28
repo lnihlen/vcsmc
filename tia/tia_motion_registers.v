@@ -29,13 +29,13 @@ module tia_motion_registers_cell_b(d, follow, latch, hmclr, rin, waout, rout);
   initial begin
     mid = 1;
   end
-  always @(posedge follow, d) begin
-    if (follow) mid = ~d;
+  always @(posedge follow or d) begin
+    if (follow) mid <= ~d;
   end
   wire latch_out;
   assign #1 latch_out = ~(hmclr | mid);
-  always @(posedge latch, latch_out) begin
-    if (latch) mid = ~latch_out;
+  always @(posedge latch or latch_out) begin
+    if (latch) mid <= ~latch_out;
   end
   assign rout = ~rin;
   assign waout = ~(mid & rout) & ~(latch_out & rin);
@@ -50,13 +50,13 @@ module tia_motion_registers_cell_c(d, follow, latch, hmclr, rin, waout, rout);
   initial begin
     mid = 1;
   end
-  always @(posedge follow, d) begin
-    if (follow) mid = ~d;
+  always @(posedge follow or d) begin
+    if (follow) mid <= ~d;
   end
   wire latch_out;
   assign #1 latch_out = ~(hmclr | mid);
-  always @(posedge latch, latch_out) begin
-    if (latch) mid = ~latch_out;
+  always @(posedge latch or latch_out) begin
+    if (latch) mid <= ~latch_out;
   end
   assign rout = ~rin;
   assign waout = ~(mid & rin) & ~(latch_out & rout);

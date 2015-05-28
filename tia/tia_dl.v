@@ -24,14 +24,14 @@ initial begin
   latched_out = 0;
 end
 
-always @(posedge s1, in) begin
+always @(posedge s1 or in) begin
   if (s1) begin
-    latched_in = ~(in | out);
+    latched_in <= ~(in | out);
   end
 end
 
 always @(posedge s2) begin
-  latched_out = ~latched_in;
+  latched_out <= ~latched_in;
 end
 
 endmodule  // tia_d2

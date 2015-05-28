@@ -23,12 +23,12 @@ end
 wire r_int;
 assign r_int = r | r2;
 
-always @(s, r_int) begin
+always @(s or r_int) begin
   #1
   if (!s && r_int)
-    q = 1;
+    q <= 1;
   else if (s && !r_int)
-    q = 0;
+    q <= 0;
 end
 
 endmodule  // sr

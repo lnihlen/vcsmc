@@ -17,17 +17,14 @@ initial begin
   out[5:0] = 6'b000000;
 end
 
-always @(posedge reset) begin
-  out[5:0] = 6'b000000;
-end
-
 always @(posedge s1) begin
-  in[4:0] = out[5:1];
-  in[5] = out[1] ^ (~out[0]);
+  in[4:0] <= out[5:1];
+  in[5] <= out[1] ^ (~out[0]);
 end
 
-always @(posedge s2) begin
-  out[5:0] = in[5:0];
+always @(posedge s2 or reset) begin
+  if (reset) out[5:0] <= 6'b000000;
+  else if (s2) out[5:0] <= in[5:0];
 end
 
 endmodule  // tia_horizontal_lfsr
