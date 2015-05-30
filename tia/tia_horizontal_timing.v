@@ -77,7 +77,7 @@ sr sr_hb(.s(sec), .r(shb), .r2(0), .q(hb_q), .q_bar(hb_q_bar));
 wire hb_dl;
 assign hb_dl = (hb_q & rhb) | (lrhb & hb_q_bar);
 wire hb_bar;
-tia_dl dl_hb(.in(hb_dl), .s1(hphi1), .s2(hphi2), .r(rhs_d), .out(hb_bar));
+tia_dl dl_hb(.in(hb_dl), .s1(hphi1), .s2(hphi2), .r(shb), .out(hb_bar));
 wire d1_sec_s, d1_sec_in;
 sr sr_sec(.s(d1_sec_s), .r(hmove), .r2(0), .q(d1_sec_in));
 tia_d1 d1_sec(.in(d1_sec_in), .s1(hphi1), .s2(hphi2), .out(sec));

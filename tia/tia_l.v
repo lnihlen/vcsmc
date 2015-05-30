@@ -10,7 +10,7 @@ module tia_l(in, follow, latch, out, out_bar);
     latch_reg = 0;
   end
 
-  assign #1 out = follow ? in : latch_reg;
+  assign #1 out = follow ? in : latch ? latch_reg : 0;
   assign out_bar = ~out;
 
   always @(follow or in) begin

@@ -22,6 +22,7 @@ wire lrhb;
 wire rhb;
 
 integer cc;
+integer motck_count;
 
 tia_biphase_clock bpc(.clk(clock),
                       .r(rsyn),
@@ -86,13 +87,15 @@ tia_horizontal_timing timing(.hphi1(hphi1),
 
 initial begin
   clock = 0;
-  cc = 0;
   rsyn = 0;
   vsyn = 0;
   vblk = 0;
   hmove = 0;
   wsyn = 1;
   d1 = 0;
+
+  cc = 0;
+  motck_count = 0;
 
   $dumpfile("out/tia_horizontal_timing_sim.vcd");
   $dumpvars(0, tia_horizontal_timing_sim);
@@ -103,12 +106,6 @@ always #100 begin
 end
 
 always @(posedge clock) begin
-  if (cc == 4) wsyn = 0;
-  if (cc == 227) wsyn = 1;
-  if (cc == 250) wsyn = 0;
-  if (cc == 453) wsyn = 1;
-  if (cc == 460) wsyn = 0;
-  // TODO: actually test something here!
   cc = cc + 1;
   if (cc > 1000) begin
     $display("OK");

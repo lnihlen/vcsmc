@@ -201,7 +201,12 @@ module tia_no_audio(
                                         .blhm(blhm),
                                         .sec(sec),
                                         .hphi1(hphi1),
-                                        .hphi2(hphi2));
+                                        .hphi2(hphi2),
+                                        .p0ec_bar(p0ec_bar),
+                                        .p1ec_bar(p1ec_bar),
+                                        .m0ec_bar(m0ec_bar),
+                                        .m1ec_bar(m1ec_bar),
+                                        .blec_bar(blec_bar));
 
   wire aphi1, aphi2, cb, vb, vb_bar, blank, motck;
   tia_horizontal_timing horizontal_timing(.hphi1(hphi1),
