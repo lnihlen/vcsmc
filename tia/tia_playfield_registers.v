@@ -51,7 +51,7 @@ wire pf0_bar;
 assign pf0_bar = ~pf0;
 wire pf0_bit5_so1, pf0_bit6_so1, pf0_bit7_so1;
 wire pf0_bit4_so2, pf0_bit5_so2, pf0_bit6_so2, pf0_bit7_so2;
-wire pf1_bit7_so2;
+wire pf1_bit7_so2, pf1_bit7_so1;
 wire pf0_bit4_o, pf0_bit5_o, pf0_bit6_o, pf0_bit7_o;
 wire pf0_bit;
 assign pf0_bit = pf0_bit4_o | pf0_bit5_o | pf0_bit6_o | pf0_bit7_o;
@@ -77,10 +77,10 @@ tia_playfield_registers_cell pf0_bit7(.i(d7), .l1(pf0), .l2(pf0_bar),
 wire pf1_bar;
 assign pf1_bar = ~pf1;
 wire pf1_bit0_so1, pf1_bit1_so1, pf1_bit2_so1, pf1_bit3_so1,
-     pf1_bit4_so1, pf1_bit5_so1, pf1_bit6_so1, pf1_bit7_so1;
+     pf1_bit4_so1, pf1_bit5_so1, pf1_bit6_so1;
 wire pf1_bit0_so2, pf1_bit1_so2, pf1_bit2_so2, pf1_bit3_so2,
      pf1_bit4_so2, pf1_bit5_so2, pf1_bit6_so2;
-wire pf2_bit7_so2;
+wire pf2_bit0_so2, pf2_bit7_so2;
 wire pf1_bit0_o, pf1_bit1_o, pf1_bit2_o, pf1_bit3_o,
      pf1_bit4_o, pf1_bit5_o, pf1_bit6_o, pf1_bit7_o;
 wire pf1_bit;
@@ -117,7 +117,7 @@ wire pf2_bar;
 assign pf2_bar = ~pf2;
 wire pf2_bit0_so1, pf2_bit1_so1, pf2_bit2_so1, pf2_bit3_so1,
      pf2_bit4_so1, pf2_bit5_so1, pf2_bit6_so1, pf2_bit7_so1;
-wire pf2_bit0_so2, pf2_bit1_so2, pf2_bit2_so2, pf2_bit3_so2,
+wire pf2_bit1_so2, pf2_bit2_so2, pf2_bit3_so2,
      pf2_bit4_so2, pf2_bit5_so2, pf2_bit6_so2;
 wire pf2_bit0_o, pf2_bit1_o, pf2_bit2_o, pf2_bit3_o,
      pf2_bit4_o, pf2_bit5_o, pf2_bit6_o, pf2_bit7_o;
