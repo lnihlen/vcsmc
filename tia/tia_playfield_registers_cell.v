@@ -20,14 +20,14 @@ module tia_playfield_registers_cell(i, l1, l2, si1, si2, hphi1, hphi2,
     so1 = 0;
     so2 = 0;
   end
-  always @(posedge hphi1 or si1 or si2) begin
+  always @(hphi1 or si1 or si2) begin
     #1
     if (hphi1) begin
       si1_store <= si1;
       si2_store <= si2;
     end
   end
-  always @(posedge hphi2 or si1_store or si2_store) begin
+  always @(hphi2 or si1_store or si2_store) begin
     #1
     if (hphi2) begin
       so1 <= si1_store;

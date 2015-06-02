@@ -24,7 +24,7 @@ initial begin
   latched_out = 0;
 end
 
-always @(posedge s1 or in) begin
+always @(s1 or in) begin
   if (s1) begin
     latched_in <= ~(in | out);
   end

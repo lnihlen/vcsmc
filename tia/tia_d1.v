@@ -19,7 +19,7 @@ initial begin
   out = 0;
 end
 
-always @(posedge s1 or in) begin
+always @(s1 or in) begin
   if (s1) begin
     tap <= ~in;
   end
