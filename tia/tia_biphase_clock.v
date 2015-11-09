@@ -32,7 +32,7 @@ always @(posedge r) begin
 end
 
 always @(posedge clk) begin
-  if (state == RESET && r == 0) state <= PHI1_ON;
+  if (state == RESET && r == 0) state <= PHI2_OFF;
   else if (state == PHI1_ON) state <= PHI1_OFF;
   else if (state == PHI1_OFF) state <= PHI2_ON;
   else if (state == PHI2_ON) state <= PHI2_OFF;

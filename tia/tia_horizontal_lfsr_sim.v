@@ -45,25 +45,21 @@ always @(posedge hphi1) begin
   if (cycle_count == 0) begin
     if (out != 0) begin
       $display("ERROR: didn't start with 0, out: %b", out);
-      $finish;
     end
   end else if (cycle_count == 57) begin
     if (out != 0) begin
       $display("ERROR, didn't cycle to 0 at 57, out: %b", out);
-      $finish;
     end
   end else if (cycle_count == 114) begin
     if (out != 0) begin
       $display("ERROR, didn't cycle to 0 at 114, out: %b", out);
-      $finish;
     end else begin
       $display("OK");
-      $finish;
     end
+    $finish;
   end else begin
     if (!out) begin
-      $display("ERROR, zero output out-of-cycle %d.", cycle_count);
-      $finish;
+      $display("ERROR, zero output out-of-cycle cc: %d.", cycle_count);
     end
   end
   cycle_count = cycle_count + 1;

@@ -85,16 +85,41 @@
   ; 192 lines of content
 
   ; 1 / 192
+  sta RESP0
   lda #$e7
   sta GRP0
+  lda #$02
   sta COLUP0
-  sta RESP0
   sta WSYNC
 
   ; 2 / 192
+  nop         ; 0/76
+  nop         ; 2/76
+  nop         ; 4/76
+  nop         ; 6/76
+  nop         ; 8/76
+  nop         ; 10/76
+  nop         ; 12/76
+  nop         ; 14/76
+  nop         ; 16/76
+  nop         ; 18/76
+  nop         ; 20/76
+  sta RESP0   ; 22/76
   sta WSYNC
 
   ; 3 / 192
+  nop         ; 0/76
+  nop         ; 2/76
+  nop         ; 4/76
+  nop         ; 6/76
+  nop         ; 8/76
+  nop         ; 10/76
+  nop         ; 12/76
+  nop         ; 14/76
+  nop         ; 16/76
+  lda #$04    ; 18/76
+  sta COLUP0  ; 20/76
+  sta RESP0   ; 23/76
   sta WSYNC
 
   ; 4 / 192
