@@ -50,7 +50,8 @@ int main(int argc, char* argv[]) {
       // so I bump the buffer size up so it won't be a problem.
       line_fragment += std::string(chunk_start, line_end);
       if (!vcsmc::Assembler::AssembleString(line_fragment, &opcodes)) {
-        fprintf(stderr, "error assembling fragment: %s\n", line_fragment.c_str());
+        fprintf(stderr, "error assembling fragment: %s\n",
+            line_fragment.c_str());
         break;
       }
       if (line_end >= bytes_read)

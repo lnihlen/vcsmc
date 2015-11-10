@@ -1,3 +1,13 @@
+  processor 6502
+  include "vcs.h"
+  include "macro.h"
+
+  SEG
+  ORG $F000
+
+Reset
+StartOfFrame
+
   lda #0
   sta VBLANK
   lda #2
@@ -1655,7 +1665,7 @@
   sta WSYNC
 
   ; turn on vblank, then 30 scanlines of overscan
-  lda #2
+  lda #$42
   sta VBLANK
 
   sta WSYNC  ; 1 / 30
@@ -1688,4 +1698,11 @@
   sta WSYNC  ; 28 / 30
   sta WSYNC  ; 29 / 30
   sta WSYNC  ; 30 / 30
-  jmp $0800
+
+  jmp StartOfFrame
+
+  ORG $FFFA
+  .word Reset
+  .word Reset
+  .word Reset
+END
