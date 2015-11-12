@@ -3,8 +3,7 @@
 
 `include "tia_no_audio.v"
 
-// iverilog -Wall -o out/build_frame build_frame.v && vvp out/build_frame      \
-// -lxt2 +input_file=/Users/luken/src/video/bin/frame-1.bin +output_file="foo.x"
+// iverilog -Wall -o out/build_frame build_frame.v && vvp out/build_frame -lxt2 +input_file=/Users/luken/src/video/bin/frame-1.bin +output_file="foo.x"
 
 module build_frame();
   reg[1024*7:0] infile;
@@ -94,6 +93,7 @@ module build_frame();
       $finish;
     end
     rom_size = $fread(rom, fdin, 0, 16383);
+    $display("read %d bytes from input file %0s", rom_size, infile);
     $fclose(fdin);
     fdout = $fopen(outfile, "w");
     if (fdout == 0) begin
@@ -137,42 +137,42 @@ module build_frame();
     end else if (state == EXECUTE) begin
       case (op)
         JMP: begin
-//          $display("%d %x: jmp", start_count, address);
+          $display("%d %x: jmp", start_count, address);
           address = address + 1023;
           address = address & 32'hfffffc00;
         end
         LDA: begin
-//          $display("%d %x: lda %x", start_count, address, rom[address]);
+          $display("%d %x: lda %x", start_count, address, rom[address]);
           reg_a = rom[address];
         end
         LDX: begin
-//          $display("%d %x: ldx %x", start_count, address, rom[address]);
+          $display("%d %x: ldx %x", start_count, address, rom[address]);
           reg_x = rom[address];
         end
         LDY: begin
-//          $display("%d %x: ldy %x", start_count, address, rom[address]);
+          $display("%d %x: ldy %x", start_count, address, rom[address]);
           reg_y = rom[address];
         end
         STA: begin
-//          $display("%d %x: sta %x", start_count, address, rom[address]);
+          $display("%d %x: sta %x", start_count, address, rom[address]);
           a = rom[address];
           d = reg_a;
         end
         STX: begin
-//          $display("%d %x: stx %x", start_count, address, rom[address]);
+          $display("%d %x: stx %x", start_count, address, rom[address]);
           a = rom[address];
           d = reg_x;
         end
         STY: begin
-//          $display("%d %x: sty %x", start_count, address, rom[address]);
+          $display("%d %x: sty %x", start_count, address, rom[address]);
           a = rom[address];
           d = reg_y;
         end
         NOP: begin
-//          $display("%d %x: nop", start_count, address);
+          $display("%d %x: nop", start_count, address);
         end
         default: begin
-//          $display("unknown opcode %x at address %d", rom[address], address);
+          $display("unknown opcode %x at address %d", rom[address], address);
           $finish;
         end
       endcase

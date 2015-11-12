@@ -56,33 +56,33 @@ StartOfFrame
   sta WSYNC  ; 34/35
   sta WSYNC  ; 35/35
 
-  lda #0
-  sta RESP0
-  sta RESP1
-  sta NUSIZ0
-  sta NUSIZ1
-  sta COLUP0
-  sta COLUP1
-  sta COLUBK
-  sta CTRLPF
-  sta REFP0
-  sta REFP1
-  sta PF0
-  sta PF1
-  sta PF2
-  sta AUDC0
-  sta AUDC1
-  sta AUDF0
-  sta AUDF1
-  sta AUDV0
-  sta AUDV1
-  sta GRP0
-  sta GRP1
-  sta ENAM0
-  sta ENAM1
-  nop
+  lda #0     ;  2/76
+  sta RESP0  ;  5/76
+  sta RESP1  ;  8/76
+  sta NUSIZ0 ; 11/76
+  sta NUSIZ1 ; 14/76
+  sta COLUP0 ; 17/76
+  sta COLUP1 ; 20/76
+  sta COLUBK ; 23/76
+  sta CTRLPF ; 26/76
+  sta REFP0  ; 29/76
+  sta REFP1  ; 32/76
+  sta PF0    ; 35/76
+  sta PF1    ; 38/76
+  sta PF2    ; 41/76
+  sta AUDC0  ; 44/76
+  sta AUDC1  ; 47/76
+  sta AUDF0  ; 50/76
+  sta AUDF1  ; 53/76
+  sta AUDV0  ; 56/76
+  sta AUDV1  ; 59/76
+  sta GRP0   ; 62/76
+  sta GRP1   ; 65/76
+  sta ENAM0  ; 68/76
+  sta ENAM1  ; 71/76
+  sta ENABL  ; 74/76
+  nop        ; 76/76
 
-  sta ENABL
   sta VDELP0
   sta VDELP1
   sta RESMP0
@@ -1601,8 +1601,8 @@ StartOfFrame
   nop         ; 66
   nop         ; 68
   nop         ; 70
-  sta RESP0
-  sta WSYNC
+  sta RESP0   ; 73
+  sta COLUP0  ; 76
 
   ; 71 / 192  -- wait 71
   nop         ; 2
@@ -1640,8 +1640,8 @@ StartOfFrame
   nop         ; 66
   nop         ; 68
   sta COLUP0  ; 71
-  sta RESP0
-  sta WSYNC
+  sta RESP0   ; 74
+  nop         ; 76
 
   ; 72 / 192  -- wait 72
   nop         ; 2
@@ -1680,14 +1680,10 @@ StartOfFrame
   nop         ; 68
   nop         ; 70
   nop         ; 72
-  sta RESP0
-  sta WSYNC
+  sta RESP0   ; 75
 
-  ; 73 / 192  -- wait 72
-  sta WSYNC
-
-  ; 74 / 192  -- wait 71
-  nop         ; 2
+  ; 73 / 192  -- wait 73
+  sta COLUP0  ; 2 - single clock holdover from previous scanline
   nop         ; 4
   nop         ; 6
   nop         ; 8
@@ -1721,14 +1717,17 @@ StartOfFrame
   nop         ; 64
   nop         ; 66
   nop         ; 68
-  sta COLUP0  ; 71
-  sta RESP0
+  nop         ; 70
+  sta COLUP0  ; 73
+  sta RESP0   ; 76
+
+  ; 74 / 192  - switchover to decrementing wait
+  sta COLUBK  ; 3
+  lda #0      ; 4
+  sta COLUP0
   sta WSYNC
 
-  ; 75 / 192
-  sta WSYNC
-
-  ; 76 / 192  -- wait 70
+  ; 75 / 192  -- wait 72
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -1764,13 +1763,97 @@ StartOfFrame
   nop         ; 66
   nop         ; 68
   nop         ; 70
-  sta RESP0
+  nop         ; 72
+  sta RESP0   ; 75
+
+  ; 76 / 192
   sta WSYNC
 
-  ; 77 / 192
+  ; 77 / 192  -- wait 71
+  sta COLUP0  ; 2 - one clock holdover from previous scanline
+  nop         ; 4
+  nop         ; 6
+  nop         ; 8
+  nop         ; 10
+  nop         ; 12
+  nop         ; 14
+  nop         ; 16
+  nop         ; 18
+  nop         ; 20
+  nop         ; 22
+  nop         ; 24
+  nop         ; 26
+  nop         ; 28
+  nop         ; 30
+  nop         ; 32
+  nop         ; 34
+  nop         ; 36
+  nop         ; 38
+  nop         ; 40
+  nop         ; 42
+  nop         ; 44
+  nop         ; 46
+  nop         ; 48
+  nop         ; 50
+  nop         ; 52
+  nop         ; 54
+  nop         ; 56
+  nop         ; 58
+  nop         ; 60
+  nop         ; 62
+  nop         ; 64
+  nop         ; 66
+  nop         ; 68
+  sta COLUP0  ; 71
+  sta RESP0   ; 74
+  nop         ; 76
+
+  ; 78 / 192
   sta WSYNC
 
-  ; 78 / 192  -- wait 69
+  ; 79 / 192  -- wait 70
+  nop         ; 2
+  nop         ; 4
+  nop         ; 6
+  nop         ; 8
+  nop         ; 10
+  nop         ; 12
+  nop         ; 14
+  nop         ; 16
+  nop         ; 18
+  nop         ; 20
+  nop         ; 22
+  nop         ; 24
+  nop         ; 26
+  nop         ; 28
+  nop         ; 30
+  nop         ; 32
+  nop         ; 34
+  nop         ; 36
+  nop         ; 38
+  nop         ; 40
+  nop         ; 42
+  nop         ; 44
+  nop         ; 46
+  nop         ; 48
+  nop         ; 50
+  nop         ; 52
+  nop         ; 54
+  nop         ; 56
+  nop         ; 58
+  nop         ; 60
+  nop         ; 62
+  nop         ; 64
+  nop         ; 66
+  nop         ; 68
+  nop         ; 70
+  sta RESP0   ; 73
+  sta COLUP0  ; 76
+
+  ; 80 / 192
+  sta WSYNC
+
+  ; 81 / 192  -- wait 69
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -1808,10 +1891,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 79 / 192
+  ; 82 / 192
   sta WSYNC
 
-  ; 80 / 192  -- wait 68
+  ; 83 / 192  -- wait 68
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -1849,10 +1932,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 81 / 192
+  ; 84 / 192
   sta WSYNC
 
-  ; 82 / 192  -- wait 67
+  ; 85 / 192  -- wait 67
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -1889,10 +1972,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 83 / 192
+  ; 86 / 192
   sta WSYNC
 
-  ; 84 / 192  -- wait 66
+  ; 87 / 192  -- wait 66
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -1929,10 +2012,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 85 / 192
+  ; 88 / 192
   sta WSYNC
 
-  ; 86 / 192  -- wait 65
+  ; 89 / 192  -- wait 65
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -1968,10 +2051,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 87 / 192
+  ; 90 / 192
   sta WSYNC
 
-  ; 88 / 192  -- wait 64
+  ; 91 / 192  -- wait 64
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2007,10 +2090,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 89 / 192
+  ; 92 / 192
   sta WSYNC
 
-  ; 90 / 192  -- wait 63
+  ; 93 / 192  -- wait 63
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2045,10 +2128,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 91 / 192
+  ; 94 / 192
   sta WSYNC
 
-  ; 92 / 192  -- wait 62
+  ; 95 / 192  -- wait 62
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2083,10 +2166,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 93 / 192
+  ; 96 / 192
   sta WSYNC
 
-  ; 94 / 192  -- wait 61
+  ; 97 / 192  -- wait 61
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2120,10 +2203,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 95 / 192
+  ; 98 / 192
   sta WSYNC
 
-  ; 96 / 192  -- wait 60
+  ; 99 / 192  -- wait 60
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2157,10 +2240,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 97 / 192
+  ; 100 / 192
   sta WSYNC
 
-  ; 98 / 192  -- wait 59
+  ; 101 / 192  -- wait 59
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2193,10 +2276,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 99 / 192
+  ; 102 / 192
   sta WSYNC
 
-  ; 100 / 192  -- wait 58
+  ; 103 / 192  -- wait 58
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2229,10 +2312,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 101 / 192
+  ; 104 / 192
   sta WSYNC
 
-  ; 102 / 192  -- wait 57
+  ; 105 / 192  -- wait 57
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2264,10 +2347,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 103 / 192
+  ; 106 / 192
   sta WSYNC
 
-  ; 104 / 192  -- wait 56
+  ; 107 / 192  -- wait 56
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2299,10 +2382,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 105 / 192
+  ; 108 / 192
   sta WSYNC
 
-  ; 106 / 192  -- wait 55
+  ; 109 / 192  -- wait 55
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2333,10 +2416,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 107 / 192
+  ; 110 / 192
   sta WSYNC
 
-  ; 108 / 192  -- wait 54
+  ; 111 / 192  -- wait 54
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2367,10 +2450,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 109 / 192
+  ; 112 / 192
   sta WSYNC
 
-  ; 110 / 192  -- wait 53
+  ; 113 / 192  -- wait 53
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2400,10 +2483,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 111 / 192
+  ; 114 / 192
   sta WSYNC
 
-  ; 112 / 192  -- wait 52
+  ; 115 / 192  -- wait 52
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2433,10 +2516,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 113 / 192
+  ; 116 / 192
   sta WSYNC
 
-  ; 114 / 192  -- wait 51
+  ; 117 / 192  -- wait 51
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2465,10 +2548,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 115 / 192
+  ; 118 / 192
   sta WSYNC
 
-  ; 116 / 192  -- wait 50
+  ; 119 / 192  -- wait 50
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2497,10 +2580,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 117 / 192
+  ; 120 / 192
   sta WSYNC
 
-  ; 118 / 192  -- wait 49
+  ; 121 / 192  -- wait 49
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2528,10 +2611,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 119 / 192
+  ; 122 / 192
   sta WSYNC
 
-  ; 120 / 192  -- wait 48
+  ; 123 / 192  -- wait 48
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2559,10 +2642,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 121 / 192
+  ; 124 / 192
   sta WSYNC
 
-  ; 122 / 192  -- wait 47
+  ; 125 / 192  -- wait 47
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2589,10 +2672,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 123 / 192
+  ; 126 / 192
   sta WSYNC
 
-  ; 124 / 192  -- wait 46
+  ; 127 / 192  -- wait 46
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2619,10 +2702,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 125 / 192
+  ; 128 / 192
   sta WSYNC
 
-  ; 126 / 192  -- wait 45
+  ; 129 / 192  -- wait 45
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2648,10 +2731,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 127 / 192
+  ; 130 / 192
   sta WSYNC
 
-  ; 128 / 192  -- wait 44
+  ; 131 / 192  -- wait 44
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2677,10 +2760,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 129 / 192
+  ; 132 / 192
   sta WSYNC
 
-  ; 130 / 192  -- wait 43
+  ; 133 / 192  -- wait 43
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2705,10 +2788,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 131 / 192
+  ; 134 / 192
   sta WSYNC
 
-  ; 132 / 192  -- wait 42
+  ; 135 / 192  -- wait 42
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2733,10 +2816,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 133 / 192
+  ; 136 / 192
   sta WSYNC
 
-  ; 134 / 192  -- wait 41
+  ; 137 / 192  -- wait 41
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2760,10 +2843,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 135 / 192
+  ; 138 / 192
   sta WSYNC
 
-  ; 136 / 192  -- wait 40
+  ; 139 / 192  -- wait 40
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2787,10 +2870,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 137 / 192
+  ; 140 / 192
   sta WSYNC
 
-  ; 138 / 192  -- wait 39
+  ; 141 / 192  -- wait 39
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2813,10 +2896,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 139 / 192
+  ; 142 / 192
   sta WSYNC
 
-  ; 140 / 192  -- wait 38
+  ; 143 / 192  -- wait 38
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2839,10 +2922,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 141 / 192
+  ; 144 / 192
   sta WSYNC
 
-  ; 142 / 192  -- wait 37
+  ; 145 / 192  -- wait 37
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2864,10 +2947,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 143 / 192
+  ; 146 / 192
   sta WSYNC
 
-  ; 144 / 192  -- wait 36
+  ; 147 / 192  -- wait 36
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2889,10 +2972,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 145 / 192
+  ; 148 / 192
   sta WSYNC
 
-  ; 146 / 192  -- wait 35
+  ; 149 / 192  -- wait 35
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2913,10 +2996,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 147 / 192
+  ; 150 / 192
   sta WSYNC
 
-  ; 148 / 192  -- wait 34
+  ; 151 / 192  -- wait 34
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2937,10 +3020,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 149 / 192
+  ; 152 / 192
   sta WSYNC
 
-  ; 150 / 192  -- wait 33
+  ; 153 / 192  -- wait 33
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2960,10 +3043,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 151 / 192
+  ; 154 / 192
   sta WSYNC
 
-  ; 152 / 192  -- wait 32
+  ; 155 / 192  -- wait 32
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -2983,10 +3066,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 153 / 192
+  ; 156 / 192
   sta WSYNC
 
-  ; 154 / 192  -- wait 31
+  ; 157 / 192  -- wait 31
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3005,10 +3088,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 155 / 192
+  ; 158 / 192
   sta WSYNC
 
-  ; 156 / 192  -- wait 30
+  ; 159 / 192  -- wait 30
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3027,10 +3110,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 157 / 192
+  ; 160 / 192
   sta WSYNC
 
-  ; 158 / 192  -- wait 29
+  ; 161 / 192  -- wait 29
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3048,10 +3131,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 159 / 192
+  ; 162 / 192
   sta WSYNC
 
-  ; 160 / 192  -- wait 28
+  ; 163 / 192  -- wait 28
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3069,10 +3152,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 161 / 192
+  ; 164 / 192
   sta WSYNC
 
-  ; 162 / 192  -- wait 27
+  ; 165 / 192  -- wait 27
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3089,10 +3172,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 163 / 192
+  ; 166 / 192
   sta WSYNC
 
-  ; 164 / 192  -- wait 26
+  ; 167 / 192  -- wait 26
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3109,10 +3192,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 165 / 192
+  ; 168 / 192
   sta WSYNC
 
-  ; 166 / 192  -- wait 25
+  ; 169 / 192  -- wait 25
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3128,10 +3211,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 167 / 192
+  ; 170 / 192
   sta WSYNC
 
-  ; 168 / 192  -- wait 24
+  ; 171 / 192  -- wait 24
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3147,10 +3230,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 169 / 192
+  ; 172 / 192
   sta WSYNC
 
-  ; 170 / 192  -- wait 23
+  ; 173 / 192  -- wait 23
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3165,10 +3248,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 171 / 192
+  ; 174 / 192
   sta WSYNC
 
-  ; 172 / 192  -- wait 22
+  ; 175 / 192  -- wait 22
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3183,10 +3266,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 173 / 192
+  ; 176 / 192
   sta WSYNC
 
-  ; 174 / 192  -- wait 21
+  ; 177 / 192  -- wait 21
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3200,10 +3283,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 175 / 192
+  ; 178 / 192
   sta WSYNC
 
-  ; 176 / 192  -- wait 20
+  ; 179 / 192  -- wait 20
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3217,10 +3300,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 177 / 192
+  ; 180 / 192
   sta WSYNC
 
-  ; 178 / 192  -- wait 19
+  ; 181 / 192  -- wait 19
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3233,10 +3316,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 179 / 192
+  ; 182 / 192
   sta WSYNC
 
-  ; 180 / 192  -- wait 18
+  ; 183 / 192  -- wait 18
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3249,10 +3332,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 181 / 192
+  ; 184 / 192
   sta WSYNC
 
-  ; 182 / 192  -- wait 17
+  ; 185 / 192  -- wait 17
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3264,10 +3347,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 183 / 192
+  ; 186 / 192
   sta WSYNC
 
-  ; 184 / 192  -- wait 16
+  ; 187 / 192  -- wait 16
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3279,10 +3362,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 185 / 192
+  ; 188 / 192
   sta WSYNC
 
-  ; 186 / 192  -- wait 15
+  ; 189 / 192  -- wait 15
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3293,10 +3376,10 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 187 / 192
+  ; 190 / 192
   sta WSYNC
 
-  ; 188 / 192  -- wait 14
+  ; 191 / 192  -- wait 14
   nop         ; 2
   nop         ; 4
   nop         ; 6
@@ -3308,30 +3391,7 @@ StartOfFrame
   sta RESP0
   sta WSYNC
 
-  ; 189 / 192
-  sta WSYNC
-
-  ; 190 / 192  -- wait 13
-  nop         ; 2
-  nop         ; 4
-  nop         ; 6
-  nop         ; 8
-  nop         ; 10
-  sta COLUP0  ; 13
-  sta RESP0
-  sta WSYNC
-
-  ; 191 / 192
-  sta WSYNC
-
-  ; 192 / 192  -- wait 12
-  nop         ; 2
-  nop         ; 4
-  nop         ; 6
-  nop         ; 8
-  nop         ; 10
-  nop         ; 12
-  sta RESP0
+  ; 192 / 192
   sta WSYNC
 
   ; turn on vblank, then 30 scanlines of overscan
