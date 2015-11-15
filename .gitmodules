@@ -1,0 +1,3 @@
+[submodule "third_party/libstella"]
+	path = third_party/libstella
+	url = https://github.com/lnihlen/libstella.git
