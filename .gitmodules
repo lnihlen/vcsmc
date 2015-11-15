@@ -1,3 +1,0 @@
-[submodule "third_party/Stella"]
-	path = third_party/Stella
-	url = https://github.com/rdparker/Stella.git
