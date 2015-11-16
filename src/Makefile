@@ -56,13 +56,13 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
          $(OUTTESTS)/state_unittests.o                                         \
 
-all: tests                                                                     \
-     $(OUT)/asm                                                                \
+all: $(OUT)/asm                                                                \
      $(OUT)/bed                                                                \
      $(OUT)/check                                                              \
      $(OUT)/conv                                                               \
      $(OUT)/exty                                                               \
      $(OUT)/picc                                                               \
+     $(OUT)/sim                                                                \
      $(OUT)/smap
 
 $(OUT)/%.o: %.cc $(DEPS)
@@ -87,6 +87,9 @@ $(OUT)/exty: $(OBJ) $(OUT)/exty.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/picc: $(OBJ) $(OUT)/picc.o
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/sim: $(OBJ) $(OUT)/sim.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/smap: $(OBJ) $(OUT)/smap.o

@@ -5,13 +5,13 @@ export CFLAGS=-std=c++11 -Wall
 export LDFLAGS=
 export LIBS=-lstdc++
 export OUT=$(CURDIR)/out
-export GTEST_INCLUDE=$(CURDIR)/third_party/gtest-1.7.0/include
+export GTEST_INCLUDE=$(CURDIR)/third_party/googletest/googletest/include
 export GTEST_LIB=$(OUT)/gtest/gtest.a
 
-all: gtest tests picc
+all: picc tests
 
 picc: | $(OUT)/
-	$(MAKE) -C src/
+	$(MAKE) -C src/ all
 
 tests: gtest
 	$(MAKE) -C src/ tests
