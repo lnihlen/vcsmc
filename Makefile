@@ -7,11 +7,12 @@ export LIBS=-lstdc++
 export OUT=$(CURDIR)/out
 export GTEST_INCLUDE=$(CURDIR)/third_party/googletest/googletest/include
 export GTEST_LIB=$(OUT)/gtest/gtest.a
-export GFLAGS_INCLUDE=$(CURDIR)/third_party/gflags
+export GFLAGS_INCLUDE=$(OUT)/gflags/include
+export GFLAGS_LIB=$(OUT)/gflags/lib/libgflags.a
 
 all: picc tests
 
-picc: | $(OUT)/
+picc: | gflags $(OUT)/
 	$(MAKE) -C src/ all
 
 tests: gtest

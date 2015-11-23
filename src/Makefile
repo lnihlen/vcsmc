@@ -1,7 +1,7 @@
 # VCSMC src/ Makefile.
 # Dependencies: libtiff, libpng, clang, OpenCL, gflags, libyaml
 # tools dependencies: python colormath, Wand, ImageMagick
-CFLAGS+=-I. -O2
+CFLAGS+=-I. -O2 -I$(GFLAGS_INCLUDE)
 LIBS+=-lm -ltiff -lpng -lyaml
 OUTTESTS=$(OUT)/tests
 
@@ -90,7 +90,7 @@ $(OUT)/picc: $(OBJ) $(OUT)/picc.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/sim: $(OBJ) $(OUT)/sim.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/smap: $(OBJ) $(OUT)/smap.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)

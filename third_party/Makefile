@@ -17,11 +17,10 @@ gflags: | $(GFLAGS_OUT) $(GFLAGS_OUT)/lib/gtest.a
 $(GFLAGS_OUT)/lib/gtest.a: export CFLAGS=-Wall
 $(GFLAGS_OUT)/lib/gtest.a: export CXX=$(CC)
 $(GFLAGS_OUT)/lib/gtest.a:
-	env
 	cmake -B$(GFLAGS_OUT) -Hgflags -G"Unix Makefiles"
 	$(MAKE) -C $(GFLAGS_OUT)
 
-libstella:
+libstella: | $(LIBSTELLA_OUT)
 	$(MAKE) -C libstella/
 
 $(GTEST_OUT):
