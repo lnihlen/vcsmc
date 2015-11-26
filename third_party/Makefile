@@ -1,8 +1,9 @@
 export GTEST_OUT=$(OUT)/gtest
 export GFLAGS_OUT=$(OUT)/gflags
 export LIBSTELLA_OUT=$(OUT)/libstella
+export LIBZ26_OUT=$(OUT)/libz26
 
-all: gtest gflags libstella
+all: gtest gflags libstella libz26
 
 gtest: export CXX=$(CC)
 gtest: export CXXFLAGS=$(CFLAGS)
@@ -23,6 +24,9 @@ $(GFLAGS_OUT)/lib/gtest.a:
 libstella: | $(LIBSTELLA_OUT)
 	$(MAKE) -C libstella/
 
+libz26: | $(LIBZ26_OUT)
+	$(MAKE) -C libz26/
+
 $(GTEST_OUT):
 	mkdir -p $(GTEST_OUT)
 
@@ -32,9 +36,11 @@ $(GFLAGS_OUT):
 $(LIBSTELLA_OUT):
 	mkdir -p $(LIBSTELLA_OUT)
 
+$(LIBZ26_OUT):
+	mkdir -p $(LIBZ26_OUT)
+
 .PHONY: clean
 clean:
 	rm -f $(GTEST_OUT)
 	rm -f $(GFLAGS_OUT)
 #	$(MAKE) -C libstella/ clean
-

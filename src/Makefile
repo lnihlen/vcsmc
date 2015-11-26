@@ -97,7 +97,8 @@ $(OUT)/smap: $(OBJ) $(OUT)/smap.o
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 
-$(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o | $(OUTTESTS)/
+$(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
+    | $(OUTTESTS)/
 	$(CC) -o $@ $^ $(GTEST_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUTTESTS)/:

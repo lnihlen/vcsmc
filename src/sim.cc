@@ -12,6 +12,5 @@ DEFINE_string(cart_format, "vcsmc",
 
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, false);
-
   return 0;
 }

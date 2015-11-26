@@ -12,7 +12,7 @@ export GFLAGS_LIB=$(OUT)/gflags/lib/libgflags.a
 
 all: picc tests
 
-picc: | gflags $(OUT)/
+picc: gflags libz26 | $(OUT)/
 	$(MAKE) -C src/ all
 
 tests: gtest
@@ -24,9 +24,11 @@ gtest: | $(OUT)/
 gflags:
 	$(MAKE) -C third_party/ gflags
 
+libz26:
+	$(MAKE) -C third_party/ libz26
+
 $(OUT)/:
 	mkdir -p out/
-	mkdir -p out/parts/
 
 .PHONY: clean
 clean:

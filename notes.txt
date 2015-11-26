@@ -1478,3 +1478,10 @@ at address 0x800 the same thing, an sta 02 with only 6 clocks left.
 at address 0x2803 same thing
 at address 0x3000 same thing
 ** note that all of these are RIGHT AFTER A JUMP
+
+===============================================================================
+
+z26 reverse engineering notes:
+
+2600core.c has c_emulator() entry point which starts the emulator loop.
+It calls c_tialine.c::nTIALineTo(void)
