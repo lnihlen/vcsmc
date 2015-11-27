@@ -1483,5 +1483,5 @@ at address 0x3000 same thing
 
 z26 reverse engineering notes:
 
-2600core.c has c_emulator() entry point which starts the emulator loop.
-It calls c_tialine.c::nTIALineTo(void)
+2600core.c has c_emulator() entry point which starts the emulator loop, has a
+method ScanFrame() which calls c_tialine.c::nTIALineTo(void).

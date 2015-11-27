@@ -1,7 +1,9 @@
 # VCSMC main Makefile
 # assumes GNU make 3.80 or up
 export CC=clang
-export CFLAGS=-std=c++11 -Wall
+# If chaning CFLAGS it is good to change them in the .ycm_extra_conf.py file
+# (also versioned) so that YCM will pick up the correct flags.
+export CFLAGS=-std=c++11 -Wall -Wextra -Werror
 export LDFLAGS=
 export LIBS=-lstdc++
 export OUT=$(CURDIR)/out

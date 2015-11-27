@@ -18,12 +18,17 @@
 
 
 /* just to be able to compile with trace */
+
+/* <LN> removed
+ *
 dd P0_Position = 0;
 dd P1_Position = 0;
 dd M0_Position = 0;
 dd M1_Position = 0;
 dd BL_Position = 0;
+ */
 
+/* <LN> moved all below to z26_state
 
 dd TIACollide = 0;	// state of the 15 collision bits
 
@@ -33,6 +38,8 @@ dd TIA_HMOVE_Setup = 0;	// it takes several steps to setup an HMOVE
 dd TIA_HMOVE_Clock = 16;	// how many HMOVE clocks since last HMOVE command
 db TIA_HMOVE_Latches = 0;	// are we done with HMOVE pulses
 db TIA_HMOVE_DoMove	= 0;	// do we need to apply more HMOVE pulses
+*/
+
 /*
 for continuity with TIA_Pixel_State:
 P0 = 0x20
@@ -41,6 +48,8 @@ M0 = 0x08
 M1 = 0x04
 BL = 0x02
 */
+
+/* <LN> moved all below to z26_state
 // how far to move object with HMOVE (0-15)
 db TIA_HMP0_Value = 8;
 db TIA_HMP1_Value = 8;
@@ -49,7 +58,7 @@ db TIA_HMM1_Value = 8;
 db TIA_HMBL_Value = 8;
 db TIA_Pixel_State = 0;	// which objects to draw in this pixel (one bit each)
 db TIA_Mask_Objects = 0x3f;	// enable VBLANK and let user disable objects
-db TIA_Do_Output = 1;	// if line is offscreen, don't copy pixels to buffer
+db s->TIA_Do_Output = 1;	// if line is offscreen, don't copy pixels to buffer
 db CTRLPF_PF_Reflect = 0;	// reflect PF in right half of screen
 db Current_PF_Pixel = 0;	// state of currently displayed PF pixel
 // how wide are we supposed to display this pixel
@@ -92,20 +101,23 @@ dd TIA_BL_counter = 0;
 // need one extra pixel for the write to take effect
 // -> render one pixel ahead of counter before updating register state
 db TIA_Delayed_Write = 0;
+*/
 
 #define BG_COLOUR 0
 #define PF_COLOUR 1
 #define P1_COLOUR 2
 #define P0_COLOUR 3
 
+/* <LN>
 dw TIA_Colour_Table[4] = {0, 0, 0, 0};
+*/
 
 db TIA_Priority_Table[2][64];
 db TIA_Score_Priority_Table[2][64];
 
 db ObjectStartTable[8][320];
 
-
+/* <LN>
 dd TIA_P0_counter_reset = 0;
 dd TIA_P1_counter_reset = 0;
 dd TIA_M0_counter_reset = 0;
@@ -130,6 +142,7 @@ db *TIA_P1_Line_Pointer;
 db *TIA_M0_Line_Pointer;
 db *TIA_M1_Line_Pointer;
 db *TIA_BL_Line_Pointer;
+*/
 
 db *TIA_P0_Table[0x2001];
 db *TIA_P1_Table[0x2001];
@@ -137,7 +150,7 @@ db *TIA_M0_Table[0x81];
 db *TIA_M1_Table[0x81];
 db *TIA_BL_Table[9];
 
-dd TIA_Playfield_Pixels[80] = {
+const dd TIA_Playfield_Pixels[80] = {
 	//repeated
 	0x00100000, 0x00200000, 0x00400000, 0x00800000,	// PF0
 	0x00008000, 0x00004000, 0x00002000, 0x00001000,	// PF1
@@ -163,7 +176,9 @@ dd TIA_Playfield_Pixels[80] = {
 	0x00001000, 0x00002000, 0x00004000, 0x00008000,	// PF1
 	0x00800000, 0x00400000, 0x00200000, 0x00100000	// PF0
 };
-dd TIA_Playfield_Bits = 0;	// all 3 PF register values (0x00 PF0 PF1 PF2)
+
+// <LN>
+// dd TIA_Playfield_Bits = 0;	// all 3 PF register values (0x00 PF0 PF1 PF2)
 
 // where to draw missiles; used for generating the TIA_Mx_Tables
 db Object_Table[8][4] = {
@@ -277,21 +292,25 @@ void Init_TIA(void){
 	
 	int	i, j, k, l, m, n;
 
-	TIACollide = 0;	// reset collision latches
+	// <LN> TIACollide = 0;	// reset collision latches
 
  	for(i = 0; i < 0x2001; i++){
 		TIA_P0_Table[i] = malloc(160);
+    /* <LN>
 		if(TIA_P0_Table[i] == NULL){
 			sprintf(msg, "Not enough memory available to run z26.\n");
 			srv_print(msg);
 			exit(1);
 		}
+    */
 		TIA_P1_Table[i] = malloc(160);
+    /* <LN>
 		if(TIA_P1_Table[i] == NULL){
 			sprintf(msg, "Not enough memory available to run z26.\n");
 			srv_print(msg);
 			exit(1);
 		}
+    */
 		for(j = 0; j < 160; j++){
 			TIA_P0_Table[i][j] = 0;
 			TIA_P1_Table[i][j] = 0;
@@ -710,17 +729,21 @@ void Init_TIA(void){
 
 	for(i = 0; i < 0x81; i++){
 		TIA_M0_Table[i] = malloc(160);
+    /* <LN>
 		if(TIA_M0_Table[i] == NULL){
 			sprintf(msg, "Not enough memory available to run z26.\n");
 			srv_print(msg);
 			exit(1);
 		}
+    */
 		TIA_M1_Table[i] = malloc(160);
-		if(TIA_M1_Table[i] == NULL){
+    /* <LN>
+    if(TIA_M1_Table[i] == NULL){
 			sprintf(msg, "Not enough memory available to run z26.\n");
 			srv_print(msg);
 			exit(1);
 		}
+    */
 		for(j = 0; j < 160; j++){
 			TIA_M0_Table[i][j] = 0;
 			TIA_M1_Table[i][j] = 0;
@@ -749,11 +772,13 @@ void Init_TIA(void){
 	}
 	for(i = 0; i < 9; i++){
 		TIA_BL_Table[i] = malloc(160);
+    /* <LN>
 		if(TIA_BL_Table[i] == NULL){
 			sprintf(msg, "Not enough memory available to run z26.\n");
 			srv_print(msg);
 			exit(1);
 		}
+    */
 		for(j = 0; j < 160; j++){
 			TIA_BL_Table[i][j] = 0;
 		}
@@ -778,6 +803,8 @@ void Init_TIA(void){
 	TIA_BL_Table[7][10] = 0x02;
 	TIA_BL_Table[7][11] = 0x02;
 
+  /* <LN>
+
 	Pointer_Index_P0 = 0;
 	Pointer_Index_P1 = 0;
 	Pointer_Index_M0 = 0;
@@ -791,6 +818,7 @@ void Init_TIA(void){
 	TIA_BL_Line_Pointer = TIA_BL_Table[Pointer_Index_BL];
 	
 	TIA_Mask_Objects = 0x3f;	// display all objects
+  */
 
 	for(i = 0; i < 8; i++){
 		for(j = 0; j < 320; j++) ObjectStartTable[i][j] = 0;
@@ -876,13 +904,13 @@ void Init_TIA(void){
 	}
 }
 
-void CatchUpPixels(void){
+void CatchUpPixels(struct z26_state* s){
 
-#include "c_catchuppixels.c"
+#include "m4/catchuppixels.c"
 
 }
 
-//  	for(CountLoop = TIA_Last_Pixel; CountLoop < ((RClock * 3) + TIA_Delayed_Write); CountLoop++){
+//  	for(CountLoop = TIA_Last_Pixel; CountLoop < ((s->RClock * 3) + TIA_Delayed_Write); CountLoop++){
 //  		LoopCount = CountLoop;
 // 		if(LoopCount > 227) LoopCount -= 228;
 //  
@@ -1033,7 +1061,7 @@ void CatchUpPixels(void){
 // 				// collisions aren't possible during VBLANK
 // 				if(!(TIA_Mask_Objects & 0x40)) TIACollide |= TIA_Collision_Table[(TIA_Pixel_State & 0x3f)];
 
-// 				if(TIA_Do_Output){
+// 				if(s->TIA_Do_Output){
 // 					// disable colours if VBLANK and let user disable objects
 // 					TIA_Pixel_State &= TIA_Mask_Objects;
 // 					// playfield doesn't use score colouring mode when it has display priority
@@ -1179,7 +1207,7 @@ void CatchUpPixels(void){
 // 				// collisions aren't possible during VBLANK
 // 				if(!(TIA_Mask_Objects & 0x40)) TIACollide |= TIA_Collision_Table[(TIA_Pixel_State & 0x3f)];
 
-// 				if(TIA_Do_Output){
+// 				if(s->TIA_Do_Output){
 // 					// disable colours if VBLANK and let user disable objects
 // 					TIA_Pixel_State &= TIA_Mask_Objects;
 // 					// playfield doesn't use score colouring mode when it has display priority
@@ -1317,7 +1345,7 @@ void CatchUpPixels(void){
 // 			}			
 // 		}else if(TIA_Display_HBlank){
 // 			
-// 			if(TIA_Do_Output){
+// 			if(s->TIA_Do_Output){
 // 				*DisplayPointer = 0;
 // 				DisplayPointer++;
 // 			}
@@ -1564,7 +1592,7 @@ void CatchUpPixels(void){
 // 			// collisions aren't possible during VBLANK
 // 			if(!(TIA_Mask_Objects & 0x40)) TIACollide |= TIA_Collision_Table[(TIA_Pixel_State & 0x3f)];
 
-// 			if(TIA_Do_Output){
+// 			if(s->TIA_Do_Output){
 // 				// disable colours if VBLANK and let user disable objects
 // 				TIA_Pixel_State &= TIA_Mask_Objects;
 // 				// playfield doesn't use score colouring mode when it has display priority
@@ -1577,32 +1605,33 @@ void CatchUpPixels(void){
 // 			}
 // 		}
 // 	}
-// 	TIA_Last_Pixel = (RClock * 3) + TIA_Delayed_Write;
+// 	TIA_Last_Pixel = (s->RClock * 3) + TIA_Delayed_Write;
 //	}
 
-
+/* <LN> wasted space?
 db TIA_Priority[0x10000];
 db TIA_Pixels[160];
 dd TIA_Colours[16] = {8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8};
 dw *TIA_Pixel_PTR;
 dd *MyDisplayPointer;
+*/
 
-void nTIALineTo(void){
+void nTIALineTo(struct z26_state* s){
 
-	QueueSoundBytes();	//  put another 2 bytes in the sound queue
+	QueueSoundBytes(s);	//  put another 2 bytes in the sound queue
 
 	// CFirst and MaxLines ? These need to be set in position.c from tiawrite.c
-	if((ScanLine < TopLine) || (ScanLine >= BottomLine)) TIA_Do_Output = 0;
-	else TIA_Do_Output = 1;
-	do_Instruction_line();
+	if((s->ScanLine < TopLine) || (s->ScanLine >= BottomLine)) s->TIA_Do_Output = 0;
+	else s->TIA_Do_Output = 1;
+	do_Instruction_line(s);
 	
-//	if((RClock < (2 * CYCLESPERSCANLINE)) && (TIA_Last_Pixel < (RClock * 3))) CatchUpPixels();
-	if(TIA_Last_Pixel < (RClock * 3)) CatchUpPixels();
-	TIA_Last_Pixel = TIA_Last_Pixel % (CYCLESPERSCANLINE * 3);
+//	if((s->RClock < (2 * CYCLESPERSCANLINE)) && (TIA_Last_Pixel < (s->RClock * 3))) CatchUpPixels();
+	if(s->TIA_Last_Pixel < (s->RClock * 3)) CatchUpPixels(s);
+	s->TIA_Last_Pixel = s->TIA_Last_Pixel % (CYCLESPERSCANLINE * 3);
 
 /*
 	int i;
-	if(TIA_Do_Output){
+	if(s->TIA_Do_Output){
 		MyDisplayPointer = (dd*) DisplayPointer;
 		TIA_Pixel_PTR = (dw*) &TIA_Pixels[0];
 		for(i = 0; i < 80; i++){

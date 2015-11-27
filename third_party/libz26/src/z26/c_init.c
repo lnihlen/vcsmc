@@ -53,6 +53,8 @@ void InitData() {
 		WriteAccess[i + 0xe000] = WriteAccess[i];
 	}
 
+/* <LN>
+
 	InitCVars();
 	Init_CPU();
 //	Init_CPUhand();
@@ -64,4 +66,5 @@ void InitData() {
 	Init_SoundQ();
 
 	RandomizeRIOTTimer();
+  */
 }
