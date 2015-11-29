@@ -461,8 +461,8 @@ int main(int argc, char* argv[]) {
     // Voting and final output.
     for (uint32 i = 0; i < frames->size(); ++i) {
       vcsmc::BitMap vote_map(width, height);
-      for (int j = 0; j < height; ++j) {
-        for (int k = 0; k < width; ++k) {
+      for (uint32 j = 0; j < height; ++j) {
+        for (uint32 k = 0; k < width; ++k) {
           uint32 votes = 0;
           if (xy_maps[i]->bit(k, j))
             ++votes;

@@ -5,7 +5,7 @@ namespace vcsmc {
 
 TEST(BitMapTests, SetBitNoExtraByte) {
   BitMap bitmap(128, 16);
-  EXPECT_EQ(16, bitmap.bytes_per_row());
+  EXPECT_EQ(16U, bitmap.bytes_per_row());
 
   for (uint32 i = 0; i < 16; ++i) {
     for (uint32 j = 0; j < 16; ++j) {
@@ -23,7 +23,7 @@ TEST(BitMapTests, SetBitNoExtraByte) {
 
 TEST(BitMapTests, SetBitExtraByte) {
   BitMap bitmap(11, 13);
-  EXPECT_EQ(2, bitmap.bytes_per_row());
+  EXPECT_EQ(2U, bitmap.bytes_per_row());
 
   for (uint32 i = 0; i < 13; ++i) {
     bitmap.SetBit(8, i, i & 1);
@@ -32,7 +32,7 @@ TEST(BitMapTests, SetBitExtraByte) {
   }
 
   for (uint32 i = 0; i < 13; ++i) {
-    EXPECT_EQ(i & 7, *(bitmap.packed_bytes() + (2 * i) + 1) & 7);
+    EXPECT_EQ(i & 7, *(bitmap.packed_bytes() + (2U * i) + 1U) & 7U);
   }
 }
 

@@ -32,11 +32,11 @@ class StateTest : public ::testing::Test {
 
 TEST_F(StateTest, InitialStateHasFullProgramRange) {
   State state;
-  EXPECT_EQ(0, state.range().start_time());
+  EXPECT_EQ(0U, state.range().start_time());
   EXPECT_EQ(kScreenSizeClocks, state.range().end_time());
   uint8 tia_values[TIA::TIA_COUNT];
   State state_value(tia_values);
-  EXPECT_EQ(0, state_value.range().start_time());
+  EXPECT_EQ(0U, state_value.range().start_time());
   EXPECT_EQ(kScreenSizeClocks, state_value.range().end_time());
 }
 
@@ -234,7 +234,7 @@ TEST_F(StateTest, AdvanceTimeAndCopyRegisterToTIAStrobeWSYNC) {
       0, Register::A, 0);
   state = whole_line->AdvanceTimeAndCopyRegisterToTIA(
       1, Register::A, TIA::WSYNC);
-  EXPECT_EQ(0, whole_line->range().start_time());
+  EXPECT_EQ(0U, whole_line->range().start_time());
   EXPECT_EQ(kScanLineWidthClocks, whole_line->range().end_time());
   EXPECT_EQ(kScanLineWidthClocks, state->range().start_time());
 

@@ -21,7 +21,7 @@ class CLImageImpl : public CLImage {
   virtual bool EnqueueCopyFromDevice(CLCommandQueue* queue, Image* image)
       override;
 
-  const cl_mem get() const { return mem_; }
+  cl_mem get() const { return mem_; }
 
  private:
   cl_mem mem_;

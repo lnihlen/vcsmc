@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<char[]> input_buffer(new char[kFileBufferSize]);
   std::unique_ptr<uint8[]> output_buffer(new uint8[kFileBufferSize]);
 
-  int bytes_read = read(input_fd, input_buffer.get(), kFileBufferSize);
+  size_t bytes_read = read(input_fd, input_buffer.get(), kFileBufferSize);
   std::string line_fragment;
   while (bytes_read > 0) {
     std::vector<std::unique_ptr<vcsmc::op::OpCode>> opcodes;
@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
     // Traverse vector generating bytecode from each opcode to fill output
     // buffer.
     uint8* out_buffer_end = output_buffer.get();
-    for (int i = 0; i < opcodes.size(); ++i)
+    for (size_t i = 0; i < opcodes.size(); ++i)
       out_buffer_end += opcodes[i]->bytecode(out_buffer_end);
 
     // Write output buffer data to file.

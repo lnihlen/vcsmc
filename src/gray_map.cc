@@ -23,9 +23,9 @@ std::unique_ptr<GrayMap> GrayMap::Load(const std::string& file_path) {
   std::unique_ptr<GrayMap> gray_map(new GrayMap(width, height));
   if (bit_depth == 8) {
     float* gray_value = gray_map->values_writeable();
-    for (int i = 0; i < height; ++i) {
+    for (uint32 i = 0; i < height; ++i) {
       uint8* gray_byte = image_bytes.get() + (i * bytes_per_row);
-      for (int j = 0; j < width; ++j) {
+      for (uint32 j = 0; j < width; ++j) {
         *gray_value = static_cast<float>(*gray_byte) / 255.0f;
         ++gray_byte;
         ++gray_value;
@@ -33,10 +33,10 @@ std::unique_ptr<GrayMap> GrayMap::Load(const std::string& file_path) {
     }
   } else {
     float* gray_value = gray_map->values_writeable();
-    for (int i = 0; i < height; ++i) {
+    for (uint32 i = 0; i < height; ++i) {
       uint16* gray_short = reinterpret_cast<uint16*>(
           image_bytes.get() + (i * bytes_per_row * 2));
-      for (int j = 0; j < width; ++j) {
+      for (uint32 j = 0; j < width; ++j) {
         *gray_value = static_cast<float>(*gray_short) / 65535.0f;
         ++gray_short;
         ++gray_value;

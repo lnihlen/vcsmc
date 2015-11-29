@@ -159,7 +159,6 @@ std::unique_ptr<CLKernel> CLDeviceContext::DoMakeKernel(
   std::unique_ptr<CLKernelImpl> kimpl(new CLKernelImpl);
   if (!kimpl->Setup(impl_->programs[program],
                     CLProgram::GetProgramName(program).c_str(),
-                    impl_->context,
                     impl_->device_id))
     return std::unique_ptr<CLKernel>();
 

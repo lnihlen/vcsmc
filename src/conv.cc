@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
   std::string input_sim_file(argv[1]);
   std::string output_image_file(argv[2]);
 
-  const uint32 kSimInputSize =
+  const size_t kSimInputSize =
       2 * vcsmc::kScreenHeight * vcsmc::kScanLineWidthClocks;
   std::unique_ptr<char[]> input_buffer(new char[kSimInputSize]);
   int input_fd = open(input_sim_file.c_str(), O_RDONLY);
@@ -34,9 +34,9 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "error opening file %s", input_sim_file.c_str());
     return -1;
   }
-  int bytes_read = read(input_fd, input_buffer.get(), kSimInputSize);
+  size_t bytes_read = read(input_fd, input_buffer.get(), kSimInputSize);
   if (bytes_read < kSimInputSize) {
-    fprintf(stderr, "read only %d bytes, expecting %d bytes", bytes_read,
+    fprintf(stderr, "read only %lu bytes, expecting %lu bytes", bytes_read,
         kSimInputSize);
     return -1;
   }

@@ -19,7 +19,7 @@
 #include "color_table.h"
 #include "constants.h"
 
-int main(int argc, char* argv[]) {
+int main() {
   if (!vcsmc::CLDeviceContext::Setup()) {
     fprintf(stderr, "OpenCL setup failed!\n");
     return -1;
@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
   int out_fd = open("color_distances_table.cc",
       O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
   if (out_fd < 0) {
-    fprintf(stderr, "error opening output spec file %s\n", argv[1]);
+    fprintf(stderr, "error opening output spec file.");
     return -1;
   }
 

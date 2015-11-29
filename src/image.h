@@ -20,11 +20,11 @@ class Image {
   Image(uint32 width, uint32 height);
   ~Image();
 
-  const uint32 width() const { return width_; }
-  const uint32 height() const { return height_; }
-  const uint32* pixels() const { return pixels_.get(); }
+  uint32 width() const { return width_; }
+  uint32 height() const { return height_; }
+  uint32* pixels() const { return pixels_.get(); }
   uint32* pixels_writeable() { return pixels_.get(); }
-  const uint32 pixel(uint32 x, uint32 y) const {
+  uint32 pixel(uint32 x, uint32 y) const {
     return pixels_[(y * width_) + x];
   }
 

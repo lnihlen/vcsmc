@@ -43,7 +43,7 @@ TEST(AssemblerTest, AssembleSingleLineLDAImmediateHex) {
   EXPECT_TRUE(Assembler::AssembleString("  lda #$f0", &opcodes));
   ASSERT_EQ(1U, opcodes.size());
   std::unique_ptr<uint8[]> bytes(new uint8[2]);
-  EXPECT_EQ(2, opcodes[0]->bytecode(bytes.get()));
+  EXPECT_EQ(2U, opcodes[0]->bytecode(bytes.get()));
   EXPECT_EQ(0xa9, bytes[0]);
   EXPECT_EQ(0xf0, bytes[1]);
 }
@@ -54,7 +54,7 @@ TEST(AssemblerTest, AssembleSingleLineSTXZeroPageTIA) {
       "  ; single-line store\n  stx AUDC0  ; update AUDC0\n", &opcodes));
   ASSERT_EQ(1U, opcodes.size());
   std::unique_ptr<uint8[]> bytes(new uint8[2]);
-  EXPECT_EQ(2, opcodes[0]->bytecode(bytes.get()));
+  EXPECT_EQ(2U, opcodes[0]->bytecode(bytes.get()));
   EXPECT_EQ(0x86, bytes[0]);
   EXPECT_EQ(0x15, bytes[1]);
 }

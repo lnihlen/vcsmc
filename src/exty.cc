@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
   uint32 bytes_to_skip = (width / 2) * (height / 2) * 2;
   int file_counter = 1;
   std::unique_ptr<uint8[]> image_buffer(new uint8[bytes_per_image]);
-  int bytes_read = 0;
+  size_t bytes_read = 0;
   while ((bytes_read = read(yuv_fd, image_buffer.get(), bytes_per_image)) ==
       bytes_per_image) {
     const size_t kFileNameBufferSize = 2048;
@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
   }
 
   if (bytes_read > 0) {
-    printf("warning: %d bytes left in file\n", bytes_read);
+    printf("warning: %lu bytes left in file\n", bytes_read);
   }
 
   return 0;

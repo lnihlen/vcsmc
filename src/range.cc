@@ -27,12 +27,12 @@ const Range& Range::operator=(const Range& range) {
   return *this;
 }
 
-const bool Range::operator==(const Range& range) const {
+bool Range::operator==(const Range& range) const {
   return (start_time() == range.start_time()) &&
       (end_time() == range.end_time());
 }
 
-const bool Range::operator!=(const Range& range) const {
+bool Range::operator!=(const Range& range) const {
   return (start_time() != range.start_time()) ||
       (end_time() != range.end_time());
 }

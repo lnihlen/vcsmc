@@ -9,7 +9,7 @@
 namespace vcsmc {
 
 // static
-const uint32 Color::AtariColorToABGR(uint8 atari_color) {
+uint32 Color::AtariColorToABGR(uint8 atari_color) {
   return kAtariNTSCABGRColorTable[atari_color / 2];
 }
 

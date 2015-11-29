@@ -18,7 +18,6 @@ class CLKernelImpl : public CLKernel {
 
   bool Setup(cl_program program,
              const std::string& name,
-             cl_context context,
              cl_device_id device_id);
 
   // CLKernel

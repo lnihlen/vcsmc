@@ -19,7 +19,6 @@ CLKernelImpl::~CLKernelImpl() {
 
 bool CLKernelImpl::Setup(cl_program program,
                          const std::string& name,
-                         cl_context context,
                          cl_device_id device_id) {
   int result = 0;
   kernel_ = clCreateKernel(program, name.c_str(), &result);
