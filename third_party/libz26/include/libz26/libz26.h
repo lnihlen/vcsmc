@@ -9,7 +9,7 @@
 void init_z26_global_tables(void);
 
 const int kLibZ26ImageWidth = 320;
-const int kLibZ26ImageHeight = 501;
+const int kLibZ26ImageHeight = 264;
 const int kLibZ26ImageSizeBytes = kLibZ26ImageWidth * kLibZ26ImageHeight;
 
 // Simulates a single frame based on the provided |byte_code|, then copies the

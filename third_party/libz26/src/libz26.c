@@ -251,7 +251,7 @@ struct z26_state* init_z26_state(uint8_t* output_picture) {
   s->Timer = START_TIME;
   s->TimerReadVec = &ReadTimer1024;
 
-  s->LinesInFrame = 262;
+  s->LinesInFrame = kLibZ26ImageHeight;
   s->ScanLine = 1;
 
   return s;
@@ -271,8 +271,6 @@ void simulate_single_frame(const uint8_t* byte_code,
     ++s->ScanLine;
     s->RClock -= CYCLESPERSCANLINE;
   }
-
-  // May need to post-process |output-picture|.
 
   // Clean up.
   free(s);
