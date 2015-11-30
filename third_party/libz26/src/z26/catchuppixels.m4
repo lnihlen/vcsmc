@@ -207,7 +207,7 @@ define(handleVisibleVBlank,`
 				handleM0
 				handleM1
 				handleBL
-				*s->DisplayPointer = 0;
+				*s->DisplayPointer = 0xbeef;
 				s->DisplayPointer++;')dnl
 define(handleVisibleVBlankNoOutput,`
 				handlePF
@@ -266,7 +266,7 @@ define(handleInvisibleVBlank,`
 						s->TIA_HMOVE_DoMove = 0;
 					}	')dnl
 define(renderBlank,`
-			*s->DisplayPointer = 0;
+			*s->DisplayPointer = 0xdead;
 			s->DisplayPointer++;')dnl
 
 define(renderLoop,

@@ -88,7 +88,6 @@ struct z26_state {
   // Below copied from z26/globals.c, which we do not include.
   db* ScreenBuffer;
   dw *DisplayPointer;
-  db RealScreenBuffer1[320*501];
   int ScanLine;
   dw reg_pc;
   db reg_sp;
@@ -108,6 +107,12 @@ struct z26_state {
   db DataBus;
   dw AddressBus;
   db RiotRam[128];
+  dd ChargeCounter;
+  int VSyncFlag;
+  dd LinesInFrame;
+  dd PrevLinesInFrame;
+  int Frame;
+  int VBlank;
 
   // Below moved from z26/cpu.m4.
   db dummy_flag;
@@ -119,6 +124,10 @@ struct z26_state {
   void (* TimerReadVec)(struct z26_state* s);
   db DDR_A;
   db DDR_B;
+
+  // ROM data used for simulation.
+  const uint8_t* ROM_data;
+  size_t ROM_size;
 };
 
 // constants defined in z26/globals.c, which we do not include.
@@ -128,42 +137,93 @@ const dd MaxLines = 256;
 // randomization.
 const int Seconds = 1448577872;
 const int TraceCount = 0;
-
+const dd ChargeTrigger0[4] = { 240, 240, 240, 240 };
 // constants defined in z26/position.c, which we do not include.
 const dd TopLine = 18;
 const dd BottomLine = TopLine + MaxLines;
+const db InputLatch[2] = {0, 0};
 
 // Read and write function pointer tables, some cart architecture specific
 // pointers. Not per simulation run but perhaps per cart architecture. Currently
-// initialized by init_z26_global_tables();
+// initialized by init_z26_global_tables() (by calling c_init.c::InitData())
 void (* ReadAccess[0x10000])(struct z26_state* s);
 void (* WriteAccess[0x10000])(struct z26_state* s);
 void (* TIARIOTReadAccess[0x1000])(struct z26_state* s);
 void (* TIARIOTWriteAccess[0x1000])(struct z26_state* s);
 
+void ReadROM4K(struct z26_state* s) {
+  // ** VCSMC bank-switching strategy goes here.
+  dw address = s->AddressBus & 0xfff;
+  if (address >= s->ROM_size) {
+    printf("warning: invalid ROM read at address %x\n", address);
+    s->DataBus = 0;
+    return;
+  }
+  // For the moment just do the unimaginative thing of reading the requested
+  // ROM address, no support for ROMs greater than 4K.
+  s->DataBus = s->ROM_data[address];
+}
+
+void WriteROM4K(struct z26_state* s) {
+  // VCSMC ROMS are read-only.
+  dw address = s->AddressBus & 0xfff;
+  printf("warning: ROM write attempt detected at address %x\n", address);
+}
+
 // TODO: bring in sound simulation later.
 void QueueSoundBytes(struct z26_state* s) {
 }
 
-// from z26/cpujam.c, made into a no-op.
+void H_AUDC0(struct z26_state* s) {
+}
+
+
+void H_AUDC1(struct z26_state* s) {
+}
+
+
+void H_AUDF0(struct z26_state* s) {
+}
+
+
+void H_AUDF1(struct z26_state* s) {
+}
+
+
+void H_AUDV0(struct z26_state* s) {
+}
+
+
+void H_AUDV1(struct z26_state* s) {
+}
+
+
+// From z26/cpujam.c, made into a no-op.
 void jam(struct z26_state* s) {
 }
 
-// from z26/c_trace.c, made into a no-op.
+// From z26/c_trace.c, made into a no-op.
 void TraceInstruction() {
+}
+
+// From z26/controls.c, no-op.
+void TestLightgunHit(dd RClock, dd ScanLine) {
 }
 
 #include "z26/c_riot.c"
 #include "m4/cpu.c"
 #include "z26/c_tialine.c"
 #include "z26/c_tiawrite.c"
-#include "z26/c_tiaread.c"
 #include "z26/c_init.c"
 
 void init_z26_global_tables(void) {
+  // Function from c_init.c that initializes the read and write function pointer
+  // tables, as well as calling other Init() functions, some of which are
+  // disabled.
+  InitData();
 }
 
-struct z26_state* init_z26_state() {
+struct z26_state* init_z26_state(uint8_t* output_picture) {
   struct z26_state* s = malloc(sizeof(struct z26_state));
   memset(s, 0, sizeof(struct z26_state));
   // Only non-zero setting copied here.
@@ -173,7 +233,6 @@ struct z26_state* init_z26_state() {
   s->TIA_HMM0_Value = 8;
   s->TIA_HMM1_Value = 8;
   s->TIA_HMBL_Value = 8;
-  s->TIA_Mask_Objects = 0x3f;
   s->TIA_Do_Output = 1;
 
   s->TIA_P0_Line_Pointer = TIA_P0_Table[0];
@@ -181,9 +240,10 @@ struct z26_state* init_z26_state() {
   s->TIA_M0_Line_Pointer = TIA_M0_Table[0];
   s->TIA_M1_Line_Pointer = TIA_M1_Table[0];
   s->TIA_BL_Line_Pointer = TIA_BL_Table[0];
+  s->TIA_Mask_Objects = 0x3f;
 
-  s->ScreenBuffer = s->RealScreenBuffer1;
-  s->DisplayPointer = (dw*)s->RealScreenBuffer1;
+  s->ScreenBuffer = output_picture;
+  s->DisplayPointer = (dw*)output_picture;
 
   s->flag_B = 0x10;
 
@@ -191,16 +251,29 @@ struct z26_state* init_z26_state() {
   s->Timer = START_TIME;
   s->TimerReadVec = &ReadTimer1024;
 
+  s->LinesInFrame = 262;
+  s->ScanLine = 1;
+
   return s;
 }
 
 // Loosely following the structure in z26/2600core.c::ScanFrame()
-void simulate_single_frame(struct z26_state* s) {
-  // Reset display pointer.
-  s->DisplayPointer = (dw*)s->ScreenBuffer;
-  s->ScanLine = 1;
-  while (s->ScanLine < 501) {
+void simulate_single_frame(const uint8_t* byte_code,
+                           size_t size,
+                           uint8_t* output_picture) {
+  struct z26_state* s = init_z26_state(output_picture);
+  s->ROM_data = byte_code;
+  s->ROM_size = size;
+
+  // Simulate frame.
+  while (s->Frame == 0) {
     nTIALineTo(s);
     ++s->ScanLine;
+    s->RClock -= CYCLESPERSCANLINE;
   }
+
+  // May need to post-process |output-picture|.
+
+  // Clean up.
+  free(s);
 }

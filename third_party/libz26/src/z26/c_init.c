@@ -53,18 +53,15 @@ void InitData() {
 		WriteAccess[i + 0xe000] = WriteAccess[i];
 	}
 
-/* <LN>
+// <LN> - globals.c	InitCVars();
+// <LN> - cpu.m4	Init_CPU();
+//	(already disabled in code) Init_CPUhand();
+	Init_TIA();  // <LN> c_tialine.c, lookup tables for graphics.
+// <LN> - c_riot.c	Init_Riot();
+// <LN> c_pitfall2.c 	Init_P2();
+// <LN> c_starpath.c	Init_Starpath();
+// <LN> 	Init_Tiasnd();
+// <LN>	Init_SoundQ();
 
-	InitCVars();
-	Init_CPU();
-//	Init_CPUhand();
-	Init_TIA();
-	Init_Riot();
-	Init_P2();
-	Init_Starpath();
-	Init_Tiasnd();
-	Init_SoundQ();
-
-	RandomizeRIOTTimer();
-  */
+// <LN>	RandomizeRIOTTimer();
 }

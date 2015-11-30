@@ -1,8 +1,8 @@
 # VCSMC src/ Makefile.
-# Dependencies: libtiff, libpng, clang, OpenCL, gflags, libyaml
+# Dependencies: libpng, clang, OpenCL
 # tools dependencies: python colormath, Wand, ImageMagick
-CFLAGS+=-I. -O2 -I$(GFLAGS_INCLUDE)
-LIBS+=-lm -ltiff -lpng -lyaml
+CFLAGS+=-I. -O2 -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)
+LIBS+=-lm -lpng
 OUTTESTS=$(OUT)/tests
 
 UNAME:=$(shell uname)
@@ -15,8 +15,8 @@ endif
 
 # OS X-specific build flags
 ifeq ($(UNAME), Darwin)
-CFLAGS+=-I/opt/local/include
-LDFLAGS+=-L/opt/local/lib
+CFLAGS+=-I/usr/local/include
+LDFLAGS+=-L/usr/local/lib
 LIBS+=-framework OpenCL
 endif
 
@@ -90,7 +90,7 @@ $(OUT)/picc: $(OBJ) $(OUT)/picc.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/sim: $(OBJ) $(OUT)/sim.o
-	$(CC) -o $@ $^ $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(GFLAGS_LIB) $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/smap: $(OBJ) $(OUT)/smap.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)

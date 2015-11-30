@@ -159,7 +159,7 @@ TEST(RangeTest, IntersectRangeEmptyRange) {
 TEST(RangeTest, SerializeToBufferEmptyRange) {
   uint8 buffer[8];
   Range range;
-  EXPECT_EQ(8, range.Serialize(buffer));
+  EXPECT_EQ(8U, range.Serialize(buffer));
   for (int i = 0; i < 8; ++i)
     EXPECT_EQ(0, buffer[i]);
 }
@@ -167,7 +167,7 @@ TEST(RangeTest, SerializeToBufferEmptyRange) {
 TEST(RangeTest, SerializeToBufferInfiniteRange) {
   uint8 buffer[8];
   Range range(0, kInfinity);
-  EXPECT_EQ(8, range.Serialize(buffer));
+  EXPECT_EQ(8U, range.Serialize(buffer));
   for (int i = 0; i < 4; ++i)
     EXPECT_EQ(0, buffer[i]);
   for (int i = 4; i < 8; ++i)
@@ -177,7 +177,7 @@ TEST(RangeTest, SerializeToBufferInfiniteRange) {
 TEST(RangeTest, SerializeToBufferNonZeroLittleEndian) {
   uint8 buffer[8];
   Range range(0x01234567, 0x89abcdef);
-  EXPECT_EQ(8, range.Serialize(buffer));
+  EXPECT_EQ(8U, range.Serialize(buffer));
   uint8 counter = 0x67;
   for (int i = 0; i < 4; ++i) {
     EXPECT_EQ(counter, buffer[i]);

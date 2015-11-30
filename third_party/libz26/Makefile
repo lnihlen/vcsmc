@@ -1,10 +1,9 @@
 all: libz26
 
-libz26:	src/libz26.c $(LIBZ26_OUT)/libz26.a
+libz26:	src/libz26.c $(LIBZ26_OUT)/libz26.o
 
-$(LIBZ26_OUT)/libz26.a: m4c | $(LIBZ26_OUT)/m4
-	$(CC) -I$(LIBZ26_OUT) -I$(LIBZ26_INCLUDE) -c src/libz26.c -o $(LIBZ26_OUT)/libz26.o
-	ar rcs $(LIBZ26_OUT)/libz26.a $(LIBZ26_OUT)/libz26.o
+$(LIBZ26_OUT)/libz26.o: m4c | $(LIBZ26_OUT)/m4
+	$(CC) -O0 -g -I$(LIBZ26_OUT) -I$(LIBZ26_INCLUDE) -c src/libz26.c -o $(LIBZ26_OUT)/libz26.o
 
 m4c: $(LIBZ26_OUT)/m4/catchuppixels.c $(LIBZ26_OUT)/m4/cpu.c
 
