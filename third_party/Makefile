@@ -1,9 +1,8 @@
 export GTEST_OUT=$(OUT)/gtest
 export GFLAGS_OUT=$(OUT)/gflags
-export LIBSTELLA_OUT=$(OUT)/libstella
 export LIBZ26_OUT=$(OUT)/libz26
 
-all: gtest gflags libstella libz26
+all: gtest gflags libz26
 
 gtest: export CXX=$(CC)
 gtest: export CXXFLAGS=-std=c++11
@@ -21,9 +20,6 @@ $(GFLAGS_OUT)/lib/gflags.a:
 	cmake -B$(GFLAGS_OUT) -Hgflags -G"Unix Makefiles"
 	$(MAKE) -C $(GFLAGS_OUT)
 
-libstella: | $(LIBSTELLA_OUT)
-	$(MAKE) -C libstella/
-
 libz26: | $(LIBZ26_OUT) $(LIBZ26_OUT)/libz26.o
 
 $(LIBZ26_OUT)/libz26.o:	libz26/
@@ -34,9 +30,6 @@ $(GTEST_OUT):
 
 $(GFLAGS_OUT):
 	mkdir -p $(GFLAGS_OUT)
-
-$(LIBSTELLA_OUT):
-	mkdir -p $(LIBSTELLA_OUT)
 
 $(LIBZ26_OUT):
 	mkdir -p $(LIBZ26_OUT)

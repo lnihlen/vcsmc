@@ -1,7 +1,7 @@
 # VCSMC src/ Makefile.
 # Dependencies: libpng, clang, OpenCL
 # tools dependencies: python colormath, Wand, ImageMagick
-CFLAGS+=-I. -O2 -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)
+CFLAGS+=-I. -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)
 LIBS+=-lm -lpng
 OUTTESTS=$(OUT)/tests
 
@@ -36,6 +36,7 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/gray_map.o                                                          \
     $(OUT)/image.o                                                             \
     $(OUT)/image_file.o                                                        \
+    $(OUT)/job_queue.o                                                         \
     $(OUT)/line_kernel.o                                                       \
     $(OUT)/opcode.o                                                            \
     $(OUT)/random.o                                                            \
@@ -51,6 +52,7 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/ciede2k_unittests.o                                       \
          $(OUTTESTS)/fft_radix_2_unittests.o                                   \
          $(OUTTESTS)/inverse_fft_norm_unittests.o                              \
+         $(OUTTESTS)/job_queue_unittests.o                                     \
          $(OUTTESTS)/lab_to_rgb_unittests.o                                    \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
@@ -61,6 +63,7 @@ all: $(OUT)/asm                                                                \
      $(OUT)/check                                                              \
      $(OUT)/conv                                                               \
      $(OUT)/exty                                                               \
+     $(OUT)/gen                                                                \
      $(OUT)/picc                                                               \
      $(OUT)/sim                                                                \
      $(OUT)/smap
@@ -91,6 +94,9 @@ $(OUT)/picc: $(OBJ) $(OUT)/picc.o
 
 $(OUT)/sim: $(OBJ) $(OUT)/sim.o
 	$(CC) -o $@ $^ $(GFLAGS_LIB) $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/gen: $(OBJ) $(OUT)/gen.o
+	$(CC) -o $@ $^ $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/smap: $(OBJ) $(OUT)/smap.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)

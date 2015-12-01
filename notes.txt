@@ -1485,3 +1485,7 @@ z26 reverse engineering notes:
 
 2600core.c has c_emulator() entry point which starts the emulator loop, has a
 method ScanFrame() which calls c_tialine.c::nTIALineTo(void).
+
+===============================================================================
+
+picc redesign to account for our new libz26 library plus gflags.

@@ -14,7 +14,8 @@ const int kLibZ26ImageSizeBytes = kLibZ26ImageWidth * kLibZ26ImageHeight;
 
 // Simulates a single frame based on the provided |byte_code|, then copies the
 // output data into |output_picture|, which needs to be at least
-// kLibZ26ImageSizeBytes large. TODO: define output format.
+// kLibZ26ImageSizeBytes large. The output image is encoded as Atari color
+// divided by two.
 void simulate_single_frame(const uint8_t* byte_code,
                            size_t size,
                            uint8_t* output_picture);
