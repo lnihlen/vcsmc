@@ -101,11 +101,15 @@ enum TIA : uint8 {
   TIA_COUNT  = 0x2d
 };
 
-enum Register : uint8 {
-  A = 0,
-  X = 1,
-  Y = 2,
-  REGISTER_COUNT = 3
+enum OpCode : uint8 {
+  JMP_Absolute = 0x4c,
+  LDA_Immediate = 0xa9,
+  LDX_Immediate = 0xa2,
+  LDY_Immediate = 0xa0,
+  NOP_Implied = 0xea,
+  STA_ZeroPage = 0x85,
+  STX_ZeroPage = 0x86,
+  STY_ZeroPage = 0x84
 };
 
 }  // namespace vcsmc

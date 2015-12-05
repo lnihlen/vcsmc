@@ -10,11 +10,7 @@
 
 namespace vcsmc {
 
-class Job {
- public:
-   virtual void Execute() = 0;
-   virtual ~Job() {}
-};
+class Job;
 
 // A JobQueue accepts a series of Job-derived classes, assigning them in
 // parallel to each of the worker threads that it creates.

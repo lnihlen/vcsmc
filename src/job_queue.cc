@@ -1,4 +1,5 @@
 #include "job_queue.h"
+#include "job.h"
 
 namespace vcsmc {
 

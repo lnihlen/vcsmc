@@ -1,5 +1,6 @@
-#include "job_queue.h"
 #include "gtest/gtest.h"
+#include "job.h"
+#include "job_queue.h"
 
 namespace vcsmc {
 
