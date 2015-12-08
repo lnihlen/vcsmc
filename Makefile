@@ -14,22 +14,16 @@ export GFLAGS_LIB=$(OUT)/gflags/lib/libgflags.a
 export LIBZ26_INCLUDE=$(CURDIR)/third_party/libz26/include
 export LIBZ26_LIB=$(OUT)/libz26/libz26.o
 
-all: picc tests
+all: depends vcsmc tests
 
-picc: gflags libz26 | $(OUT)/
+depends: | $(OUT)/
+	$(MAKE) -C third_party/ all
+
+vcsmc: depends | $(OUT)/
 	$(MAKE) -C src/ all
 
-tests: gtest
+tests: gtest picc | $(OUT)/
 	$(MAKE) -C src/ tests
-
-gtest:
-	$(MAKE) -C third_party/ gtest
-
-gflags:
-	$(MAKE) -C third_party/ gflags
-
-libz26:
-	$(MAKE) -C third_party/ libz26
 
 $(OUT)/:
 	mkdir -p out/
