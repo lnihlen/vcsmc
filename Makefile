@@ -11,6 +11,7 @@ export GTEST_INCLUDE=$(CURDIR)/third_party/googletest/googletest/include
 export GTEST_LIB=$(OUT)/gtest/gtest.a
 export GFLAGS_INCLUDE=$(OUT)/gflags/include
 export GFLAGS_LIB=$(OUT)/gflags/lib/libgflags.a
+export LIBYAML_INCLUDE=$(CURDIR)/third_party/libyaml/include
 export LIBZ26_INCLUDE=$(CURDIR)/third_party/libz26/include
 export LIBZ26_LIB=$(OUT)/libz26/libz26.o
 

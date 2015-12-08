@@ -1,6 +1,8 @@
 #ifndef SRC_SPEC_H_
 #define SRC_SPEC_H_
 
+#include <memory>
+
 #include "constants.h"
 #include "range.h"
 #include "types.h"
@@ -15,16 +17,10 @@ namespace vcsmc {
 // individual frame of video.
 class Spec {
  public:
-  // Saves the Spec into the provided buffer. Returns the number of bytes stored
-  // in the buffer.
-  size_t Serialize(uint8* buffer);
-
-  // Loads a spec from a buffer. Returns the spec, plus the number of bytes read
-  // is saved at |bytes_read_out|, currently 10 bytes.
-  static Spec Deserialize(const uint8* buffer, size_t* bytes_read_out);
-
   // Returns a range in CPU cycles that the spec is required to operate for.
   const Range& range() const { return range_; }
+  size_t bytes() const { return bytes_; }
+  const uint8* bytecode() const { return bytecode_.get(); }
 
  private:
   Range range_;

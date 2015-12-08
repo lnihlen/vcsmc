@@ -6,7 +6,6 @@
 #include <string>
 
 #include "image.h"
-#include "cl_image.h"
 #include "types.h"
 
 namespace vcsmc {

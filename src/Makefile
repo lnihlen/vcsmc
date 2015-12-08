@@ -1,72 +1,31 @@
 # VCSMC src/ Makefile.
 # Dependencies: libpng, clang, OpenCL
 # tools dependencies: python colormath, Wand, ImageMagick
-CFLAGS+=-I. -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)
+CFLAGS+=-I. -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE) -I$(LIBYAML_INCLUDE)
 LIBS+=-lm -lpng
 OUTTESTS=$(OUT)/tests
 
 UNAME:=$(shell uname)
 
-# Linux-specific build flags
-ifeq ($(UNAME), Linux)
-LIBS+=-lOpenCL -lpthread
-CFLAGS+=-DNVIDIA_OPENCL_LAMENESS
-endif
-
 # OS X-specific build flags
 ifeq ($(UNAME), Darwin)
 CFLAGS+=-I/usr/local/include
 LDFLAGS+=-L/usr/local/lib
-LIBS+=-framework OpenCL
 endif
 
 DEPS=constants.h image_file.h types.h
-OBJ=$(OUT)/assembler.o                                                         \
-    $(OUT)/bit_map.o                                                           \
-    $(OUT)/cl_buffer_impl.o                                                    \
-    $(OUT)/cl_command_queue_impl.o                                             \
-    $(OUT)/cl_device_context.o                                                 \
-    $(OUT)/cl_image_impl.o                                                     \
-    $(OUT)/cl_kernel_impl.o                                                    \
-    $(OUT)/cl_program.o                                                        \
-    $(OUT)/color.o                                                             \
-    $(OUT)/color_distances_table.o                                             \
-    $(OUT)/color_table.o                                                       \
-    $(OUT)/frame_fitter.o                                                      \
-    $(OUT)/gray_map.o                                                          \
+OBJ=$(OUT)/color_table.o                                                       \
     $(OUT)/image.o                                                             \
     $(OUT)/image_file.o                                                        \
     $(OUT)/job_queue.o                                                         \
-    $(OUT)/line_kernel.o                                                       \
-    $(OUT)/opcode.o                                                            \
-    $(OUT)/random.o                                                            \
     $(OUT)/range.o                                                             \
     $(OUT)/spec.o                                                              \
-    $(OUT)/state.o                                                             \
-    $(OUT)/value_map.o                                                         \
-    $(OUT)/video_frame_data.o                                                  \
-    $(OUT)/video_frame_data_parser.o                                           \
 
-TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
-         $(OUTTESTS)/bit_map_unittests.o                                       \
-         $(OUTTESTS)/ciede2k_unittests.o                                       \
-         $(OUTTESTS)/fft_radix_2_unittests.o                                   \
-         $(OUTTESTS)/inverse_fft_norm_unittests.o                              \
-         $(OUTTESTS)/job_queue_unittests.o                                     \
-         $(OUTTESTS)/lab_to_rgb_unittests.o                                    \
+TEST_OBJ=$(OUTTESTS)/job_queue_unittests.o                                     \
          $(OUTTESTS)/range_unittests.o                                         \
-         $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
-         $(OUTTESTS)/state_unittests.o                                         \
 
-all: $(OUT)/asm                                                                \
-     $(OUT)/bed                                                                \
-     $(OUT)/check                                                              \
-     $(OUT)/conv                                                               \
-     $(OUT)/exty                                                               \
-     $(OUT)/gen                                                                \
-     $(OUT)/picc                                                               \
+all: $(OUT)/gen                                                                \
      $(OUT)/sim                                                                \
-     $(OUT)/smap
 
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -74,32 +33,11 @@ $(OUT)/%.o: %.cc $(DEPS)
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CC) -c -o $@ $< $(CFLAGS) -I$(GTEST_INCLUDE)
 
-$(OUT)/asm: $(OBJ) $(OUT)/asm.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
-
-$(OUT)/bed: $(OBJ) $(OUT)/bed.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
-
-$(OUT)/check: $(OBJ) $(OUT)/check.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
-
-$(OUT)/conv: $(OBJ) $(OUT)/conv.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
-
-$(OUT)/exty: $(OBJ) $(OUT)/exty.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
-
-$(OUT)/picc: $(OBJ) $(OUT)/picc.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
-
-$(OUT)/sim: $(OBJ) $(OUT)/sim.o
-	$(CC) -o $@ $^ $(GFLAGS_LIB) $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
-
 $(OUT)/gen: $(OBJ) $(OUT)/gen.o
 	$(CC) -o $@ $^ $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-$(OUT)/smap: $(OBJ) $(OUT)/smap.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+$(OUT)/sim: $(OBJ) $(OUT)/sim.o
+	$(CC) -o $@ $^ $(GFLAGS_LIB) $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 
