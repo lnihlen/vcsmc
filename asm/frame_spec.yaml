@@ -1,0 +1,109 @@
+- first_cycle: 0  # first scanline, turn off vblank, turn on vsync, init state.
+  bytecode: |
+    lda #0
+    sta VBLANK
+    ldx #2
+    stx VSYNC
+    sta VSYNC
+    sta RESP0
+    sta RESP1
+    sta NUSIZ0
+    sta NUSIZ1
+    sta COLUP0
+    sta COLUP1
+    sta COLUBK
+    sta CTRLPF
+    sta REFP0
+    sta REFP1
+    sta PF0
+    sta PF1
+    sta PF2
+    sta AUDC0
+    sta AUDC1
+    sta AUDF0
+    sta AUDF1
+    sta AUDV0
+    sta AUDV1
+    sta GRP0
+    sta GRP1
+    sta ENAM0
+    sta ENAM1
+    sta ENABL
+    sta VDELP0
+    sta VDELP1
+    sta RESMP0
+    sta RESMP1
+    sta HMCLR
+- first_cycle: 228  # 3rd scanline, turn off vsync.
+  bytecode: |
+    lda #0
+    sta VSYNC
+- first_cycle: 17632 # 232nd scanline, turn on vblank wait for almost 30 frames.
+  bytecode: |
+    lda #$42
+    sta VBLANK
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    sta GRP0

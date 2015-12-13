@@ -13,11 +13,11 @@ $(GTEST_OUT)/libgtest.a:
 	cmake -B$(GTEST_OUT) -Hgoogletest/googletest -G"Unix Makefiles"
 	$(MAKE) -C $(GTEST_OUT)
 
-gflags: $(GFLAGS_OUT)/lib/gflags.a | $(GFLAGS_OUT)
+gflags: $(GFLAGS_OUT)/lib/libgflags.a | $(GFLAGS_OUT)
 
-$(GFLAGS_OUT)/lib/gflags.a: export CFLAGS=-Wall
-$(GFLAGS_OUT)/lib/gflags.a: export CXX=$(CC)
-$(GFLAGS_OUT)/lib/gflags.a:
+$(GFLAGS_OUT)/lib/libgflags.a: export CFLAGS=-Wall
+$(GFLAGS_OUT)/lib/libgflags.a: export CXX=$(CC)
+$(GFLAGS_OUT)/lib/libgflags.a:
 	cmake -B$(GFLAGS_OUT) -Hgflags -G"Unix Makefiles"
 	$(MAKE) -C $(GFLAGS_OUT)
 

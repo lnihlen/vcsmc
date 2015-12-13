@@ -1,17 +1,18 @@
 # VCSMC main Makefile
 # assumes GNU make 3.80 or up
 export CC=clang
-# If chaning CFLAGS it is good to change them in the .ycm_extra_conf.py file
+# If changing CFLAGS it is good to change them in the .ycm_extra_conf.py file
 # (also versioned) so that YCM will pick up the correct flags.
 export CFLAGS=-std=c++11 -Wall -Wextra -Werror -O0 -g
 export LDFLAGS=
 export LIBS=-lstdc++
 export OUT=$(CURDIR)/out
 export GTEST_INCLUDE=$(CURDIR)/third_party/googletest/googletest/include
-export GTEST_LIB=$(OUT)/gtest/gtest.a
+export GTEST_LIB=$(OUT)/gtest/libgtest.a
 export GFLAGS_INCLUDE=$(OUT)/gflags/include
 export GFLAGS_LIB=$(OUT)/gflags/lib/libgflags.a
 export LIBYAML_INCLUDE=$(CURDIR)/third_party/libyaml/include
+export LIBYAML_LIB=$(OUT)/libyaml/libyaml.a
 export LIBZ26_INCLUDE=$(CURDIR)/third_party/libz26/include
 export LIBZ26_LIB=$(OUT)/libz26/libz26.o
 
@@ -23,7 +24,7 @@ depends: | $(OUT)/
 vcsmc: depends | $(OUT)/
 	$(MAKE) -C src/ all
 
-tests: gtest picc | $(OUT)/
+tests: depends vcsmc | $(OUT)/
 	$(MAKE) -C src/ tests
 
 $(OUT)/:

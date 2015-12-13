@@ -2,6 +2,8 @@
 #define SRC_SPEC_H_
 
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "constants.h"
 #include "range.h"
@@ -17,16 +19,29 @@ namespace vcsmc {
 // individual frame of video.
 class Spec {
  public:
+  Spec(const Range& range, size_t size, std::unique_ptr<uint8[]> bytecode);
+
   // Returns a range in CPU cycles that the spec is required to operate for.
   const Range& range() const { return range_; }
-  size_t bytes() const { return bytes_; }
+  // Size in bytes.
+  size_t size() const { return size_; }
+  // Pointer to the bytecode.
   const uint8* bytecode() const { return bytecode_.get(); }
 
  private:
   Range range_;
-  size_t bytes_;
+  size_t size_;
   std::unique_ptr<uint8[]> bytecode_;
 };
+
+typedef std::shared_ptr<std::vector<Spec>> SpecList;
+
+// Returns a list of Specs parsed from the indicated YAML file, or nullptr on
+// error.
+SpecList ParseSpecListFile(const std::string& file_name);
+// Convenience method mostly for testing, calls same underlying implementation
+// as on file parser.
+SpecList ParseSpecListString(const std::string& spec_string);
 
 }  // namespace vcsmc
 

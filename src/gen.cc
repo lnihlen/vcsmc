@@ -14,7 +14,7 @@ DEFINE_int32(worker_threads, 0,
 
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, false);
-
+/*
   vcsmc::JobQueue job_queue(FLAGS_worker_threads);
   map<kernel_hash, float score> score_map;
   std::vector<std::shared_ptr<vcsmc::kernel>> current_generation(
@@ -75,6 +75,6 @@ int main(int argc, char* argv[]) {
     // As well update overall report log.
 
   }
-
+*/
   return 0;
 }
