@@ -7,3 +7,6 @@
 [submodule "third_party/libyaml"]
 	path = third_party/libyaml
 	url = https://github.com/yaml/libyaml
+[submodule "third_party/farmhash"]
+	path = third_party/farmhash
+	url = https://github.com/google/farmhash

@@ -7,6 +7,9 @@ export CFLAGS=-std=c++11 -Wall -Wextra -Werror -O0 -g
 export LDFLAGS=
 export LIBS=-lstdc++
 export OUT=$(CURDIR)/out
+
+export FARMHASH_LIB=$(OUT)/farmhash/lib/libfarmhash.a
+export FARMHASH_INCLUDE=$(OUT)/farmhash/include
 export GTEST_INCLUDE=$(CURDIR)/third_party/googletest/googletest/include
 export GTEST_LIB=$(OUT)/gtest/libgtest.a
 export GFLAGS_INCLUDE=$(OUT)/gflags/include

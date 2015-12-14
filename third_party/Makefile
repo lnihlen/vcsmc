@@ -1,9 +1,18 @@
+export FARMHASH_OUT=$(OUT)/farmhash
+export FARMHASH_DIR=$(CURDIR)/farmhash
 export GTEST_OUT=$(OUT)/gtest
 export GFLAGS_OUT=$(OUT)/gflags
 export LIBYAML_OUT=$(OUT)/libyaml
 export LIBZ26_OUT=$(OUT)/libz26
 
-all: gtest gflags libyaml libz26
+all: farmhash gtest gflags libyaml libz26
+
+farmhash: $(FARMHASH_OUT)/lib/libfarmhash.a | $(FARMHASH_OUT)
+
+$(FARMHASH_OUT)/lib/libfarmhash.a: export CFLAGS=-Wall
+$(FARMHASH_OUT)/lib/libfarmhash.a: | $(FARMHASH_OUT)
+	cd $(FARMHASH_OUT); $(FARMHASH_DIR)/configure --prefix=$(FARMHASH_OUT)
+	$(MAKE) -C $(FARMHASH_OUT) install
 
 gtest: $(GTEST_OUT)/libgtest.a | $(GTEST_OUT)
 
@@ -34,6 +43,9 @@ libz26: | $(LIBZ26_OUT) $(LIBZ26_OUT)/libz26.o
 $(LIBZ26_OUT)/libz26.o:	libz26/
 	$(MAKE) -C libz26/
 
+$(FARMHASH_OUT):
+	mkdir -p $(FARMHASH_OUT)
+
 $(GTEST_OUT):
 	mkdir -p $(GTEST_OUT)
 
@@ -49,6 +61,7 @@ $(LIBZ26_OUT):
 
 .PHONY: clean
 clean:
+	rm -f $(FARMHASH_OUT)
 	rm -f $(GTEST_OUT)
 	rm -f $(GFLAGS_OUT)
 	rm -f $(LIBYAML_OUT)
