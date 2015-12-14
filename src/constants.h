@@ -27,27 +27,18 @@ const uint32 kVBlankScanLines = 37;
 const uint32 kOverscanScanLines = 30;
 const uint32 kScreenHeight = 262;
 const uint32 kScreenSizeClocks = kScreenHeight * kScanLineWidthClocks;
+const uint32 kScreenSizeCycles = kScreenSizeClocks / kColorClocksPerCPUCycle;
 
 const uint8 kColuUnpainted = 0xff;
-// The ith most significant bit in this field represents the ith address in the
-// TIA enum below.
-// 0001 1100 0000 0000 0000 0000 0001 1111 0000 0000 0000 1100
-const uint64 kTIAStrobeMask = 0x1c00001f000c;
 
-const uint32 kJumpAbsoluteCPUCycles = 3u;
-const uint32 kLoadImmediateCPUCycles = 2u;
-const uint32 kLoadImmediateColorClocks =
-    kLoadImmediateCPUCycles * kColorClocksPerCPUCycle;
-const uint32 kStoreZeroPageCPUCycles = 3u;
-const uint32 kStoreZeroPageColorClocks =
-    kStoreZeroPageCPUCycles * kColorClocksPerCPUCycle;
-const uint32 kNoOpCPUCycles = 2u;
-const uint32 kNoOpColorClocks = kNoOpCPUCycles * kColorClocksPerCPUCycle;
-const uint32 kMinimumIdleTime = 2 * kColorClocksPerCPUCycle;
-
-const uint32 kBankSize = 1024;
+const uint32 kBankSize = 4096;
+// We leave 16 bytes at the bottom of each bank for the reset/load vectors.
+const uint32 kBankPadding = 16;
 
 const double kPi = 3.1415926535897932384626433832795028841971693993751;
+
+// Number of uint32 words to generate/use for a random seed.
+const size_t kSeedSizeWords = 16;
 
 // Defines the address and name of every register on the TIA. The ones marked
 // as (strobe) are write-only and writing to them will cause new changes in

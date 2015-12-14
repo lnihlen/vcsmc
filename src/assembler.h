@@ -41,6 +41,9 @@ size_t UnpackOpCode(uint32 packed_op, uint8* target);
 size_t OpCodeBytes(OpCode op);
 uint32 OpCodeCycles(OpCode op);
 
+size_t OpCodeBytes(uint32 op);
+uint32 OpCodeCycles(uint32 op);
+
 }  // namespace vcsmc
 
 #endif  // SRC_ASSEMBLER_H_

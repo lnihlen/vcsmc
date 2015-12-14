@@ -489,4 +489,12 @@ uint32 OpCodeCycles(OpCode op) {
   return 0;
 }
 
+size_t OpCodeBytes(uint32 op) {
+  return OpCodeBytes(static_cast<OpCode>(op & 0x000000ff));
+}
+
+uint32 OpCodeCycles(uint32 op) {
+  return OpCodeCycles(static_cast<OpCode>(op & 0x000000ff));
+}
+
 }  // namespace vcsmc

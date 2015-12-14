@@ -20,6 +20,7 @@ namespace vcsmc {
 class Spec {
  public:
   Spec(const Range& range, size_t size, std::unique_ptr<uint8[]> bytecode);
+  Spec(const Spec& spec);
 
   // Returns a range in CPU cycles that the spec is required to operate for.
   const Range& range() const { return range_; }

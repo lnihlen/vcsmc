@@ -38,7 +38,8 @@
   bytecode: |
     lda #0
     sta VSYNC
-- first_cycle: 17632 # 232nd scanline, turn on vblank wait for almost 30 frames.
+- first_cycle: 17632 # 232nd scanline, turn on vblank wait for 29 frames.
+  hard_duration: 2204
   bytecode: |
     lda #$42
     sta VBLANK
@@ -71,39 +72,4 @@
     sta WSYNC
     sta WSYNC
     sta WSYNC
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
-    sta GRP0
+

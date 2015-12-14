@@ -16,6 +16,7 @@ vcsmc::SpecList ParseSpecListInternal(yaml_parser_t parser) {
     kIdle,   // Outside of a Spec, waiting for the next one.
     kReady,  // Inside of a Spec, but not midway through a key-value pair.
     kFirstCycle,  // Next scalar should be the numeric value of first_cycle.
+    kHardDuration,  // Optional next scalar should be hard-coded duration.
     kBytecode,   // Next scalar value should be the assembler code.
     kDone,  // Stream is finished, exit parser loop.
   };
@@ -24,6 +25,8 @@ vcsmc::SpecList ParseSpecListInternal(yaml_parser_t parser) {
   char* assembly = nullptr;
   size_t assembly_length = 0;
   uint32 assembly_cycles = 0;
+  uint32 hard_duration = 0;
+  uint32 last_cycle = 0;
   std::unique_ptr<uint8[]> bytecode;
   std::string scalar;
   vcsmc::SpecList spec_list(new std::vector<vcsmc::Spec>());
@@ -43,6 +46,8 @@ vcsmc::SpecList ParseSpecListInternal(yaml_parser_t parser) {
         assembly = nullptr;
         assembly_length = 0;
         assembly_cycles = 0;
+        hard_duration = 0;
+        last_cycle = 0;
         state = kReady;
         break;
 
@@ -55,6 +60,8 @@ vcsmc::SpecList ParseSpecListInternal(yaml_parser_t parser) {
             state = kFirstCycle;
           } else if (scalar == "bytecode") {
             state = kBytecode;
+          } else if (scalar == "hard_duration") {
+            state = kHardDuration;
           } else {
             return nullptr;
           }
@@ -66,6 +73,9 @@ vcsmc::SpecList ParseSpecListInternal(yaml_parser_t parser) {
             vcsmc::AssembleString(scalar, &assembly_cycles, &assembly_length);
           if (!bytecode) return nullptr;
           state = kReady;
+        } else if (state == kHardDuration) {
+          hard_duration = strtoul(scalar.c_str(), NULL, 10);
+          state = kReady;
         } else {
           return nullptr;
         }
@@ -74,9 +84,12 @@ vcsmc::SpecList ParseSpecListInternal(yaml_parser_t parser) {
       // End of map, check that we have a complete entry and create a new Spec
       // from it.
       case YAML_MAPPING_END_EVENT:
+        last_cycle = first_cycle +
+          (hard_duration > 0 ? hard_duration : assembly_cycles);
         spec_list->emplace_back(
-            vcsmc::Range(first_cycle, first_cycle + assembly_cycles),
-            assembly_length, std::move(bytecode));
+            vcsmc::Range(first_cycle, last_cycle),
+            assembly_length,
+            std::move(bytecode));
         state = kIdle;
         break;
 
@@ -106,6 +119,13 @@ Spec::Spec(const Range& range, size_t size, std::unique_ptr<uint8[]> bytecode)
   : range_(range),
     size_(size),
     bytecode_(std::move(bytecode)) {}
+
+Spec::Spec(const Spec& spec)
+   : range_(spec.range_),
+     size_(spec.size_),
+     bytecode_(new uint8[spec.size_]) {
+  std::memcpy(bytecode_.get(), spec.bytecode_.get(), spec.size_);
+}
 
 SpecList ParseSpecListFile(const std::string& file_name) {
   yaml_parser_t parser;

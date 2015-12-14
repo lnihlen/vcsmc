@@ -19,6 +19,7 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/image.o                                                             \
     $(OUT)/image_file.o                                                        \
     $(OUT)/job_queue.o                                                         \
+    $(OUT)/kernel.o                                                            \
     $(OUT)/range.o                                                             \
     $(OUT)/spec.o                                                              \
 
