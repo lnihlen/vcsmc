@@ -4,7 +4,6 @@
     sta VBLANK
     ldx #2
     stx VSYNC
-    sta VSYNC
     sta RESP0
     sta RESP1
     sta NUSIZ0

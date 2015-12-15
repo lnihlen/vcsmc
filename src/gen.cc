@@ -17,10 +17,12 @@ DEFINE_int32(worker_threads, 0,
     "Number of threads to create to work in parallel, set to 0 to pick based "
     "on hardware.");
 
-DEFINE_string(spec_list_file, "", "Path to spec list yaml file.");
+DEFINE_string(spec_list_file, "asm/frame_spec.yaml",
+    "Path to spec list yaml file.");
 DEFINE_string(random_seed, "",
     "Hex string of seed for pseudorandom seed generation. If not provided one "
     "will be generated from hardware random device.");
+DEFINE_string(log_base_dir, "out/log", "Base directory for log entries.");
 
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, false);
@@ -55,9 +57,6 @@ int main(int argc, char* argv[]) {
   std::vector<std::shared_ptr<vcsmc::Kernel>> current_generation(
       FLAGS_generation_size);
 
-  // TODO: Go look in log directory to see if we are resuming work from a
-  // previous run, if so restore that state, otherwise generate all new stuff.
-
   // Generate FLAGS_generation_size number of random individuals.
   for (int i = 0; i < FLAGS_generation_size; ++i) {
     std::array<uint32, vcsmc::kSeedSizeWords> seed;
@@ -71,6 +70,7 @@ int main(int argc, char* argv[]) {
   }
 
   for (int i = 0; i < FLAGS_max_generation_number; ++i) {
+
     /*
     // Discard worse half of generation.
     //

@@ -1,8 +1,9 @@
 # VCSMC src/ Makefile.
 # Dependencies: libpng, clang, OpenCL
 # tools dependencies: python colormath, Wand, ImageMagick
-CFLAGS+=-I. -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE) -I$(LIBYAML_INCLUDE)
-LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB)
+CFLAGS+=-I. -I$(FARMHASH_INCLUDE) -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)      \
+    -I$(LIBYAML_INCLUDE)
+LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(FARMHASH_LIB)
 OUTTESTS=$(OUT)/tests
 
 UNAME:=$(shell uname)
@@ -25,6 +26,7 @@ OBJ=$(OUT)/assembler.o                                                         \
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/job_queue_unittests.o                                     \
+         $(OUTTESTS)/kernel_unittests.o                                        \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/spec_unittests.o
 

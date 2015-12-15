@@ -465,6 +465,7 @@ size_t OpCodeBytes(OpCode op) {
     case STY_ZeroPage:
       return 2;
   }
+  assert(false);
   return 0;
 }
 
@@ -486,6 +487,7 @@ uint32 OpCodeCycles(OpCode op) {
     case STY_ZeroPage:
       return 3;
   }
+  assert(false);
   return 0;
 }
 

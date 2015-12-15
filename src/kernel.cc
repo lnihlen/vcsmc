@@ -5,6 +5,9 @@
 #include <cstring>
 #include <random>
 
+#include <farmhash.h>
+#include <libz26/libz26.h>
+
 #include "assembler.h"
 
 namespace vcsmc {
@@ -24,7 +27,8 @@ void Kernel::GenerateRandomKernelJob::Execute() {
   // the top.
   while (current_cycle < kScreenSizeCycles - 3) {
     uint32 next_spec_start_time = spec_list_index < specs_->size() ?
-        specs_->at(spec_list_index).range().start_time() : kInfinity;
+        specs_->at(spec_list_index).range().start_time() :
+        kScreenSizeCycles - 3;
     size_t next_spec_size = spec_list_index < specs_->size() ?
         specs_->at(spec_list_index).size() : 0;
     if (current_cycle == next_spec_start_time) {
@@ -59,6 +63,7 @@ void Kernel::GenerateRandomKernelJob::Execute() {
           kernel_->AppendJmpSpec(current_cycle, total_byte_size % kBankSize);
           const Spec& jmp_spec = kernel_->specs_->back();
           current_cycle += jmp_spec.range().Duration();
+          starting_cycle = current_cycle;
           assert(cycles_remaining > jmp_spec.range().Duration());
           cycles_remaining -= jmp_spec.range().Duration();
           total_byte_size += jmp_spec.size();
@@ -82,6 +87,7 @@ void Kernel::GenerateRandomKernelJob::Execute() {
   }
   assert(current_cycle == kScreenSizeCycles - 3);
   kernel_->AppendJmpSpec(current_cycle, total_byte_size % kBankSize);
+  total_byte_size += kernel_->specs_->back().size();
   kernel_->RegenerateBytecode(total_byte_size);
 }
 
@@ -191,13 +197,13 @@ uint32 Kernel::GenerateRandomStore() {
 }
 
 void Kernel::AppendJmpSpec(uint32 current_cycle, size_t current_bank_size) {
-  assert(current_bank_size < (kBankSize - kBankPadding));
+  assert(current_bank_size < (kBankSize - kBankPadding - 3));
   size_t bank_balance_size = kBankSize - current_bank_size;
   std::unique_ptr<uint8[]> bytecode(new uint8[bank_balance_size]);
   std::memset(bytecode.get() + 3, 0, bank_balance_size - 3);
-  bytecode_.get()[0] = JMP_Absolute;
-  bytecode_.get()[1] = 0x00;
-  bytecode_.get()[2] = 0xf0;
+  bytecode.get()[0] = JMP_Absolute;
+  bytecode.get()[1] = 0x00;
+  bytecode.get()[2] = 0xf0;
   specs_->emplace_back(
       Range(current_cycle, current_cycle + 3),
       bank_balance_size,
@@ -236,6 +242,8 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
       ++current_spec_index;
     }
   }
+  fingerprint_ = util::Hash64(reinterpret_cast<const char*>(bytecode_.get()),
+                              bytecode_size_);
 }
 
 }  // namespace vcmsc
