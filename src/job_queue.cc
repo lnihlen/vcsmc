@@ -5,7 +5,7 @@ namespace vcsmc {
 
 JobQueue::JobQueue(size_t number_of_threads)
   : exit_(false),
-  active_workers_(0) {
+    active_workers_(0) {
   if (number_of_threads == 0) {
     number_of_threads = std::thread::hardware_concurrency() ?
       std::thread::hardware_concurrency() : 4;
@@ -34,8 +34,16 @@ void JobQueue::Enqueue(std::unique_ptr<Job> job) {
 }
 
 void JobQueue::Finish() {
-  std::unique_lock<std::mutex> lock(active_mutex_);
-  active_cv_.wait(lock, [this] { return active_workers_ == 0; });
+  {
+    // First wait for the queue to empty out.
+    std::unique_lock<std::mutex> lock(mutex_);
+    queue_size_cv_.wait(lock, [this] { return queue_.size() == 0; });
+  }
+  {
+    // Now wait for the number of active threads to be zero.
+    std::unique_lock<std::mutex> lock(active_mutex_);
+    active_cv_.wait(lock, [this] { return active_workers_ == 0; });
+  }
 }
 
 void JobQueue::ThreadWorkLoop() {
@@ -53,6 +61,8 @@ void JobQueue::ThreadWorkLoop() {
       std::unique_lock<std::mutex> lock(active_mutex_);
       active_workers_++;
     }
+
+    queue_size_cv_.notify_one();
 
     job->Execute();
 

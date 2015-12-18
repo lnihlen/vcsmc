@@ -37,6 +37,7 @@ class JobQueue {
   std::condition_variable cv_;
   bool exit_;
   std::queue<std::unique_ptr<Job>> queue_;
+  std::condition_variable queue_size_cv_;
 
   std::mutex active_mutex_;
   std::condition_variable active_cv_;

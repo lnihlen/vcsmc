@@ -128,6 +128,8 @@ struct z26_state {
   // ROM data used for simulation.
   const uint8_t* ROM_data;
   size_t ROM_size;
+  size_t bank_count;
+  db reset_read;
 };
 
 // constants defined in z26/globals.c, which we do not include.
@@ -152,22 +154,31 @@ void (* TIARIOTReadAccess[0x1000])(struct z26_state* s);
 void (* TIARIOTWriteAccess[0x1000])(struct z26_state* s);
 
 void ReadROM4K(struct z26_state* s) {
-  // ** VCSMC bank-switching strategy goes here.
+  // VCSMC bank-switching strategy goes here.
   dw address = s->AddressBus & 0xfff;
-  if (address >= s->ROM_size) {
-    printf("warning: invalid ROM read at address %x\n", address);
-    s->DataBus = 0;
+  if (address == 0) {
+    if (s->reset_read == 1) {
+      ++s->bank_count;
+    } else {
+      s->reset_read = 1;
+    }
+  }
+  if ((s->bank_count * 4096) + address >= s->ROM_size) {
+    // printf("warning: invalid ROM read at address %x, "
+    //       "bank_count = %lu, rom_size = %lu\n",
+    //       address, s->bank_count, s->ROM_size);
+    s->DataBus = 0x00;
     return;
   }
   // For the moment just do the unimaginative thing of reading the requested
   // ROM address, no support for ROMs greater than 4K.
-  s->DataBus = s->ROM_data[address];
+  s->DataBus = s->ROM_data[(s->bank_count * 4096) + address];
 }
 
 void WriteROM4K(struct z26_state* s) {
   // VCSMC ROMS are read-only.
   dw address = s->AddressBus & 0xfff;
-  printf("warning: ROM write attempt detected at address %x\n", address);
+  printf("LibZ26 warning: ROM write attempt detected at address %x\n", address);
 }
 
 // TODO: bring in sound simulation later.

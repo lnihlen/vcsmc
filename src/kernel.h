@@ -18,22 +18,44 @@ class Kernel {
   // Creates an empty kernel with the provided random seed and specs.
   explicit Kernel(std::seed_seq& seed);
 
+  // Save the simulated kernel image to provided png filename.
+  bool SaveImage(const std::string& file_name) const;
+
+  void ResetVictories() { victories_ = 0; }
+  void AddVictory() { ++victories_; }
+
   const uint8* bytecode() const { return bytecode_.get(); }
+  const uint8* sim_frame() const { return sim_frame_.get(); }
   size_t bytecode_size() const { return bytecode_size_; }
   uint64 fingerprint() const { return fingerprint_; }
+  bool score_valid() const { return score_valid_; }
+  double score() const { return score_; }
+  uint32 victories() const { return victories_; }
 
   // Given a pointer to a completely empty Kernel this Job will populate it with
   // totally random bytecode.
   class GenerateRandomKernelJob : public Job {
    public:
-    explicit GenerateRandomKernelJob(
-        std::shared_ptr<Kernel> kernel, SpecList specs)
-      : kernel_(kernel), specs_(specs) {}
+    GenerateRandomKernelJob(std::shared_ptr<Kernel> kernel, SpecList specs)
+        : kernel_(kernel), specs_(specs) {}
     void Execute() override;
 
    private:
     std::shared_ptr<Kernel> kernel_;
     SpecList specs_;
+  };
+
+  // Score an unscored kernel by simulating it and then comparing it to the
+  // target lab image.
+  class ScoreKernelJob : public Job {
+   public:
+    ScoreKernelJob(std::shared_ptr<Kernel> kernel, const double* target_lab)
+        : kernel_(kernel), target_lab_(target_lab) {}
+    void Execute() override;
+
+   private:
+    std::shared_ptr<Kernel> kernel_;
+    const double* target_lab_;
   };
 
  private:
@@ -44,6 +66,7 @@ class Kernel {
   // Given valid data in opcodes_ refills bytecode_ with the concatenated data
   // in opcodes_ and specs_, appends jumps and updates fingerprint_.
   void RegenerateBytecode(size_t bytecode_size);
+  void SimulateAndScore(const double* target_lab);
 
   std::default_random_engine engine_;
   SpecList specs_;
@@ -51,8 +74,12 @@ class Kernel {
   std::vector<std::unique_ptr<std::vector<uint32>>> opcodes_;
   std::vector<Range> opcode_ranges_;
   std::unique_ptr<uint8[]> bytecode_;
+  std::unique_ptr<uint8[]> sim_frame_;
   size_t bytecode_size_;
   uint64 fingerprint_;
+  bool score_valid_;
+  double score_;
+  uint32 victories_;
 };
 
 } // namespace vcsmc

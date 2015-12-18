@@ -6,9 +6,15 @@
 #include <random>
 
 #include <farmhash.h>
+extern "C" {
 #include <libz26/libz26.h>
+}
 
 #include "assembler.h"
+#include "color.h"
+#include "color_table.h"
+#include "image.h"
+#include "image_file.h"
 
 namespace vcsmc {
 
@@ -16,7 +22,25 @@ Kernel::Kernel(std::seed_seq& seed)
   : engine_(seed),
     specs_(new std::vector<Spec>()),
     bytecode_size_(0),
-    fingerprint_(0) {
+    fingerprint_(0),
+    score_valid_(false),
+    score_(0.0),
+    victories_(0) {
+}
+
+bool Kernel::SaveImage(const std::string& file_name) const {
+  if (!score_valid_ || !sim_frame_) return false;
+  Image image(kTargetFrameWidthPixels, kFrameHeightPixels);
+  uint32* pix = image.pixels_writeable();
+  const uint8* sim = sim_frame_.get();
+  for (size_t i = 0; i < kFrameWidthPixels * kFrameHeightPixels; ++i) {
+    *pix = kAtariNTSCABGRColorTable[*sim];
+    ++pix;
+    *pix = kAtariNTSCABGRColorTable[*sim];
+    ++pix;
+    ++sim;
+  }
+  return ImageFile::Save(&image, file_name);
 }
 
 void Kernel::GenerateRandomKernelJob::Execute() {
@@ -64,7 +88,7 @@ void Kernel::GenerateRandomKernelJob::Execute() {
           const Spec& jmp_spec = kernel_->specs_->back();
           current_cycle += jmp_spec.range().Duration();
           starting_cycle = current_cycle;
-          assert(cycles_remaining > jmp_spec.range().Duration());
+          assert(cycles_remaining >= jmp_spec.range().Duration());
           cycles_remaining -= jmp_spec.range().Duration();
           total_byte_size += jmp_spec.size();
           assert(0 == total_byte_size % kBankSize);
@@ -80,15 +104,20 @@ void Kernel::GenerateRandomKernelJob::Execute() {
           ops->push_back(op);
         }
       }
-      assert(ops->size());
-      kernel_->opcodes_.emplace_back(std::move(ops));
-      kernel_->opcode_ranges_.emplace_back(starting_cycle, current_cycle);
+      if (ops->size()) {
+        kernel_->opcodes_.emplace_back(std::move(ops));
+        kernel_->opcode_ranges_.emplace_back(starting_cycle, current_cycle);
+      }
     }
   }
   assert(current_cycle == kScreenSizeCycles - 3);
   kernel_->AppendJmpSpec(current_cycle, total_byte_size % kBankSize);
   total_byte_size += kernel_->specs_->back().size();
   kernel_->RegenerateBytecode(total_byte_size);
+}
+
+void Kernel::ScoreKernelJob::Execute() {
+  kernel_->SimulateAndScore(target_lab_);
 }
 
 uint32 Kernel::GenerateRandomOpcode(uint32 cycles_remaining) {
@@ -200,10 +229,18 @@ void Kernel::AppendJmpSpec(uint32 current_cycle, size_t current_bank_size) {
   assert(current_bank_size < (kBankSize - kBankPadding - 3));
   size_t bank_balance_size = kBankSize - current_bank_size;
   std::unique_ptr<uint8[]> bytecode(new uint8[bank_balance_size]);
-  std::memset(bytecode.get() + 3, 0, bank_balance_size - 3);
+  std::memset(bytecode.get() + 3, 0, bank_balance_size - 6);
   bytecode.get()[0] = JMP_Absolute;
   bytecode.get()[1] = 0x00;
   bytecode.get()[2] = 0xf0;
+  // Need to create the jump table at the end of each 4K bank, pointing back to
+  // the top of the program address space.
+  bytecode.get()[bank_balance_size - 6] = 0x00;
+  bytecode.get()[bank_balance_size - 5] = 0xf0;
+  bytecode.get()[bank_balance_size - 4] = 0x00;
+  bytecode.get()[bank_balance_size - 3] = 0xf0;
+  bytecode.get()[bank_balance_size - 2] = 0x00;
+  bytecode.get()[bank_balance_size - 1] = 0xf0;
   specs_->emplace_back(
       Range(current_cycle, current_cycle + 3),
       bank_balance_size,
@@ -212,6 +249,8 @@ void Kernel::AppendJmpSpec(uint32 current_cycle, size_t current_bank_size) {
 
 void Kernel::RegenerateBytecode(size_t bytecode_size) {
   bytecode_size_ = bytecode_size;
+  score_valid_ = false;
+  score_ = 0.0;
   bytecode_.reset(new uint8[bytecode_size]);
   uint32 current_cycle = 0;
   size_t current_range_index = 0;
@@ -244,6 +283,24 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
   }
   fingerprint_ = util::Hash64(reinterpret_cast<const char*>(bytecode_.get()),
                               bytecode_size_);
+}
+
+void Kernel::SimulateAndScore(const double* target_lab) {
+  sim_frame_.reset(new uint8[kLibZ26ImageSizeBytes]);
+  simulate_single_frame(bytecode_.get(), bytecode_size_, sim_frame_.get());
+  score_ = 0.0;
+  const uint8* frame_pointer = sim_frame_.get();
+  const double* target_pointer = target_lab;
+  for (size_t i = 0; i < kFrameWidthPixels * kFrameHeightPixels; ++i) {
+    score_ += Ciede2k(kAtariNTSCLabColorTable + (*frame_pointer * 4),
+                      target_pointer);
+    target_pointer += 4;
+    score_ += Ciede2k(kAtariNTSCLabColorTable + (*frame_pointer * 4),
+                      target_pointer);
+    target_pointer += 4;
+    ++frame_pointer;
+  }
+  score_valid_ = true;
 }
 
 }  // namespace vcmsc

@@ -16,6 +16,7 @@ endif
 
 DEPS=constants.h image_file.h types.h
 OBJ=$(OUT)/assembler.o                                                         \
+    $(OUT)/color.o                                                             \
     $(OUT)/color_table.o                                                       \
     $(OUT)/image.o                                                             \
     $(OUT)/image_file.o                                                        \
@@ -25,6 +26,7 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/spec.o                                                              \
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
+         $(OUTTESTS)/color_unittests.o                                         \
          $(OUTTESTS)/job_queue_unittests.o                                     \
          $(OUTTESTS)/kernel_unittests.o                                        \
          $(OUTTESTS)/range_unittests.o                                         \
@@ -40,7 +42,7 @@ $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CC) -c -o $@ $< $(CFLAGS) -I$(GTEST_INCLUDE)
 
 $(OUT)/gen: $(OBJ) $(OUT)/gen.o
-	$(CC) -o $@ $^ $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/sim: $(OBJ) $(OUT)/sim.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
@@ -49,7 +51,7 @@ tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
     | $(OUTTESTS)/
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS) $(GTEST_LIB)
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS) $(GTEST_LIB)
 
 $(OUTTESTS)/:
 	mkdir -p $(OUTTESTS)
