@@ -1,6 +1,7 @@
 // gen - uses Evolutionary Programming to evolve a series of Kernels that can
 // generate some facsimile of the supplied input image.
 
+#include <algorithm>
 #include <array>
 #include <gflags/gflags.h>
 #include <stdlib.h>
@@ -17,17 +18,17 @@ extern "C" {
 #include <libz26/libz26.h>
 }
 
-DEFINE_int32(generation_size, 50000,
+DEFINE_int32(generation_size, 10000,
     "Number of individuals to keep in an evolutionary programing generation.");
 DEFINE_int32(max_generation_number, 10000,
     "Number of generations of evolutionary programming to run.");
-DEFINE_int32(tournament_size, 500,
+DEFINE_int32(tournament_size, 1000,
     "Number of kernels each should compete against.");
 DEFINE_int32(worker_threads, 0,
     "Number of threads to create to work in parallel, set to 0 to pick based "
     "on hardware.");
 
-DEFINE_string(log_base_dir, "out/log", "Base directory for log entries.");
+DEFINE_string(log_base_dir, "", "Base directory for log entries.");
 DEFINE_string(random_seed, "",
     "Hex string of seed for pseudorandom seed generation. If not provided one "
     "will be generated from hardware random device.");
@@ -55,7 +56,8 @@ class CompeteKernelJob : public vcsmc::Job {
         generation_->size() - 1);
     for (size_t i = 0; i < tourney_size_; ++i) {
       size_t contestant_index = tourney_distro(engine_);
-      if (generation_->at(contestant_index)->score() < kernel_->score())
+      // Lower scores mean better performance.
+      if (generation_->at(contestant_index)->score() > kernel_->score())
         kernel_->AddVictory();
     }
   }
@@ -106,7 +108,7 @@ int main(int argc, char* argv[]) {
     for (size_t j = 0; j < vcsmc::kSeedSizeWords; ++j)
       seed[j] = seed_engine();
     std::seed_seq kernel_seed(seed.begin(), seed.end());
-    generation->emplace_back(new vcsmc::Kernel(kernel_seed));
+    generation->at(i).reset(new vcsmc::Kernel(kernel_seed));
     job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
         new vcsmc::Kernel::GenerateRandomKernelJob(
             generation->at(i), spec_list)));
@@ -161,17 +163,56 @@ int main(int argc, char* argv[]) {
     // Wait for simulation to finish.
     job_queue.Finish();
 
-    printf("  conducting tournament.\n");
+    printf("    conducting tournament.\n");
 
     // Conduct tournament based on scores.
     for (int j = 0; j < FLAGS_generation_size; ++j) {
       std::array<uint32, vcsmc::kSeedSizeWords> seed;
       for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
-        seed[j] = seed_engine();
+        seed[k] = seed_engine();
       std::seed_seq tourney_seed(seed.begin(), seed.end());
       job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(new CompeteKernelJob(
           generation, generation->at(j), tourney_seed, FLAGS_tournament_size)));
     }
+
+    // Wait for tournament to finish.
+    job_queue.Finish();
+
+    printf("    sorting results.\n");
+
+    // Sort generation by victories.
+    std::sort(generation->begin(), generation->end(),
+        [](std::shared_ptr<vcsmc::Kernel> a, std::shared_ptr<vcsmc::Kernel> b) {
+          return b->victories() < a->victories();
+        });
+
+    // Report statistics and save champion image to disk.
+    printf("    grand champion: %016llx with score: %f.\n",
+        generation->at(0)->fingerprint(), generation->at(0)->score());
+
+    char kernel_image_path_buf[128];
+    snprintf(kernel_image_path_buf, 128,
+        "%s/%05d-%016llx.png",
+        FLAGS_log_base_dir.c_str(), i, generation->at(0)->fingerprint());
+    generation->at(0)->SaveImage(std::string(kernel_image_path_buf));
+
+    printf("    mutating generation.\n");
+    // Replace lowest-scoring half of generation with mutated versions of
+    // highest-scoring half of generation.
+    for (int j = FLAGS_generation_size / 2; j < FLAGS_generation_size; ++j) {
+      std::array<uint32, vcsmc::kSeedSizeWords> seed;
+      for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
+        seed[k] = seed_engine();
+      std::seed_seq kernel_seed(seed.begin(), seed.end());
+      generation->at(j).reset(new vcsmc::Kernel(kernel_seed));
+      job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
+            new vcsmc::Kernel::MutateKernelJob(
+              generation->at(j - (FLAGS_generation_size / 2)),
+              generation->at(j),
+              4u)));
+    }
+
+    job_queue.Finish();
   }
 
   return 0;

@@ -9,14 +9,14 @@ all: farmhash gtest gflags libyaml libz26
 
 farmhash: $(FARMHASH_OUT)/lib/libfarmhash.a | $(FARMHASH_OUT)
 
-$(FARMHASH_OUT)/lib/libfarmhash.a: export CFLAGS=-Wall
+$(FARMHASH_OUT)/lib/libfarmhash.a: export CFLAGS=-Wall -O2
 $(FARMHASH_OUT)/lib/libfarmhash.a: | $(FARMHASH_OUT)
 	cd $(FARMHASH_OUT); $(FARMHASH_DIR)/configure --prefix=$(FARMHASH_OUT)
 	$(MAKE) -C $(FARMHASH_OUT) install
 
 gtest: $(GTEST_OUT)/libgtest.a | $(GTEST_OUT)
 
-$(GTEST_OUT)/libgtest.a: export CFLAGS=-Wall
+$(GTEST_OUT)/libgtest.a: export CFLAGS=-Wall -O2
 $(GTEST_OUT)/libgtest.a: export CXX=$(CC)
 $(GTEST_OUT)/libgtest.a:
 	cmake -B$(GTEST_OUT) -Hgoogletest/googletest -G"Unix Makefiles"
@@ -24,7 +24,7 @@ $(GTEST_OUT)/libgtest.a:
 
 gflags: $(GFLAGS_OUT)/lib/libgflags.a | $(GFLAGS_OUT)
 
-$(GFLAGS_OUT)/lib/libgflags.a: export CFLAGS=-Wall
+$(GFLAGS_OUT)/lib/libgflags.a: export CFLAGS=-Wall -O2
 $(GFLAGS_OUT)/lib/libgflags.a: export CXX=$(CC)
 $(GFLAGS_OUT)/lib/libgflags.a:
 	cmake -B$(GFLAGS_OUT) -Hgflags -G"Unix Makefiles"
@@ -32,7 +32,7 @@ $(GFLAGS_OUT)/lib/libgflags.a:
 
 libyaml: $(LIBYAML_OUT)/libyaml.a | $(LIBYAML_OUT)
 
-$(LIBYAML_OUT)/libyaml.a: export CFLAGS=-Wall
+$(LIBYAML_OUT)/libyaml.a: export CFLAGS=-Wall -O2
 $(LIBYAML_OUT)/libyaml.a: export CXX=$(CC)
 $(LIBYAML_OUT)/libyaml.a:
 	cmake -B$(LIBYAML_OUT) -Hlibyaml -G"Unix Makefiles"

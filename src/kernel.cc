@@ -66,7 +66,7 @@ void Kernel::GenerateRandomKernelJob::Execute() {
       ++spec_list_index;
     } else {
       uint32_t starting_cycle = current_cycle;
-      std::unique_ptr<std::vector<uint32>> ops(new std::vector<uint32>());
+      kernel_->opcodes_.emplace_back();
       uint32 cycles_remaining = next_spec_start_time - current_cycle;
       size_t bytes_remaining =
         (total_byte_size % kBankSize) + kBankPadding < kBankSize ?
@@ -81,9 +81,10 @@ void Kernel::GenerateRandomKernelJob::Execute() {
         if (bytes_remaining < kBankPadding ||
             (bytes_remaining < next_spec_size &&
                 cycles_remaining < kBankPadding)) {
-          kernel_->opcodes_.emplace_back(std::move(ops));
-          ops.reset(new std::vector<uint32>());
-          kernel_->opcode_ranges_.emplace_back(starting_cycle, current_cycle);
+          if (kernel_->opcodes_.back().size()) {
+            kernel_->opcodes_.emplace_back();
+            kernel_->opcode_ranges_.emplace_back(starting_cycle, current_cycle);
+          }
           kernel_->AppendJmpSpec(current_cycle, total_byte_size % kBankSize);
           const Spec& jmp_spec = kernel_->specs_->back();
           current_cycle += jmp_spec.range().Duration();
@@ -101,12 +102,13 @@ void Kernel::GenerateRandomKernelJob::Execute() {
           size_t op_size = OpCodeBytes(op);
           bytes_remaining -= op_size;
           total_byte_size += op_size;
-          ops->push_back(op);
+          kernel_->opcodes_.back().push_back(op);
         }
       }
-      if (ops->size()) {
-        kernel_->opcodes_.emplace_back(std::move(ops));
+      if (kernel_->opcodes_.back().size()) {
         kernel_->opcode_ranges_.emplace_back(starting_cycle, current_cycle);
+      } else {
+        kernel_->opcodes_.pop_back();
       }
     }
   }
@@ -120,6 +122,29 @@ void Kernel::ScoreKernelJob::Execute() {
   kernel_->SimulateAndScore(target_lab_);
 }
 
+void Kernel::MutateKernelJob::Execute() {
+  // Copy the internal program state of the original kernel to the target.
+  target_->specs_.reset(new std::vector<Spec>());
+  std::copy(original_->specs_->begin(), original_->specs_->end(),
+      std::back_inserter(*target_->specs_.get()));
+  target_->opcodes_.clear();
+  for (size_t i = 0; i < original_->opcodes_.size(); ++i) {
+    target_->opcodes_.emplace_back();
+    std::copy(original_->opcodes_[i].begin(), original_->opcodes_[i].end(),
+        std::back_inserter(target_->opcodes_.back()));
+  }
+  target_->opcode_ranges_.clear();
+  std::copy(original_->opcode_ranges_.begin(), original_->opcode_ranges_.end(),
+      std::back_inserter(target_->opcode_ranges_));
+  target_->bytecode_size_ = original_->bytecode_size_;
+
+  // Now do the mutations to the target.
+  for (size_t i = 0; i < number_of_mutations_; ++i)
+    target_->Mutate();
+
+  target_->RegenerateBytecode(target_->bytecode_size_);
+}
+
 uint32 Kernel::GenerateRandomOpcode(uint32 cycles_remaining) {
   // As no possible instruction lasts only one cycle we cannot support a
   // situation where only one cycle is remaining.
@@ -127,21 +152,14 @@ uint32 Kernel::GenerateRandomOpcode(uint32 cycles_remaining) {
   // With two or four cycles remaining we must only generate two-cycle
   // instructions.
   if (cycles_remaining == 2 || cycles_remaining == 4) {
-    std::uniform_int_distribution<int> distro(0, 3);
-    if (distro(engine_) == 0) {
-      return PackOpCode(OpCode::NOP_Implied, 0, 0);
-    } else {
-      return GenerateRandomLoad();
-    }
+    return GenerateRandomLoad();
   } else if (cycles_remaining == 3) {
     return GenerateRandomStore();
   }
 
-  std::uniform_int_distribution<int> distro(0, 6);
+  std::uniform_int_distribution<int> distro(0, 1);
   int roll = distro(engine_);
   if (roll == 0) {
-    return PackOpCode(OpCode::NOP_Implied, 0, 0);
-  } else if (roll <= 3) {
     return GenerateRandomLoad();
   }
   return GenerateRandomStore();
@@ -165,6 +183,7 @@ uint32 Kernel::GenerateRandomLoad() {
       assert(false);
       break;
   }
+  assert(false);
   return 0;
 }
 
@@ -222,6 +241,7 @@ uint32 Kernel::GenerateRandomStore() {
       assert(false);
       break;
   }
+  assert(false);
   return 0;
 }
 
@@ -264,11 +284,12 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
       opcode_ranges_[current_range_index].start_time() :
       kInfinity;
     if (current_cycle == next_range_start_time) {
-      std::vector<uint32>* ops = opcodes_[current_range_index].get();
+      std::vector<uint32>& ops = opcodes_[current_range_index];
+      assert(ops.size() > 0);
       // Serialize the packed opcodes into the buffer.
-      for (size_t i = 0; i < ops->size(); ++i) {
-        current_byte += UnpackOpCode(ops->at(i), current_byte);
-        current_cycle += OpCodeCycles(ops->at(i));
+      for (size_t i = 0; i < ops.size(); ++i) {
+        current_byte += UnpackOpCode(ops[i], current_byte);
+        current_cycle += OpCodeCycles(ops[i]);
       }
       ++current_range_index;
     } else {
@@ -301,6 +322,48 @@ void Kernel::SimulateAndScore(const double* target_lab) {
     ++frame_pointer;
   }
   score_valid_ = true;
+}
+
+void Kernel::Mutate() {
+  // Pick a field of opcodes at random.
+  std::uniform_int_distribution<size_t>
+    opcode_field_distro(0, opcodes_.size() - 1);
+  size_t opcode_field = opcode_field_distro(engine_);
+
+  assert(opcodes_[opcode_field].size() > 0);
+  std::uniform_int_distribution<size_t>
+    opcode_within_field(0, opcodes_[opcode_field].size() - 1);
+
+  // Either modify an opcode or swap two of them based on random bit.
+  std::uniform_int_distribution<int> swap_or_modify(0, 1);
+  if (opcodes_[opcode_field].size() > 1 && swap_or_modify(engine_)) {
+    size_t index_1 = opcode_within_field(engine_);
+    size_t index_2 = opcode_within_field(engine_);
+    uint32 op_1 = opcodes_[opcode_field][index_1];
+    opcodes_[opcode_field][index_1] = opcodes_[opcode_field][index_2];
+    opcodes_[opcode_field][index_2] = op_1;
+  } else {
+    size_t index = opcode_within_field(engine_);
+    OpCode old_op = static_cast<OpCode>(
+        opcodes_[opcode_field][index] & 0x000000ff);
+    switch (old_op) {
+      case LDA_Immediate:
+      case LDX_Immediate:
+      case LDY_Immediate:
+        opcodes_[opcode_field][index] = GenerateRandomLoad();
+        break;
+
+      case STA_ZeroPage:
+      case STX_ZeroPage:
+      case STY_ZeroPage:
+        opcodes_[opcode_field][index] = GenerateRandomStore();
+        break;
+
+      default:
+        assert(false);
+        break;
+    }
+  }
 }
 
 }  // namespace vcmsc

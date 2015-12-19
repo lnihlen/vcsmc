@@ -31,6 +31,7 @@ class Kernel {
   bool score_valid() const { return score_valid_; }
   double score() const { return score_; }
   uint32 victories() const { return victories_; }
+  const SpecList specs() const { return specs_; }
 
   // Given a pointer to a completely empty Kernel this Job will populate it with
   // totally random bytecode.
@@ -58,6 +59,23 @@ class Kernel {
     const double* target_lab_;
   };
 
+  // Given a provided reference kernel, generate the target kernel as a copy of
+  // the reference with the provided number of random mutations.
+  class MutateKernelJob : public Job {
+    public:
+     MutateKernelJob(const std::shared_ptr<Kernel> original,
+                     std::shared_ptr<Kernel> target,
+                     size_t number_of_mutations)
+        : original_(original),
+          target_(target),
+          number_of_mutations_(number_of_mutations) {}
+     void Execute() override;
+    private:
+     const std::shared_ptr<Kernel> original_;
+     std::shared_ptr<Kernel> target_;
+     size_t number_of_mutations_;
+  };
+
  private:
   uint32 GenerateRandomOpcode(uint32 cycles_remaining);
   uint32 GenerateRandomLoad();
@@ -67,15 +85,18 @@ class Kernel {
   // in opcodes_ and specs_, appends jumps and updates fingerprint_.
   void RegenerateBytecode(size_t bytecode_size);
   void SimulateAndScore(const double* target_lab);
+  void Mutate();
 
   std::default_random_engine engine_;
+
   SpecList specs_;
-  // List of dynamic program code that exists between specs.
-  std::vector<std::unique_ptr<std::vector<uint32>>> opcodes_;
+  std::vector<std::vector<uint32>> opcodes_;
   std::vector<Range> opcode_ranges_;
+
+  size_t bytecode_size_;
   std::unique_ptr<uint8[]> bytecode_;
   std::unique_ptr<uint8[]> sim_frame_;
-  size_t bytecode_size_;
+
   uint64 fingerprint_;
   bool score_valid_;
   double score_;

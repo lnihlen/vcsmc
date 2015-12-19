@@ -15,8 +15,7 @@
 
 namespace {
 
-void ValidateKernel(vcsmc::SpecList specs,
-                    std::shared_ptr<vcsmc::Kernel> kernel) {
+void ValidateKernel(std::shared_ptr<vcsmc::Kernel> kernel) {
   // Bytecode size should be a multiple of the bank size.
   EXPECT_EQ(0U, kernel->bytecode_size() % vcsmc::kBankSize);
   size_t banks = kernel->bytecode_size() / vcsmc::kBankSize;
@@ -56,17 +55,18 @@ void ValidateKernel(vcsmc::SpecList specs,
   size_t current_spec_index = 0;
   size_t current_byte = 0;
   while (current_byte < kernel->bytecode_size()) {
-    uint32 next_spec_start_time = current_spec_index < specs->size() ?
-      specs->at(current_spec_index).range().start_time() :
+    uint32 next_spec_start_time = current_spec_index < kernel->specs()->size() ?
+      kernel->specs()->at(current_spec_index).range().start_time() :
       vcsmc::kScreenSizeCycles;
     if (current_cycle == next_spec_start_time) {
-      ASSERT_GT(specs->size(), current_spec_index);
+      ASSERT_GT(kernel->specs()->size(), current_spec_index);
       EXPECT_EQ(0,
-          std::memcmp(specs->at(current_spec_index).bytecode(),
+          std::memcmp(kernel->specs()->at(current_spec_index).bytecode(),
                       kernel->bytecode() + current_byte,
-                      specs->at(current_spec_index).size()));
-      current_byte += specs->at(current_spec_index).size();
-      current_cycle = specs->at(current_spec_index).range().end_time();
+                      kernel->specs()->at(current_spec_index).size()));
+      current_byte += kernel->specs()->at(current_spec_index).size();
+      current_cycle =
+        kernel->specs()->at(current_spec_index).range().end_time();
       ++current_spec_index;
     } else {
       while (current_cycle < next_spec_start_time) {
@@ -88,7 +88,7 @@ void ValidateKernel(vcsmc::SpecList specs,
   }
   EXPECT_EQ(kernel->bytecode_size(), current_byte);
   EXPECT_EQ(vcsmc::kScreenSizeCycles, current_cycle);
-  EXPECT_EQ(specs->size(), current_spec_index);
+  EXPECT_EQ(kernel->specs()->size(), current_spec_index);
 }
 
 class GenerateBackgroundColorKernelJob : public vcsmc::Job {
@@ -215,17 +215,19 @@ class GenerateBackgroundColorKernelJob : public vcsmc::Job {
 
     vcsmc::Kernel::GenerateRandomKernelJob gen_job(kernel_, specs);
     gen_job.Execute();
-    ValidateKernel(specs, kernel_);
+    ValidateKernel(kernel_);
 
     size_t idx = (static_cast<size_t>(bg_) / 2) * 4;
-    double* target_ptr = target_.get();
-    for (size_t i = 0;
-         i < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels; ++i) {
-      *(target_ptr + 0) = vcsmc::kAtariNTSCLabColorTable[idx + 0];
-      *(target_ptr + 1) = vcsmc::kAtariNTSCLabColorTable[idx + 1];
-      *(target_ptr + 2) = vcsmc::kAtariNTSCLabColorTable[idx + 2];
-      *(target_ptr + 3) = vcsmc::kAtariNTSCLabColorTable[idx + 3];
-      target_ptr += 4;
+    if (target_) {
+      double* target_ptr = target_.get();
+      for (size_t i = 0;
+           i < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels; ++i) {
+        *(target_ptr + 0) = vcsmc::kAtariNTSCLabColorTable[idx + 0];
+        *(target_ptr + 1) = vcsmc::kAtariNTSCLabColorTable[idx + 1];
+        *(target_ptr + 2) = vcsmc::kAtariNTSCLabColorTable[idx + 2];
+        *(target_ptr + 3) = vcsmc::kAtariNTSCLabColorTable[idx + 3];
+        target_ptr += 4;
+      }
     }
   }
 
@@ -261,7 +263,7 @@ TEST(GenerateRandomKernelJobTest, GeneratesValidRandomKernel) {
   std::shared_ptr<Kernel> kernel(new Kernel(seed));
   Kernel::GenerateRandomKernelJob job(kernel, specs);
   job.Execute();
-  ValidateKernel(specs, kernel);
+  ValidateKernel(kernel);
 }
 
 TEST(ScoreKernelJobTest, SimulatesSimpleFrameKernel) {
@@ -304,6 +306,22 @@ TEST(ScoreKernelJobTest, SimulatesSimpleFrameKernel) {
   }
 
   EXPECT_EQ(128u, fingerprints.size());
+}
+
+TEST(MutateKernelJobTest, MutatesSimpleFrameKernel) {
+  std::string seed_str = "trivial stable testing seed for mutate kernel";
+  std::seed_seq seed(seed_str.begin(), seed_str.end());
+  std::shared_ptr<Kernel> original_kernel(new Kernel(seed));
+  GenerateBackgroundColorKernelJob gen_job(original_kernel, 64, nullptr);
+  gen_job.Execute();
+  std::string target_seed_str = "target stable testing seed";
+  std::seed_seq target_seed(target_seed_str.begin(), target_seed_str.end());
+  std::shared_ptr<Kernel> target_kernel(new Kernel(target_seed));
+  vcsmc::Kernel::MutateKernelJob mutate_job(
+      original_kernel, target_kernel, 128);
+  mutate_job.Execute();
+  ValidateKernel(target_kernel);
+  EXPECT_NE(original_kernel->fingerprint(), target_kernel->fingerprint());
 }
 
 }  // namespace vcsmc

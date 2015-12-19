@@ -3,7 +3,7 @@
 export CC=clang
 # If changing CFLAGS it is good to change them in the .ycm_extra_conf.py file
 # (also versioned) so that YCM will pick up the correct flags.
-export CFLAGS=-std=c++11 -Wall -Wextra -Werror -O0 -g
+export CFLAGS=-std=c++11 -Wall -Wextra -Werror -O2
 export LDFLAGS=
 export LIBS=-lstdc++
 export OUT=$(CURDIR)/out
