@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <gflags/gflags.h>
 #include <stdlib.h>
 #include <random>
@@ -39,6 +40,21 @@ DEFINE_string(target_image_file, "",
 
 typedef std::shared_ptr<std::vector<std::shared_ptr<vcsmc::Kernel>>> Generation;
 
+std::string FormatDuration(const std::chrono::duration<uint64,
+    std::milli>& duration) {
+  auto hours = std::chrono::duration_cast<std::chrono::hours>(duration);
+  auto minutes = std::chrono::duration_cast<std::chrono::minutes>(
+      duration % std::chrono::hours(1));
+  auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
+      duration % std::chrono::minutes(1));
+  auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(
+      duration % std::chrono::seconds(1));
+  char dur_buf[64];
+  snprintf(dur_buf, 64, "%ld:%02ld:%02lld.%03lld", hours.count(),
+      minutes.count(), seconds.count(), msec.count());
+  return std::string(dur_buf);
+}
+
 class CompeteKernelJob : public vcsmc::Job {
  public:
   CompeteKernelJob(
@@ -69,6 +85,8 @@ class CompeteKernelJob : public vcsmc::Job {
 };
 
 int main(int argc, char* argv[]) {
+  std::chrono::time_point<std::chrono::system_clock> program_start =
+      std::chrono::system_clock::now();
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
   printf("parsing spec list %s.\n", FLAGS_spec_list_file.c_str());
@@ -146,22 +164,39 @@ int main(int argc, char* argv[]) {
   init_z26_global_tables();
 
   for (int i = 0; i < FLAGS_max_generation_number; ++i) {
+    std::chrono::time_point<std::chrono::system_clock> loop_start =
+        std::chrono::system_clock::now();
 
     printf("starting generation %d of %d.\n", i, FLAGS_max_generation_number);
 
     printf("    scoring kernels.\n");
 
+    std::chrono::time_point<std::chrono::system_clock> sim_start =
+        std::chrono::system_clock::now();
+
+    uint32 score_count = 0;
     // Score all unscored kernels in the current generation.
     for (int j = 0; j < FLAGS_generation_size; ++j) {
       if (!generation->at(j)->score_valid()) {
         job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
               new vcsmc::Kernel::ScoreKernelJob(generation->at(j),
                                                 target_lab.get())));
+        ++score_count;
       }
     }
 
     // Wait for simulation to finish.
     job_queue.Finish();
+
+    std::chrono::time_point<std::chrono::system_clock> sim_finish =
+        std::chrono::system_clock::now();
+    std::chrono::duration<uint64, std::milli> sim_duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            sim_finish - sim_start);
+    std::string dur_str = FormatDuration(sim_duration);
+    uint64 fps = (static_cast<uint64>(score_count) * 1000) /
+        sim_duration.count();
+    printf("    simulation took %s, fps: %llu.\n", dur_str.c_str(), fps);
 
     printf("    conducting tournament.\n");
 
@@ -213,7 +248,26 @@ int main(int argc, char* argv[]) {
     }
 
     job_queue.Finish();
+
+    std::chrono::time_point<std::chrono::system_clock> loop_finish =
+        std::chrono::system_clock::now();
+    std::chrono::duration<uint64, std::milli> loop_duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            loop_finish - loop_start);
+    dur_str = FormatDuration(loop_duration);
+    std::chrono::duration<uint64, std::milli> eta = loop_duration *
+        (FLAGS_max_generation_number - i - 1);
+    std::string eta_str = FormatDuration(eta);
+    printf("    loop took %s, eta: %s.\n", dur_str.c_str(), eta_str.c_str());
   }
+
+  std::chrono::time_point<std::chrono::system_clock> program_finish =
+      std::chrono::system_clock::now();
+  std::chrono::duration<uint64, std::milli> total_program_duration =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          program_finish - program_start);
+  std::string dur_str = FormatDuration(total_program_duration);
+  printf("total program duration %s.\n", dur_str.c_str());
 
   return 0;
 }
