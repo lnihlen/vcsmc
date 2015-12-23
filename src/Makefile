@@ -2,8 +2,8 @@
 # Dependencies: libpng, clang, OpenCL
 # tools dependencies: python colormath, Wand, ImageMagick
 CFLAGS+=-I. -I$(FARMHASH_INCLUDE) -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)      \
-    -I$(LIBYAML_INCLUDE)
-LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(FARMHASH_LIB)
+    -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE)
+LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(FARMHASH_LIB) $(GPERF_LIB)
 OUTTESTS=$(OUT)/tests
 
 UNAME:=$(shell uname)
@@ -11,7 +11,7 @@ UNAME:=$(shell uname)
 # OS X-specific build flags
 ifeq ($(UNAME), Darwin)
 CFLAGS+=-I/usr/local/include
-LDFLAGS+=-L/usr/local/lib
+LDFLAGS+=-L/usr/local/lib -Wl,-no_pie
 endif
 
 DEPS=constants.h image_file.h types.h

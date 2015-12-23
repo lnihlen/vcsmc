@@ -5,6 +5,7 @@
 #include <array>
 #include <chrono>
 #include <gflags/gflags.h>
+#include <gperftools/profiler.h>
 #include <stdlib.h>
 #include <random>
 
@@ -37,6 +38,8 @@ DEFINE_string(spec_list_file, "asm/frame_spec.yaml",
     "Path to spec list yaml file.");
 DEFINE_string(target_image_file, "",
     "Path to target image file to score kernels against.");
+DEFINE_string(gperf_output_file, "",
+    "Defining enables gperftools output to the provided profile path.");
 
 typedef std::shared_ptr<std::vector<std::shared_ptr<vcsmc::Kernel>>> Generation;
 
@@ -88,6 +91,12 @@ int main(int argc, char* argv[]) {
   std::chrono::time_point<std::chrono::system_clock> program_start =
       std::chrono::system_clock::now();
   gflags::ParseCommandLineFlags(&argc, &argv, false);
+
+  if (FLAGS_gperf_output_file != "") {
+    printf("profiling enabled, saving output to %s.\n",
+        FLAGS_gperf_output_file.c_str());
+    ProfilerStart(FLAGS_gperf_output_file.c_str());
+  }
 
   printf("parsing spec list %s.\n", FLAGS_spec_list_file.c_str());
 
@@ -259,6 +268,10 @@ int main(int argc, char* argv[]) {
         (FLAGS_max_generation_number - i - 1);
     std::string eta_str = FormatDuration(eta);
     printf("    loop took %s, eta: %s.\n", dur_str.c_str(), eta_str.c_str());
+  }
+
+  if (FLAGS_gperf_output_file != "") {
+    ProfilerStop();
   }
 
   std::chrono::time_point<std::chrono::system_clock> program_finish =
