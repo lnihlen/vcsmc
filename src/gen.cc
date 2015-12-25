@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <chrono>
 #include <gflags/gflags.h>
 #include <gperftools/profiler.h>
@@ -12,6 +13,7 @@
 #include "image.h"
 #include "image_file.h"
 #include "color.h"
+#include "color_table.h"
 #include "job_queue.h"
 #include "kernel.h"
 #include "spec.h"
@@ -29,6 +31,11 @@ DEFINE_int32(tournament_size, 1000,
 DEFINE_int32(worker_threads, 0,
     "Number of threads to create to work in parallel, set to 0 to pick based "
     "on hardware.");
+DEFINE_int32(max_mutations, 5,
+    "Maximum number of mutations applied per-kernel to a single generation, "
+    "based on number of generations same kernel has won.");
+DEFINE_int32(stale_mutations_multiplier, 1,
+    "Number of mutations to add per generation of stale evolution.");
 
 DEFINE_string(log_base_dir, "", "Base directory for log entries.");
 DEFINE_string(random_seed, "",
@@ -58,6 +65,35 @@ std::string FormatDuration(const std::chrono::duration<uint64,
   return std::string(dur_buf);
 }
 
+class ComputeColorErrorTableJob : public vcsmc::Job {
+ public:
+  ComputeColorErrorTableJob(
+      const double* target_lab,
+      std::vector<double>& error_table,
+      size_t color_index)
+      : target_lab_(target_lab),
+        error_table_(error_table),
+        color_index_(color_index),
+        call_count_(0) {}
+  void Execute() override {
+    ++call_count_;
+    assert(call_count_ == 1);
+    const double* atari_lab = vcsmc::kAtariNTSCLabColorTable +
+        (color_index_ * 4);
+    for (size_t i = 0;
+         i < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels; ++i) {
+      double error = vcsmc::Ciede2k(target_lab_, atari_lab);
+      target_lab_ += 4;
+      error_table_.push_back(error);
+    }
+  }
+ private:
+  const double* target_lab_;
+  std::vector<double>& error_table_;
+  size_t color_index_;
+  size_t call_count_;
+};
+
 class CompeteKernelJob : public vcsmc::Job {
  public:
   CompeteKernelJob(
@@ -71,12 +107,12 @@ class CompeteKernelJob : public vcsmc::Job {
         tourney_size_(tourney_size) {}
   void Execute() override {
     kernel_->ResetVictories();
-    std::uniform_int_distribution<size_t> tourney_distro(0,
-        generation_->size() - 1);
+    std::uniform_int_distribution<size_t> tourney_distro(
+        0, generation_->size() - 1);
     for (size_t i = 0; i < tourney_size_; ++i) {
       size_t contestant_index = tourney_distro(engine_);
       // Lower scores mean better performance.
-      if (generation_->at(contestant_index)->score() > kernel_->score())
+      if (generation_->at(contestant_index)->score() >= kernel_->score())
         kernel_->AddVictory();
     }
   }
@@ -91,12 +127,6 @@ int main(int argc, char* argv[]) {
   std::chrono::time_point<std::chrono::system_clock> program_start =
       std::chrono::system_clock::now();
   gflags::ParseCommandLineFlags(&argc, &argv, false);
-
-  if (FLAGS_gperf_output_file != "") {
-    printf("profiling enabled, saving output to %s.\n",
-        FLAGS_gperf_output_file.c_str());
-    ProfilerStart(FLAGS_gperf_output_file.c_str());
-  }
 
   printf("parsing spec list %s.\n", FLAGS_spec_list_file.c_str());
 
@@ -160,7 +190,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Convert target image to Lab colors for scoring.
-  std::unique_ptr<double[]> target_lab(
+  std::shared_ptr<double> target_lab(
       new double[vcsmc::kTargetFrameWidthPixels *
                  vcsmc::kFrameHeightPixels * 4]);
   for (size_t i = 0;
@@ -169,8 +199,27 @@ int main(int argc, char* argv[]) {
         target_lab.get() + (i * 4));
   }
 
+  printf("building error tables for target image.\n");
+
+  vcsmc::Kernel::ScoreKernelJob::ColorDistances color_distances(128);
+  for (size_t i = 0; i < vcsmc::kNTSCColors; ++i) {
+    job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(new ComputeColorErrorTableJob(
+        target_lab.get(), color_distances[i], i)));
+  }
+
+  job_queue.Finish();
+
   // Initialize simulator global state.
   init_z26_global_tables();
+
+  if (FLAGS_gperf_output_file != "") {
+    printf("profiling enabled, saving output to %s.\n",
+        FLAGS_gperf_output_file.c_str());
+    ProfilerStart(FLAGS_gperf_output_file.c_str());
+  }
+
+  int streak = 0;
+  uint64 last_champion = 0;
 
   for (int i = 0; i < FLAGS_max_generation_number; ++i) {
     std::chrono::time_point<std::chrono::system_clock> loop_start =
@@ -189,7 +238,7 @@ int main(int argc, char* argv[]) {
       if (!generation->at(j)->score_valid()) {
         job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
               new vcsmc::Kernel::ScoreKernelJob(generation->at(j),
-                                                target_lab.get())));
+                                                color_distances)));
         ++score_count;
       }
     }
@@ -230,17 +279,28 @@ int main(int argc, char* argv[]) {
           return b->victories() < a->victories();
         });
 
-    // Report statistics and save champion image to disk.
-    printf("    grand champion: %016llx with score: %f.\n",
-        generation->at(0)->fingerprint(), generation->at(0)->score());
+    if (generation->at(0)->fingerprint() == last_champion) {
+      ++streak;
+    } else {
+      last_champion = generation->at(0)->fingerprint();
+      streak = 0;
+    }
 
+    // Report statistics and save champion image to disk.
+    printf("    grand champion: %016llx, streak: %d, with score: %f.\n",
+        generation->at(0)->fingerprint(), streak, generation->at(0)->score());
+
+/*
     char kernel_image_path_buf[128];
     snprintf(kernel_image_path_buf, 128,
         "%s/%05d-%016llx.png",
         FLAGS_log_base_dir.c_str(), i, generation->at(0)->fingerprint());
     generation->at(0)->SaveImage(std::string(kernel_image_path_buf));
+*/
 
-    printf("    mutating generation.\n");
+    int mutations = std::min(FLAGS_max_mutations,
+        1 + (streak * FLAGS_stale_mutations_multiplier));
+    printf("    mutating generation %d times each.\n", mutations);
     // Replace lowest-scoring half of generation with mutated versions of
     // highest-scoring half of generation.
     for (int j = FLAGS_generation_size / 2; j < FLAGS_generation_size; ++j) {
@@ -253,7 +313,7 @@ int main(int argc, char* argv[]) {
             new vcsmc::Kernel::MutateKernelJob(
               generation->at(j - (FLAGS_generation_size / 2)),
               generation->at(j),
-              4u)));
+              mutations)));
     }
 
     job_queue.Finish();
@@ -273,6 +333,14 @@ int main(int argc, char* argv[]) {
   if (FLAGS_gperf_output_file != "") {
     ProfilerStop();
   }
+
+  char kernel_image_path_buf[128];
+  snprintf(kernel_image_path_buf, 128,
+      "%s/%05d-%016llx.png",
+      FLAGS_log_base_dir.c_str(),
+      FLAGS_max_generation_number,
+      generation->at(0)->fingerprint());
+  generation->at(0)->SaveImage(std::string(kernel_image_path_buf));
 
   std::chrono::time_point<std::chrono::system_clock> program_finish =
       std::chrono::system_clock::now();

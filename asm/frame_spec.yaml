@@ -34,9 +34,35 @@
     sta RESMP1
     sta HMCLR
 - first_cycle: 228  # 3rd scanline, turn off vsync.
+  hard_duration: 1900
   bytecode: |
     lda #0
     sta VSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
+    sta WSYNC
 - first_cycle: 17632 # 232nd scanline, turn on vblank wait for 29 frames.
   hard_duration: 2204
   bytecode: |

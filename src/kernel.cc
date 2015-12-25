@@ -18,6 +18,8 @@ extern "C" {
 
 namespace vcsmc {
 
+const size_t kSimSkipLines = 23;
+
 Kernel::Kernel(std::seed_seq& seed)
   : engine_(seed),
     specs_(new std::vector<Spec>()),
@@ -32,10 +34,8 @@ bool Kernel::SaveImage(const std::string& file_name) const {
   if (!score_valid_ || !sim_frame_) return false;
   Image image(kTargetFrameWidthPixels, kFrameHeightPixels);
   uint32* pix = image.pixels_writeable();
-  const uint8* sim = sim_frame_.get();
-  for (size_t i = 0; i < kFrameWidthPixels * kFrameHeightPixels; ++i) {
-    *pix = kAtariNTSCABGRColorTable[*sim];
-    ++pix;
+  const uint8* sim = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
+  for (size_t i = 0; i < kTargetFrameWidthPixels * kFrameHeightPixels; ++i) {
     *pix = kAtariNTSCABGRColorTable[*sim];
     ++pix;
     ++sim;
@@ -119,7 +119,7 @@ void Kernel::GenerateRandomKernelJob::Execute() {
 }
 
 void Kernel::ScoreKernelJob::Execute() {
-  kernel_->SimulateAndScore(target_lab_);
+  kernel_->SimulateAndScore(distances_);
 }
 
 void Kernel::MutateKernelJob::Execute() {
@@ -306,19 +306,16 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
                               bytecode_size_);
 }
 
-void Kernel::SimulateAndScore(const double* target_lab) {
+void Kernel::SimulateAndScore(const ScoreKernelJob::ColorDistances& distances) {
   sim_frame_.reset(new uint8[kLibZ26ImageSizeBytes]);
+  std::memset(sim_frame_.get(), 0, kLibZ26ImageSizeBytes);
   simulate_single_frame(bytecode_.get(), bytecode_size_, sim_frame_.get());
   score_ = 0.0;
-  const uint8* frame_pointer = sim_frame_.get();
-  const double* target_pointer = target_lab;
-  for (size_t i = 0; i < kFrameWidthPixels * kFrameHeightPixels; ++i) {
-    score_ += Ciede2k(kAtariNTSCLabColorTable + (*frame_pointer * 4),
-                      target_pointer);
-    target_pointer += 4;
-    score_ += Ciede2k(kAtariNTSCLabColorTable + (*frame_pointer * 4),
-                      target_pointer);
-    target_pointer += 4;
+  uint8* frame_pointer = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
+  for (size_t i = 0; i < kTargetFrameWidthPixels * kFrameHeightPixels; ++i) {
+    *frame_pointer = *frame_pointer & 0x7f;
+    assert(*frame_pointer < 128);
+    score_ += distances[*frame_pointer][i];
     ++frame_pointer;
   }
   score_valid_ = true;

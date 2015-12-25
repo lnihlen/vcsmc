@@ -50,13 +50,15 @@ class Kernel {
   // target lab image.
   class ScoreKernelJob : public Job {
    public:
-    ScoreKernelJob(std::shared_ptr<Kernel> kernel, const double* target_lab)
-        : kernel_(kernel), target_lab_(target_lab) {}
+    typedef std::vector<std::vector<double>> ColorDistances;
+    ScoreKernelJob(std::shared_ptr<Kernel> kernel,
+        const ColorDistances& distances)
+        : kernel_(kernel), distances_(distances) {}
     void Execute() override;
 
    private:
     std::shared_ptr<Kernel> kernel_;
-    const double* target_lab_;
+    const ColorDistances& distances_;
   };
 
   // Given a provided reference kernel, generate the target kernel as a copy of
@@ -84,7 +86,7 @@ class Kernel {
   // Given valid data in opcodes_ refills bytecode_ with the concatenated data
   // in opcodes_ and specs_, appends jumps and updates fingerprint_.
   void RegenerateBytecode(size_t bytecode_size);
-  void SimulateAndScore(const double* target_lab);
+  void SimulateAndScore(const ScoreKernelJob::ColorDistances& distances);
   void Mutate();
 
   std::default_random_engine engine_;

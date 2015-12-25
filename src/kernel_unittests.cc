@@ -95,9 +95,8 @@ class GenerateBackgroundColorKernelJob : public vcsmc::Job {
  public:
   GenerateBackgroundColorKernelJob(
       std::shared_ptr<vcsmc::Kernel> kernel,
-      uint8 bg,
-      std::shared_ptr<double> target)
-      : kernel_(kernel), bg_(bg), target_(target) {}
+      uint8 bg)
+      : kernel_(kernel), bg_(bg) {}
   void Execute() override {
     vcsmc::SpecList specs(new std::vector<vcsmc::Spec>());
     // We build a huge no-op kernel out of specs that handle the required
@@ -216,25 +215,11 @@ class GenerateBackgroundColorKernelJob : public vcsmc::Job {
     vcsmc::Kernel::GenerateRandomKernelJob gen_job(kernel_, specs);
     gen_job.Execute();
     ValidateKernel(kernel_);
-
-    size_t idx = (static_cast<size_t>(bg_) / 2) * 4;
-    if (target_) {
-      double* target_ptr = target_.get();
-      for (size_t i = 0;
-           i < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels; ++i) {
-        *(target_ptr + 0) = vcsmc::kAtariNTSCLabColorTable[idx + 0];
-        *(target_ptr + 1) = vcsmc::kAtariNTSCLabColorTable[idx + 1];
-        *(target_ptr + 2) = vcsmc::kAtariNTSCLabColorTable[idx + 2];
-        *(target_ptr + 3) = vcsmc::kAtariNTSCLabColorTable[idx + 3];
-        target_ptr += 4;
-      }
-    }
   }
 
  private:
   std::shared_ptr<vcsmc::Kernel> kernel_;
   uint8 bg_;
-  std::shared_ptr<double> target_;
 };
 
 }
@@ -269,7 +254,6 @@ TEST(GenerateRandomKernelJobTest, GeneratesValidRandomKernel) {
 TEST(ScoreKernelJobTest, SimulatesSimpleFrameKernel) {
   vcsmc::JobQueue job_queue(0);
   std::vector<std::shared_ptr<vcsmc::Kernel>> kernels;
-  std::vector<std::shared_ptr<double>> targets;
 
   for (size_t i = 0; i < 128; ++i) {
     char seed_char[64];
@@ -277,20 +261,26 @@ TEST(ScoreKernelJobTest, SimulatesSimpleFrameKernel) {
     std::string seed_str(seed_char);
     std::seed_seq seed(seed_str.begin(), seed_str.end());
     kernels.emplace_back(new Kernel(seed));
-    targets.emplace_back(new double[vcsmc::kTargetFrameWidthPixels *
-                                    vcsmc::kFrameHeightPixels * 4]);
     job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
           new GenerateBackgroundColorKernelJob(
-            kernels[i], static_cast<uint8>(i * 2), targets[i])));
+            kernels[i], static_cast<uint8>(i * 2))));
   }
 
   job_queue.Finish();
 
   // Simulate and score, should produce a valid empty frame with background
   // color.
+  std::vector<Kernel::ScoreKernelJob::ColorDistances> test_distances(128);
   for (size_t i = 0; i < 128; ++i) {
+    // Build distance table that treats target background color as zero error,
+    // all other colors as nonzero.
+    for (size_t j = 0; j < 128; ++j) {
+      const double dist = (i == j) ? 0.0 : 1.0;
+      test_distances[i].emplace_back(
+          kTargetFrameWidthPixels * kFrameHeightPixels, dist);
+    }
     job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
-          new vcsmc::Kernel::ScoreKernelJob(kernels[i], targets[i].get())));
+          new vcsmc::Kernel::ScoreKernelJob(kernels[i], test_distances[i])));
   }
 
   job_queue.Finish();
@@ -312,7 +302,7 @@ TEST(MutateKernelJobTest, MutatesSimpleFrameKernel) {
   std::string seed_str = "trivial stable testing seed for mutate kernel";
   std::seed_seq seed(seed_str.begin(), seed_str.end());
   std::shared_ptr<Kernel> original_kernel(new Kernel(seed));
-  GenerateBackgroundColorKernelJob gen_job(original_kernel, 64, nullptr);
+  GenerateBackgroundColorKernelJob gen_job(original_kernel, 64);
   gen_job.Execute();
   std::string target_seed_str = "target stable testing seed";
   std::seed_seq target_seed(target_seed_str.begin(), target_seed_str.end());
