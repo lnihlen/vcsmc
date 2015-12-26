@@ -209,6 +209,20 @@ int main(int argc, char* argv[]) {
 
   job_queue.Finish();
 
+  // Compute theoretical minimum error.
+  double min_total_error = 0.0;
+  for (size_t i = 0;
+      i < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels; i += 2) {
+    double min_pixel_error = color_distances[0][i] + color_distances[0][i + 1];
+    for (size_t j = 1; j < vcsmc::kNTSCColors; ++j) {
+      double sum = color_distances[j][i] + color_distances[j][i + 1];
+      min_pixel_error = std::min(min_pixel_error, sum);
+    }
+    min_total_error += min_pixel_error;
+  }
+
+  printf("minimum total theoretical error: %f\n", min_total_error);
+
   // Initialize simulator global state.
   init_z26_global_tables();
 
@@ -286,17 +300,14 @@ int main(int argc, char* argv[]) {
       streak = 0;
     }
 
-    // Report statistics and save champion image to disk.
-    printf("    grand champion: %016llx, streak: %d, with score: %f.\n",
-        generation->at(0)->fingerprint(), streak, generation->at(0)->score());
+    double percent_error = ((generation->at(0)->score() - min_total_error) /
+        min_total_error) * 100.0;
 
-/*
-    char kernel_image_path_buf[128];
-    snprintf(kernel_image_path_buf, 128,
-        "%s/%05d-%016llx.png",
-        FLAGS_log_base_dir.c_str(), i, generation->at(0)->fingerprint());
-    generation->at(0)->SaveImage(std::string(kernel_image_path_buf));
-*/
+    // Report statistics and save champion image to disk.
+    printf("    grand champion: %016llx, streak: %d, with score: %f, "
+           "%f percent of theoretical minimum.\n",
+        generation->at(0)->fingerprint(), streak, generation->at(0)->score(),
+        percent_error);
 
     int mutations = std::min(FLAGS_max_mutations,
         1 + (streak * FLAGS_stale_mutations_multiplier));
