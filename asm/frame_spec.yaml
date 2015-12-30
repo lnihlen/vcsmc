@@ -1,5 +1,5 @@
 - first_cycle: 0  # first scanline, turn off vblank, turn on vsync, init state.
-  bytecode: |
+  bytecode: |  # TODO: s/bytecode/assembler
     lda #0
     sta VBLANK
     ldx #2

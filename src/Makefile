@@ -23,6 +23,7 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/job_queue.o                                                         \
     $(OUT)/kernel.o                                                            \
     $(OUT)/range.o                                                             \
+    $(OUT)/serialization.o                                                     \
     $(OUT)/spec.o                                                              \
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
@@ -30,7 +31,7 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/job_queue_unittests.o                                     \
          $(OUTTESTS)/kernel_unittests.o                                        \
          $(OUTTESTS)/range_unittests.o                                         \
-         $(OUTTESTS)/spec_unittests.o
+         $(OUTTESTS)/serialization_unittests.o
 
 all: $(OUT)/gen                                                                \
      $(OUT)/sim                                                                \

@@ -11,6 +11,7 @@
 #include "constants.h"
 #include "gtest/gtest.h"
 #include "job_queue.h"
+#include "serialization.h"
 #include "spec.h"
 
 namespace {

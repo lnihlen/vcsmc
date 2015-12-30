@@ -16,21 +16,23 @@
 #include "color_table.h"
 #include "job_queue.h"
 #include "kernel.h"
+#include "serialization.h"
 #include "spec.h"
 
 extern "C" {
 #include <libz26/libz26.h>
 }
 
-DEFINE_int32(generation_size, 10000,
+DEFINE_int32(generation_size, 1000,
     "Number of individuals to keep in an evolutionary programing generation.");
-DEFINE_int32(max_generation_number, 10000,
+DEFINE_int32(max_generation_number, 100000,
     "Number of generations of evolutionary programming to run.");
-DEFINE_int32(tournament_size, 1000,
+DEFINE_int32(tournament_size, 100,
     "Number of kernels each should compete against.");
 DEFINE_int32(worker_threads, 0,
     "Number of threads to create to work in parallel, set to 0 to pick based "
     "on hardware.");
+// TODO: invert logic here, something like max - (i * stale_mutations)
 DEFINE_int32(max_mutations, 5,
     "Maximum number of mutations applied per-kernel to a single generation, "
     "based on number of generations same kernel has won.");
@@ -44,11 +46,16 @@ DEFINE_string(random_seed, "",
 DEFINE_string(spec_list_file, "asm/frame_spec.yaml",
     "Path to spec list yaml file.");
 DEFINE_string(target_image_file, "",
-    "Path to target image file to score kernels against.");
+    "Required path to target image file to score kernels against.");
 DEFINE_string(gperf_output_file, "",
     "Defining enables gperftools output to the provided profile path.");
-
-typedef std::shared_ptr<std::vector<std::shared_ptr<vcsmc::Kernel>>> Generation;
+DEFINE_string(seed_generation_file, "",
+    "Optional file with saved generation data, to seed the first generation of "
+    "the evolutionary programming algorithm. The generation size will be set "
+    "to the number of kernels in the file. Any provided spec list will also be "
+    "ignored as the kernels provide their own spec.");
+DEFINE_string(final_generation_file, "out/generation.yaml",
+    "Required path to output yaml file for final generation.");
 
 std::string FormatDuration(const std::chrono::duration<uint64,
     std::milli>& duration) {
@@ -97,7 +104,7 @@ class ComputeColorErrorTableJob : public vcsmc::Job {
 class CompeteKernelJob : public vcsmc::Job {
  public:
   CompeteKernelJob(
-      const Generation generation,
+      const vcsmc::Generation generation,
       std::shared_ptr<vcsmc::Kernel> kernel,
       std::seed_seq& seed,
       size_t tourney_size)
@@ -117,7 +124,7 @@ class CompeteKernelJob : public vcsmc::Job {
     }
   }
  private:
-  const Generation generation_;
+  const vcsmc::Generation generation_;
   std::shared_ptr<vcsmc::Kernel> kernel_;
   std::default_random_engine engine_;
   size_t tourney_size_;
@@ -127,18 +134,6 @@ int main(int argc, char* argv[]) {
   std::chrono::time_point<std::chrono::system_clock> program_start =
       std::chrono::system_clock::now();
   gflags::ParseCommandLineFlags(&argc, &argv, false);
-
-  printf("parsing spec list %s.\n", FLAGS_spec_list_file.c_str());
-
-  vcsmc::SpecList spec_list = vcsmc::ParseSpecListFile(FLAGS_spec_list_file);
-  if (!spec_list) {
-    fprintf(stderr, "Error parsing spec list file %s.\n",
-        FLAGS_spec_list_file.c_str());
-    return -1;
-  }
-
-  printf("generating initial population of %d individuals.\n",
-      FLAGS_generation_size);
 
   std::array<uint32, vcsmc::kSeedSizeWords> seed_array;
   if (FLAGS_random_seed.size() == vcsmc::kSeedSizeWords * 8) {
@@ -156,19 +151,43 @@ int main(int argc, char* argv[]) {
   std::default_random_engine seed_engine(master_seed);
 
   vcsmc::JobQueue job_queue(FLAGS_worker_threads);
-  Generation generation(new std::vector<std::shared_ptr<vcsmc::Kernel>>(
-        FLAGS_generation_size));
+  vcsmc::Generation generation;
 
-  // Generate FLAGS_generation_size number of random individuals.
-  for (int i = 0; i < FLAGS_generation_size; ++i) {
-    std::array<uint32, vcsmc::kSeedSizeWords> seed;
-    for (size_t j = 0; j < vcsmc::kSeedSizeWords; ++j)
-      seed[j] = seed_engine();
-    std::seed_seq kernel_seed(seed.begin(), seed.end());
-    generation->at(i).reset(new vcsmc::Kernel(kernel_seed));
-    job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
-        new vcsmc::Kernel::GenerateRandomKernelJob(
-            generation->at(i), spec_list)));
+  int generation_size = FLAGS_generation_size;
+  if (FLAGS_seed_generation_file == "") {
+    printf("parsing spec list %s.\n", FLAGS_spec_list_file.c_str());
+
+    vcsmc::SpecList spec_list = vcsmc::ParseSpecListFile(FLAGS_spec_list_file);
+    if (!spec_list) {
+      fprintf(stderr, "Error parsing spec list file %s.\n",
+          FLAGS_spec_list_file.c_str());
+      return -1;
+    }
+
+    printf("generating initial population of %d individuals.\n",
+        generation_size);
+    generation.reset(new std::vector<std::shared_ptr<vcsmc::Kernel>>);
+    // Generate FLAGS_generation_size number of random individuals.
+    for (int i = 0; i < generation_size; ++i) {
+      std::array<uint32, vcsmc::kSeedSizeWords> seed;
+      for (size_t j = 0; j < vcsmc::kSeedSizeWords; ++j)
+        seed[j] = seed_engine();
+      std::seed_seq kernel_seed(seed.begin(), seed.end());
+      generation->emplace_back(new vcsmc::Kernel(kernel_seed));
+      job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
+          new vcsmc::Kernel::GenerateRandomKernelJob(
+              generation->at(i), spec_list)));
+    }
+  } else {
+    printf("loading initial population from %s.\n",
+        FLAGS_seed_generation_file.c_str());
+    generation = vcsmc::ParseGenerationFile(FLAGS_seed_generation_file);
+    if (!generation) {
+      fprintf(stderr, "error parsing generation seed file.\n");
+      return -1;
+    }
+    generation_size = generation->size();
+    printf("  loaded %d kernels.\n", generation_size);
   }
 
   printf("loading target image file %s.\n", FLAGS_target_image_file.c_str());
@@ -176,7 +195,7 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<vcsmc::Image> target_image = vcsmc::ImageFile::Load(
       FLAGS_target_image_file);
   if (!target_image) {
-    fprintf(stderr, "Error opening target_image_file \"%s\".",
+    fprintf(stderr, "error opening target_image_file \"%s\".",
         FLAGS_target_image_file.c_str());
     return -1;
   }
@@ -248,7 +267,7 @@ int main(int argc, char* argv[]) {
 
     uint32 score_count = 0;
     // Score all unscored kernels in the current generation.
-    for (int j = 0; j < FLAGS_generation_size; ++j) {
+    for (int j = 0; j < generation_size; ++j) {
       if (!generation->at(j)->score_valid()) {
         job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
               new vcsmc::Kernel::ScoreKernelJob(generation->at(j),
@@ -273,7 +292,7 @@ int main(int argc, char* argv[]) {
     printf("    conducting tournament.\n");
 
     // Conduct tournament based on scores.
-    for (int j = 0; j < FLAGS_generation_size; ++j) {
+    for (int j = 0; j < generation_size; ++j) {
       std::array<uint32, vcsmc::kSeedSizeWords> seed;
       for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
         seed[k] = seed_engine();
@@ -305,7 +324,7 @@ int main(int argc, char* argv[]) {
 
     // Report statistics and save champion image to disk.
     printf("    grand champion: %016llx, streak: %d, with score: %f, "
-           "%f percent of theoretical minimum.\n",
+           "%.02f percent of theoretical minimum.\n",
         generation->at(0)->fingerprint(), streak, generation->at(0)->score(),
         percent_error);
 
@@ -314,7 +333,7 @@ int main(int argc, char* argv[]) {
     printf("    mutating generation %d times each.\n", mutations);
     // Replace lowest-scoring half of generation with mutated versions of
     // highest-scoring half of generation.
-    for (int j = FLAGS_generation_size / 2; j < FLAGS_generation_size; ++j) {
+    for (int j = generation_size / 2; j < generation_size; ++j) {
       std::array<uint32, vcsmc::kSeedSizeWords> seed;
       for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
         seed[k] = seed_engine();
@@ -322,7 +341,7 @@ int main(int argc, char* argv[]) {
       generation->at(j).reset(new vcsmc::Kernel(kernel_seed));
       job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
             new vcsmc::Kernel::MutateKernelJob(
-              generation->at(j - (FLAGS_generation_size / 2)),
+              generation->at(j - (generation_size / 2)),
               generation->at(j),
               mutations)));
     }
@@ -343,6 +362,14 @@ int main(int argc, char* argv[]) {
 
   if (FLAGS_gperf_output_file != "") {
     ProfilerStop();
+  }
+
+  printf("saving final generation to %s.\n",
+      FLAGS_final_generation_file.c_str());
+
+  if (!vcsmc::SaveGenerationFile(generation, FLAGS_final_generation_file)) {
+    fprintf(stderr, "error saving final generation file %s\n",
+        FLAGS_final_generation_file.c_str());
   }
 
   char kernel_image_path_buf[128];

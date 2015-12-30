@@ -37,13 +37,6 @@ class Spec {
 
 typedef std::shared_ptr<std::vector<Spec>> SpecList;
 
-// Returns a list of Specs parsed from the indicated YAML file, or nullptr on
-// error.
-SpecList ParseSpecListFile(const std::string& file_name);
-// Convenience method mostly for testing, calls same underlying implementation
-// as on file parser.
-SpecList ParseSpecListString(const std::string& spec_string);
-
 }  // namespace vcsmc
 
 #endif  // SRC_SPEC_H_

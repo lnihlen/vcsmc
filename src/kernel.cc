@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstring>
 #include <random>
+#include <sstream>
 
 #include <farmhash.h>
 extern "C" {
@@ -30,6 +31,52 @@ Kernel::Kernel(std::seed_seq& seed)
     victories_(0) {
 }
 
+Kernel::Kernel(
+    const std::string& random_state,
+    SpecList specs,
+    const std::vector<Range>& dynamic_areas,
+    const std::vector<std::unique_ptr<uint8[]>>& packed_opcodes)
+    : specs_(specs) {
+  std::istringstream sstream(random_state);
+  sstream >> engine_;
+  assert(dynamic_areas.size() == packed_opcodes.size());
+  size_t spec_list_index = 0;
+  size_t opcode_list_index = 0;
+  uint32 current_cycle = 0;
+  size_t total_byte_size = 0;
+  while (current_cycle < kScreenSizeCycles) {
+    uint32 next_spec_start_time = spec_list_index < specs_->size() ?
+        specs_->at(spec_list_index).range().start_time() :
+        kScreenSizeCycles;
+    if (current_cycle == next_spec_start_time) {
+      assert(spec_list_index < specs_->size());
+      total_byte_size += specs_->at(spec_list_index).size();
+      current_cycle = specs_->at(spec_list_index).range().end_time();
+      ++spec_list_index;
+    } else {
+      uint32 starting_cycle = current_cycle;
+      opcodes_.emplace_back();
+      assert(opcode_list_index < dynamic_areas.size());
+      assert(total_byte_size == dynamic_areas[opcode_list_index].start_time());
+      uint8* current_byte = packed_opcodes[opcode_list_index].get();
+      while (current_byte - packed_opcodes[opcode_list_index].get() <
+          dynamic_areas[opcode_list_index].Duration()) {
+        OpCode op = static_cast<OpCode>(*current_byte);
+        size_t opcode_size = OpCodeBytes(op);
+        uint8 arg1 = opcode_size > 1 ? *(current_byte + 1) : 0;
+        uint8 arg2 = opcode_size > 2 ? *(current_byte + 2) : 0;
+        opcodes_.back().push_back(PackOpCode(op, arg1, arg2));
+        current_byte += opcode_size;
+        total_byte_size += opcode_size;
+        current_cycle += OpCodeCycles(op);
+      }
+      opcode_ranges_.emplace_back(starting_cycle, current_cycle);
+      ++opcode_list_index;
+    }
+  }
+  RegenerateBytecode(total_byte_size);
+}
+
 bool Kernel::SaveImage(const std::string& file_name) const {
   if (!score_valid_ || !sim_frame_) return false;
   Image image(kTargetFrameWidthPixels, kFrameHeightPixels);
@@ -41,6 +88,12 @@ bool Kernel::SaveImage(const std::string& file_name) const {
     ++sim;
   }
   return ImageFile::Save(&image, file_name);
+}
+
+std::string Kernel::GetRandomState() const {
+  std::ostringstream sstream;
+  sstream << engine_;
+  return sstream.str();
 }
 
 void Kernel::GenerateRandomKernelJob::Execute() {
@@ -65,7 +118,7 @@ void Kernel::GenerateRandomKernelJob::Execute() {
       total_byte_size += next_spec_size;
       ++spec_list_index;
     } else {
-      uint32_t starting_cycle = current_cycle;
+      uint32 starting_cycle = current_cycle;
       kernel_->opcodes_.emplace_back();
       uint32 cycles_remaining = next_spec_start_time - current_cycle;
       size_t bytes_remaining =
@@ -272,6 +325,7 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
   score_valid_ = false;
   score_ = 0.0;
   bytecode_.reset(new uint8[bytecode_size]);
+  dynamic_areas_.clear();
   uint32 current_cycle = 0;
   size_t current_range_index = 0;
   size_t current_spec_index = 0;
@@ -286,11 +340,14 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
     if (current_cycle == next_range_start_time) {
       std::vector<uint32>& ops = opcodes_[current_range_index];
       assert(ops.size() > 0);
+      uint32_t starting_byte = current_byte - bytecode_.get();
       // Serialize the packed opcodes into the buffer.
       for (size_t i = 0; i < ops.size(); ++i) {
         current_byte += UnpackOpCode(ops[i], current_byte);
         current_cycle += OpCodeCycles(ops[i]);
       }
+      dynamic_areas_.emplace_back(starting_byte,
+          current_byte - bytecode_.get());
       ++current_range_index;
     } else {
       assert(current_cycle == next_spec_start_time);

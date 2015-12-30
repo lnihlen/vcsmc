@@ -1,9 +1,65 @@
 #include "gtest/gtest.h"
+
+#include <random>
+#include <string>
+
+#include "kernel.h"
+#include "serialization.h"
 #include "spec.h"
 
 namespace vcsmc {
 
-TEST(SpecTest, ParseSpecListStringSingle) {
+TEST(SerializationTest, Base64EncodeDecode) {
+  uint8 buf[128];
+  std::string seed_str = "base64 test seed";
+  std::seed_seq seed(seed_str.begin(), seed_str.end());
+  std::default_random_engine engine(seed);
+  std::uniform_int_distribution<uint8> distro(0, 255);
+  for (size_t i = 0; i < 128; ++i) {
+    buf[i] = distro(engine);
+  }
+  for (size_t i = 0; i < 127; ++i) {
+    size_t len = 128 - i;
+    std::string encode = vcsmc::Base64Encode(buf + i, len, 0);
+    std::unique_ptr<uint8[]> decode = vcsmc::Base64Decode(encode, len);
+    EXPECT_EQ(0, std::memcmp(decode.get(), buf + i, len));
+    encode = vcsmc::Base64Encode(buf, len, 0);
+    decode = vcsmc::Base64Decode(encode, len);
+    EXPECT_EQ(0, std::memcmp(decode.get(), buf, len));
+  }
+}
+
+TEST(SerializationTest, ParseGenerationStringSingle) {
+  SpecList specs = ParseSpecListString(
+      "- first_cycle: 0\n"
+      "  bytecode: |\n"
+      "    lda #0\n"
+      "    sta VBLANK\n"
+      "    lda #2\n"
+      "    sta VSYNC\n"
+      "- first_cycle: 228\n"
+      "  bytecode: |\n"
+      "    lda #0\n"
+      "    sta VSYNC\n"
+      "- first_cycle: 17632\n"
+      "  bytecode: |\n"
+      "    lda #$42\n"
+      "    sta VBLANK\n");
+  ASSERT_NE(nullptr, specs);
+  std::string seed_str = "serialization test seed";
+  std::seed_seq seed(seed_str.begin(), seed_str.end());
+  std::shared_ptr<Kernel> kernel(new Kernel(seed));
+  Kernel::GenerateRandomKernelJob job(kernel, specs);
+  job.Execute();
+  std::string kernel_str;
+  ASSERT_EQ(true, SaveKernelToString(kernel, kernel_str));
+  Generation gen = ParseGenerationString(kernel_str);
+  ASSERT_NE(nullptr, gen);
+  ASSERT_EQ(1u, gen->size());
+  EXPECT_EQ(kernel->fingerprint(), gen->at(0)->fingerprint());
+}
+
+TEST(SerializationTest, ParseSpecListStringSingle) {
   SpecList sl = ParseSpecListString(
       "first_cycle: 10\n"
       "bytecode: sta VBLANK\n");
@@ -53,7 +109,7 @@ TEST(SpecTest, ParseSpecListStringMultiple) {
   EXPECT_EQ(0x0fu, bytecode_b[6]);
 }
 
-TEST(SpecTest, ParseSpecListWithHardDuration) {
+TEST(SerializationTest, ParseSpecListWithHardDuration) {
   SpecList sl = ParseSpecListString(
       "- first_cycle: 192\n"
       "  hard_duration: 227\n"
