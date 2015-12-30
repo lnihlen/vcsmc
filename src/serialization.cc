@@ -384,6 +384,7 @@ Generation ParseGenerationFile(const std::string& file_name) {
   yaml_parser_set_input_file(&parser, file);
   Generation gen = ParseGenerationInternal(parser);
   yaml_parser_delete(&parser);
+  fclose(file);
   return gen;
 }
 
@@ -458,6 +459,7 @@ SpecList ParseSpecListFile(const std::string& file_name) {
   yaml_parser_set_input_file(&parser, file);
   SpecList result = ParseSpecListInternal(parser);
   yaml_parser_delete(&parser);
+  fclose(file);
   return result;
 }
 
