@@ -25,6 +25,7 @@ Kernel::Kernel(std::seed_seq& seed)
   : engine_(seed),
     specs_(new std::vector<Spec>()),
     bytecode_size_(0),
+    total_dynamic_opcodes_(0),
     fingerprint_(0),
     score_valid_(false),
     score_(0.0),
@@ -36,7 +37,8 @@ Kernel::Kernel(
     SpecList specs,
     const std::vector<Range>& dynamic_areas,
     const std::vector<std::unique_ptr<uint8[]>>& packed_opcodes)
-    : specs_(specs) {
+    : specs_(specs),
+      total_dynamic_opcodes_(0) {
   std::istringstream sstream(random_state);
   sstream >> engine_;
   assert(dynamic_areas.size() == packed_opcodes.size());
@@ -70,6 +72,8 @@ Kernel::Kernel(
         total_byte_size += opcode_size;
         current_cycle += OpCodeCycles(op);
       }
+      total_dynamic_opcodes_ += opcodes_.back().size();
+      opcode_counts_.push_back(total_dynamic_opcodes_);
       opcode_ranges_.emplace_back(starting_cycle, current_cycle);
       ++opcode_list_index;
     }
@@ -160,6 +164,8 @@ void Kernel::GenerateRandomKernelJob::Execute() {
       }
       if (kernel_->opcodes_.back().size()) {
         kernel_->opcode_ranges_.emplace_back(starting_cycle, current_cycle);
+        kernel_->total_dynamic_opcodes_ += kernel_->opcodes_.back().size();
+        kernel_->opcode_counts_.push_back(kernel_->total_dynamic_opcodes_);
       } else {
         kernel_->opcodes_.pop_back();
       }
@@ -190,6 +196,10 @@ void Kernel::MutateKernelJob::Execute() {
   std::copy(original_->opcode_ranges_.begin(), original_->opcode_ranges_.end(),
       std::back_inserter(target_->opcode_ranges_));
   target_->bytecode_size_ = original_->bytecode_size_;
+
+  target_->total_dynamic_opcodes_ = original_->total_dynamic_opcodes_;
+  std::copy(original_->opcode_counts_.begin(), original_->opcode_counts_.end(),
+      std::back_inserter(target_->opcode_counts_));
 
   // Now do the mutations to the target.
   for (size_t i = 0; i < number_of_mutations_; ++i)
@@ -381,9 +391,11 @@ void Kernel::SimulateAndScore(const ScoreKernelJob::ColorDistances& distances) {
 void Kernel::Mutate() {
   // Pick a field of opcodes at random.
   std::uniform_int_distribution<size_t>
-    opcode_field_distro(0, opcodes_.size() - 1);
-  size_t opcode_field = opcode_field_distro(engine_);
-
+    opcode_index_distro(0, total_dynamic_opcodes_ - 1);
+  size_t opcode_index = opcode_index_distro(engine_);
+  size_t opcode_field = 0;
+  while (opcode_index > opcode_counts_[opcode_field])
+    ++opcode_field;
   assert(opcodes_[opcode_field].size() > 0);
   std::uniform_int_distribution<size_t>
     opcode_within_field(0, opcodes_[opcode_field].size() - 1);

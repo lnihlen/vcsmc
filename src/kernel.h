@@ -103,13 +103,15 @@ class Kernel {
 
   SpecList specs_;
   std::vector<Range> opcode_ranges_;
-  // TODO: make distribution over all opcodes uniform
   std::vector<std::vector<uint32>> opcodes_;
 
   size_t bytecode_size_;
   std::vector<Range> dynamic_areas_;
   std::unique_ptr<uint8[]> bytecode_;
   std::unique_ptr<uint8[]> sim_frame_;
+
+  size_t total_dynamic_opcodes_;
+  std::vector<size_t> opcode_counts_;
 
   uint64 fingerprint_;
   bool score_valid_;

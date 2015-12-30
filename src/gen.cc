@@ -271,11 +271,9 @@ int main(int argc, char* argv[]) {
 
     if ((generation_count % FLAGS_save_count) == 0) {
       // Report statistics and save generation to disk.
-      printf("generation %d grand champion: %016llx with score: %f, %.02f%% "
-             "greater than theoretical minimum.\n",
+      printf("generation %7d leader: %016llx with score: %6.2f%%.\n",
           generation_count,
           generation->at(0)->fingerprint(),
-          generation->at(0)->score(),
           percent_error);
       SaveState(generation);
     }
