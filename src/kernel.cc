@@ -139,8 +139,10 @@ void Kernel::GenerateRandomKernelJob::Execute() {
             (bytes_remaining < next_spec_size &&
                 cycles_remaining < kBankPadding)) {
           if (kernel_->opcodes_.back().size()) {
-            kernel_->opcodes_.emplace_back();
+            kernel_->total_dynamic_opcodes_ += kernel_->opcodes_.back().size();
+            kernel_->opcode_counts_.push_back(kernel_->total_dynamic_opcodes_);
             kernel_->opcode_ranges_.emplace_back(starting_cycle, current_cycle);
+            kernel_->opcodes_.emplace_back();
           }
           kernel_->AppendJmpSpec(current_cycle, total_byte_size % kBankSize);
           const Spec& jmp_spec = kernel_->specs_->back();
@@ -382,7 +384,8 @@ void Kernel::SimulateAndScore(const ScoreKernelJob::ColorDistances& distances) {
   for (size_t i = 0; i < kTargetFrameWidthPixels * kFrameHeightPixels; ++i) {
     *frame_pointer = *frame_pointer & 0x7f;
     assert(*frame_pointer < 128);
-    score_ += distances[*frame_pointer][i];
+    double pixel_error = distances[*frame_pointer][i];
+    score_ += pixel_error;
     ++frame_pointer;
   }
   score_valid_ = true;

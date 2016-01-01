@@ -16,8 +16,10 @@ endif
 
 DEPS=constants.h image_file.h types.h
 OBJ=$(OUT)/assembler.o                                                         \
+    $(OUT)/bit_map.o                                                           \
     $(OUT)/color.o                                                             \
     $(OUT)/color_table.o                                                       \
+    $(OUT)/gray_map.o                                                          \
     $(OUT)/image.o                                                             \
     $(OUT)/image_file.o                                                        \
     $(OUT)/job_queue.o                                                         \
@@ -25,8 +27,10 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/range.o                                                             \
     $(OUT)/serialization.o                                                     \
     $(OUT)/spec.o                                                              \
+    $(OUT)/value_map.o
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
+         $(OUTTESTS)/bit_map_unittests.o                                       \
          $(OUTTESTS)/color_unittests.o                                         \
          $(OUTTESTS)/job_queue_unittests.o                                     \
          $(OUTTESTS)/kernel_unittests.o                                        \

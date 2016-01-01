@@ -1489,3 +1489,25 @@ method ScanFrame() which calls c_tialine.c::nTIALineTo(void).
 ===============================================================================
 
 picc redesign to account for our new libz26 library plus gflags.
+
+===============================================================================
+
+Investigation ideas for evolutionary programming. Need to add charting feature
+to allow for comparison of techniques. Every n generations should output gen
+number, lowest score raw and %, elapsed time.
+
+a) optional edge detection grayscale image - bring back gray map support and
+  add a feature to gen to take in an error map which adds an additional weight
+  multiplier to individual pixels.
+b) generation randomization - if the cohort is stagnating randomize every member
+  by applying a high number of mutations to every member of the cohort
+c) model building - first we build _influence_map_ which is a per-pixel
+  (or per-line) model of where in the bytecode changes have impacted that pixel.
+  Then build generation error map which is sum of all per-pixel (or per-line)
+  errors used as probability distribution to select mutation points.
+
+===============================================================================
+
+Edge building:
+
+convert stills/frame-01.png -lat 50 -canny 0x1+10%+30% -colorspace gray edges/frame-01.png

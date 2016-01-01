@@ -9,10 +9,11 @@
 #include <stdlib.h>
 #include <random>
 
-#include "image.h"
-#include "image_file.h"
+#include "bit_map.h"
 #include "color.h"
 #include "color_table.h"
+#include "image.h"
+#include "image_file.h"
 #include "job_queue.h"
 #include "kernel.h"
 #include "serialization.h"
@@ -37,6 +38,8 @@ DEFINE_int32(target_percent_error, 10,
     "reach.");
 DEFINE_int32(save_count, 1000,
     "Number of generations to run before saving the results.");
+DEFINE_int32(error_bitmap_multiplier, 5,
+    "Multiplier to add to optional error weighting bitmap.");
 
 DEFINE_string(random_seed, "",
     "Hex string of seed for pseudorandom seed generation. If not provided one "
@@ -56,25 +59,32 @@ DEFINE_string(generation_output_file, "out/generation.yaml",
     "Required - path to output yaml file for generation saves.");
 DEFINE_string(image_output_file, "",
     "Optional file to save champion simulated image to.");
+DEFINE_string(input_error_weighting_bitmap, "",
+    "Optional file to bitmap image of additional weight per-pixel to add to "
+    "error distance computations.");
 
 class ComputeColorErrorTableJob : public vcsmc::Job {
  public:
   ComputeColorErrorTableJob(
       const double* target_lab,
       std::vector<double>& error_table,
-      size_t color_index)
+      size_t color_index,
+      const vcsmc::BitMap* error_weights)
       : target_lab_(target_lab),
         error_table_(error_table),
         color_index_(color_index),
-        call_count_(0) {}
+        error_weights_(error_weights) {}
   void Execute() override {
-    ++call_count_;
-    assert(call_count_ == 1);
     const double* atari_lab = vcsmc::kAtariNTSCLabColorTable +
         (color_index_ * 4);
     for (size_t i = 0;
          i < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels; ++i) {
       double error = vcsmc::Ciede2k(target_lab_, atari_lab);
+      if (error_weights_ &&
+          error_weights_->bit(i % vcsmc::kTargetFrameWidthPixels,
+                              i / vcsmc::kTargetFrameWidthPixels)) {
+        error *= static_cast<double>(FLAGS_error_bitmap_multiplier);
+      }
       target_lab_ += 4;
       error_table_.push_back(error);
     }
@@ -83,7 +93,7 @@ class ComputeColorErrorTableJob : public vcsmc::Job {
   const double* target_lab_;
   std::vector<double>& error_table_;
   size_t color_index_;
-  size_t call_count_;
+  const vcsmc::BitMap* error_weights_;
 };
 
 class CompeteKernelJob : public vcsmc::Job {
@@ -179,15 +189,17 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<vcsmc::Image> target_image = vcsmc::ImageFile::Load(
       FLAGS_target_image_file);
   if (!target_image) {
-    fprintf(stderr, "error opening target_image_file \"%s\".",
+    fprintf(stderr, "error opening target_image_file \"%s\".\n",
         FLAGS_target_image_file.c_str());
     return -1;
   }
   if (target_image->width() != vcsmc::kTargetFrameWidthPixels ||
       target_image->height() != vcsmc::kFrameHeightPixels) {
-    fprintf(stderr, "Bad image dimensions %dx%d not %dx%d in %s",
-        target_image->width(), target_image->height(),
-        vcsmc::kTargetFrameWidthPixels, vcsmc::kFrameHeightPixels,
+    fprintf(stderr, "Bad image dimensions %dx%d not %dx%d in %s\n",
+        target_image->width(),
+        target_image->height(),
+        vcsmc::kTargetFrameWidthPixels,
+        vcsmc::kFrameHeightPixels,
         FLAGS_target_image_file.c_str());
     return -1;
   }
@@ -202,10 +214,31 @@ int main(int argc, char* argv[]) {
         target_lab.get() + (i * 4));
   }
 
+  std::unique_ptr<vcsmc::BitMap> error_weights;
+  if (FLAGS_input_error_weighting_bitmap != "") {
+    error_weights = vcsmc::BitMap::Load(FLAGS_input_error_weighting_bitmap);
+    if (!error_weights) {
+      fprintf(stderr, "error opening error weight image file %s.\n",
+          FLAGS_input_error_weighting_bitmap.c_str());
+      return -1;
+    }
+    if (error_weights->width() != vcsmc::kTargetFrameWidthPixels ||
+        error_weights->height() != vcsmc::kFrameHeightPixels) {
+      fprintf(stderr,
+          "Bad error weight image dimensions %dx%d not %dx%d in %s\n",
+          error_weights->width(),
+          error_weights->height(),
+          vcsmc::kTargetFrameWidthPixels,
+          vcsmc::kFrameHeightPixels,
+          FLAGS_input_error_weighting_bitmap.c_str());
+      return -1;
+    }
+  }
+
   vcsmc::Kernel::ScoreKernelJob::ColorDistances color_distances(128);
   for (size_t i = 0; i < vcsmc::kNTSCColors; ++i) {
     job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(new ComputeColorErrorTableJob(
-        target_lab.get(), color_distances[i], i)));
+        target_lab.get(), color_distances[i], i, error_weights.get())));
   }
 
   job_queue.Finish();
@@ -271,7 +304,7 @@ int main(int argc, char* argv[]) {
 
     if ((generation_count % FLAGS_save_count) == 0) {
       // Report statistics and save generation to disk.
-      printf("generation %7d leader: %016llx with score: %6.2f%%.\n",
+      printf("generation: %7d leader: %016llx with score: %6.2f%%.\n",
           generation_count,
           generation->at(0)->fingerprint(),
           percent_error);
