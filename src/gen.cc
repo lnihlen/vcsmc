@@ -70,6 +70,8 @@ DEFINE_string(input_error_weighting_bitmap, "",
     "error distance computations.");
 DEFINE_string(global_minimum_output_file, "out/minimum.yaml",
     "Required file path to save global minimum error kernel to.");
+DEFINE_string(ideal_image_output_file, "out/ideal.png",
+    "Optional file path to save ideal color fit image.");
 
 class ComputeColorErrorTableJob : public vcsmc::Job {
  public:
@@ -261,14 +263,36 @@ int main(int argc, char* argv[]) {
 
   // Compute theoretical minimum error.
   double min_total_error = 0.0;
+  std::unique_ptr<vcsmc::Image> ideal_image;
+  if (FLAGS_ideal_image_output_file != "") {
+    ideal_image.reset(new vcsmc::Image(vcsmc::kTargetFrameWidthPixels,
+          vcsmc::kFrameHeightPixels));
+  }
   for (size_t i = 0;
       i < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels; i += 2) {
     double min_pixel_error = color_distances[0][i] + color_distances[0][i + 1];
+    size_t min_pixel_color = 0;
     for (size_t j = 1; j < vcsmc::kNTSCColors; ++j) {
       double sum = color_distances[j][i] + color_distances[j][i + 1];
-      min_pixel_error = std::min(min_pixel_error, sum);
+      if (sum < min_pixel_error) {
+        min_pixel_error = sum;
+        min_pixel_color = j;
+      }
     }
     min_total_error += min_pixel_error;
+    if (ideal_image) {
+      ideal_image->pixels_writeable()[i] =
+          vcsmc::kAtariNTSCABGRColorTable[min_pixel_color];
+      ideal_image->pixels_writeable()[i + 1] =
+          vcsmc::kAtariNTSCABGRColorTable[min_pixel_color];
+    }
+  }
+  if (ideal_image) {
+    if (!vcsmc::ImageFile::Save(ideal_image.get(),
+          FLAGS_ideal_image_output_file)) {
+      fprintf(stderr, "Error saving ideal image output file.\n");
+      return -1;
+    }
   }
 
   // Initialize simulator global state.
@@ -342,12 +366,12 @@ int main(int argc, char* argv[]) {
       SaveState(generation, global_minimum);
     }
 
-    if (fabs(last_generation_score - percent_error) < 0.001) {
+    if (fabs(last_generation_score - percent_error) < 0.00001) {
       ++streak;
     } else {
+      last_generation_score = percent_error;
       streak = 0;
     }
-    last_generation_score = percent_error;
 
     if (FLAGS_stagnant_generation_count == 0 ||
         streak < FLAGS_stagnant_generation_count) {
