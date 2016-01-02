@@ -451,6 +451,21 @@ bool SaveKernelToString(std::shared_ptr<Kernel> kernel,
   return true;
 }
 
+bool SaveKernelToFile(std::shared_ptr<Kernel> kernel,
+    const std::string& file_name) {
+  std::string kernel_str;
+  if (!SaveKernelToString(kernel, kernel_str))
+    return false;
+  int fd = open(file_name.c_str(),
+      O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+  if (fd < 0) return false;
+  size_t bytes_written = write(fd, kernel_str.c_str(), kernel_str.size());
+  if (bytes_written != kernel_str.size())
+    return false;
+  close(fd);
+  return true;
+}
+
 SpecList ParseSpecListFile(const std::string& file_name) {
   yaml_parser_t parser;
   yaml_parser_initialize(&parser);

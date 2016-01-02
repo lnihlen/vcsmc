@@ -40,6 +40,12 @@ DEFINE_int32(save_count, 1000,
     "Number of generations to run before saving the results.");
 DEFINE_int32(error_bitmap_multiplier, 5,
     "Multiplier to add to optional error weighting bitmap.");
+DEFINE_int32(stagnant_generation_count, 250,
+    "Number of generations without score change before randomizing entire "
+    "cohort. Set to zero to disable.");
+DEFINE_int32(stagnant_mutation_count, 16,
+    "Number of mutations to apply to each cohort member when re-randomizing "
+    "stagnant cohort.");
 
 DEFINE_string(random_seed, "",
     "Hex string of seed for pseudorandom seed generation. If not provided one "
@@ -56,12 +62,14 @@ DEFINE_string(seed_generation_file, "",
     "to the number of kernels in the file. Any provided spec list will also be "
     "ignored as the kernels provide their own spec.");
 DEFINE_string(generation_output_file, "out/generation.yaml",
-    "Required - path to output yaml file for generation saves.");
+    "Optional path to output yaml file for generation saves.");
 DEFINE_string(image_output_file, "",
-    "Optional file to save champion simulated image to.");
+    "Optional file to save minimum simulated image to.");
 DEFINE_string(input_error_weighting_bitmap, "",
     "Optional file to bitmap image of additional weight per-pixel to add to "
     "error distance computations.");
+DEFINE_string(global_minimum_output_file, "out/minimum.yaml",
+    "Required file path to save global minimum error kernel to.");
 
 class ComputeColorErrorTableJob : public vcsmc::Job {
  public:
@@ -125,13 +133,21 @@ class CompeteKernelJob : public vcsmc::Job {
   size_t tourney_size_;
 };
 
-void SaveState(vcsmc::Generation generation) {
-  if (!vcsmc::SaveGenerationFile(generation, FLAGS_generation_output_file)) {
-    fprintf(stderr, "error saving final generation file %s\n",
-        FLAGS_generation_output_file.c_str());
+void SaveState(vcsmc::Generation generation,
+    std::shared_ptr<vcsmc::Kernel> global_minimum) {
+  if (FLAGS_generation_output_file != "") {
+    if (!vcsmc::SaveGenerationFile(generation, FLAGS_generation_output_file)) {
+      fprintf(stderr, "error saving final generation file %s\n",
+          FLAGS_generation_output_file.c_str());
+    }
   }
   if (FLAGS_image_output_file != "") {
-    generation->at(0)->SaveImage(FLAGS_image_output_file);
+    global_minimum->SaveImage(FLAGS_image_output_file);
+  }
+  if (!vcsmc::SaveKernelToFile(global_minimum,
+        FLAGS_global_minimum_output_file)) {
+    fprintf(stderr, "error saving global minimum kernel %s\n",
+        FLAGS_global_minimum_output_file.c_str());
   }
 }
 
@@ -267,6 +283,12 @@ int main(int argc, char* argv[]) {
   double percent_error = 0.0;
   double target_percent_error = static_cast<double>(FLAGS_target_percent_error);
   int generation_count = 0;
+  int streak = 0;
+  double last_generation_score = 0.0;
+  bool reroll = false;
+
+  std::shared_ptr<vcsmc::Kernel> global_minimum = generation->at(0);
+
   while (percent_error > target_percent_error || generation_count == 0) {
     // Score all unscored kernels in the current generation.
     for (int j = 0; j < generation_size; ++j) {
@@ -296,37 +318,75 @@ int main(int argc, char* argv[]) {
     // Sort generation by victories.
     std::sort(generation->begin(), generation->end(),
         [](std::shared_ptr<vcsmc::Kernel> a, std::shared_ptr<vcsmc::Kernel> b) {
+          if (a->victories() == b->victories())
+            return a->score() < b->score();
+
           return b->victories() < a->victories();
         });
+
+    if (generation->at(0)->score() < global_minimum->score()) {
+      global_minimum = generation->at(0);
+    }
 
     percent_error = ((generation->at(0)->score() - min_total_error) /
         min_total_error) * 100.0;
 
     if ((generation_count % FLAGS_save_count) == 0) {
       // Report statistics and save generation to disk.
-      printf("generation: %7d leader: %016llx with score: %6.2f%%.\n",
+      printf("gen: %7d leader: %016llx score: %6.2f%% %s\n",
           generation_count,
           generation->at(0)->fingerprint(),
-          percent_error);
-      SaveState(generation);
+          percent_error,
+          reroll ? "*" : "");
+      reroll = false;
+      SaveState(generation, global_minimum);
     }
 
-    // Replace lowest-scoring half of generation with mutated versions of
-    // highest-scoring half of generation.
-    for (int j = generation_size / 2; j < generation_size; ++j) {
-      std::array<uint32, vcsmc::kSeedSizeWords> seed;
-      for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
-        seed[k] = seed_engine();
-      std::seed_seq kernel_seed(seed.begin(), seed.end());
-      generation->at(j).reset(new vcsmc::Kernel(kernel_seed));
-      job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
-            new vcsmc::Kernel::MutateKernelJob(
-              generation->at(j - (generation_size / 2)),
-              generation->at(j),
-              1)));
+    if (fabs(last_generation_score - percent_error) < 0.001) {
+      ++streak;
+    } else {
+      streak = 0;
+    }
+    last_generation_score = percent_error;
+
+    if (FLAGS_stagnant_generation_count == 0 ||
+        streak < FLAGS_stagnant_generation_count) {
+      // Replace lowest-scoring half of generation with mutated versions of
+      // highest-scoring half of generation.
+      for (int j = generation_size / 2; j < generation_size; ++j) {
+        std::array<uint32, vcsmc::kSeedSizeWords> seed;
+        for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
+          seed[k] = seed_engine();
+        std::seed_seq kernel_seed(seed.begin(), seed.end());
+        generation->at(j).reset(new vcsmc::Kernel(kernel_seed));
+        job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
+              new vcsmc::Kernel::MutateKernelJob(
+                generation->at(j - (generation_size / 2)),
+                generation->at(j),
+                1)));
+      }
+      job_queue.Finish();
+    } else {
+      reroll = true;
+      streak = 0;
+      vcsmc::Generation mutated_generation(
+          new std::vector<std::shared_ptr<vcsmc::Kernel>>);
+      for (int j = 0; j < generation_size; ++j) {
+        std::array<uint32, vcsmc::kSeedSizeWords> seed;
+        for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
+          seed[k] = seed_engine();
+        std::seed_seq kernel_seed(seed.begin(), seed.end());
+        mutated_generation->emplace_back(new vcsmc::Kernel(kernel_seed));
+        job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
+              new vcsmc::Kernel::MutateKernelJob(
+                generation->at(j),
+                mutated_generation->at(j),
+                FLAGS_stagnant_mutation_count)));
+      }
+      job_queue.Finish();
+      generation = mutated_generation;
     }
 
-    job_queue.Finish();
     ++generation_count;
     if (FLAGS_max_generation_number > 0 &&
         generation_count > FLAGS_max_generation_number) {
@@ -340,7 +400,7 @@ int main(int argc, char* argv[]) {
     ProfilerStop();
   }
 
-  SaveState(generation);
+  SaveState(generation, global_minimum);
 
   return 0;
 }

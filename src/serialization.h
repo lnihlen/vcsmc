@@ -14,6 +14,8 @@ Generation ParseGenerationString(const std::string& gen_string);
 bool SaveGenerationFile(Generation gen, const std::string& file_name);
 bool SaveKernelToString(std::shared_ptr<Kernel> kernel,
     std::string& string_out);
+bool SaveKernelToFile(std::shared_ptr<Kernel> kernel,
+    const std::string& file_name);
 
 // Returns a list of Specs parsed from the indicated YAML file, or nullptr on
 // error.
