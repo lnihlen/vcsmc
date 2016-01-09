@@ -39,6 +39,7 @@ class Kernel {
   uint64 fingerprint() const { return fingerprint_; }
   bool score_valid() const { return score_valid_; }
   double score() const { return score_; }
+  const double* pixel_errors() const { return pixel_errors_.get(); }
   uint32 victories() const { return victories_; }
   const SpecList specs() const { return specs_; }
   const std::vector<std::vector<uint32>>& opcodes() const { return opcodes_; }
@@ -74,18 +75,18 @@ class Kernel {
   // Given a provided reference kernel, generate the target kernel as a copy of
   // the reference with the provided number of random mutations.
   class MutateKernelJob : public Job {
-    public:
-     MutateKernelJob(const std::shared_ptr<Kernel> original,
-                     std::shared_ptr<Kernel> target,
-                     size_t number_of_mutations)
-        : original_(original),
-          target_(target),
-          number_of_mutations_(number_of_mutations) {}
-     void Execute() override;
-    private:
-     const std::shared_ptr<Kernel> original_;
-     std::shared_ptr<Kernel> target_;
-     size_t number_of_mutations_;
+   public:
+    MutateKernelJob(const std::shared_ptr<Kernel> original,
+                    std::shared_ptr<Kernel> target,
+                    size_t number_of_mutations)
+       : original_(original),
+         target_(target),
+         number_of_mutations_(number_of_mutations) {}
+    void Execute() override;
+   private:
+    const std::shared_ptr<Kernel> original_;
+    std::shared_ptr<Kernel> target_;
+    size_t number_of_mutations_;
   };
 
  private:
@@ -98,6 +99,9 @@ class Kernel {
   void RegenerateBytecode(size_t bytecode_size);
   void SimulateAndScore(const ScoreKernelJob::ColorDistances& distances);
   void Mutate();
+  // Given a number within [0, total_dynamic_opcodes_) returns the index of the
+  // vector within opcodes_ that contains this value.
+  size_t OpcodeFieldIndex(size_t opcode_index);
 
   std::default_random_engine engine_;
 
@@ -117,6 +121,7 @@ class Kernel {
   bool score_valid_;
   double score_;
   uint32 victories_;
+  std::unique_ptr<double[]> pixel_errors_;
 };
 
 typedef std::shared_ptr<std::vector<std::shared_ptr<Kernel>>> Generation;

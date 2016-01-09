@@ -381,14 +381,23 @@ void Kernel::SimulateAndScore(const ScoreKernelJob::ColorDistances& distances) {
   simulate_single_frame(bytecode_.get(), bytecode_size_, sim_frame_.get());
   score_ = 0.0;
   uint8* frame_pointer = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
+  pixel_errors_.reset(new double[kTargetFrameWidthPixels * kFrameHeightPixels]);
   for (size_t i = 0; i < kTargetFrameWidthPixels * kFrameHeightPixels; ++i) {
     *frame_pointer = *frame_pointer & 0x7f;
     assert(*frame_pointer < 128);
-    double pixel_error = distances[*frame_pointer][i];
-    score_ += pixel_error;
+    pixel_errors_.get()[i] = score_;
+    score_ += distances[*frame_pointer][i];
     ++frame_pointer;
   }
   score_valid_ = true;
+}
+
+size_t Kernel::OpcodeFieldIndex(size_t opcode_index) {
+  size_t opcode_field = 0;
+  while (opcode_index >= opcode_counts_[opcode_field])
+    ++opcode_field;
+  assert(opcode_field < opcode_counts_.size());
+  return opcode_field;
 }
 
 void Kernel::Mutate() {
@@ -396,23 +405,27 @@ void Kernel::Mutate() {
   std::uniform_int_distribution<size_t>
     opcode_index_distro(0, total_dynamic_opcodes_ - 1);
   size_t opcode_index = opcode_index_distro(engine_);
-  size_t opcode_field = 0;
-  while (opcode_index > opcode_counts_[opcode_field])
-    ++opcode_field;
+  size_t opcode_field = OpcodeFieldIndex(opcode_index);
+  size_t opcode_baseline =
+    opcode_field == 0 ? 0 : opcode_counts_[opcode_field - 1];
   assert(opcodes_[opcode_field].size() > 0);
-  std::uniform_int_distribution<size_t>
-    opcode_within_field(0, opcodes_[opcode_field].size() - 1);
+  assert(opcode_index >= opcode_baseline);
 
   // Either modify an opcode or swap two of them based on random bit.
   std::uniform_int_distribution<int> swap_or_modify(0, 1);
   if (opcodes_[opcode_field].size() > 1 && swap_or_modify(engine_)) {
-    size_t index_1 = opcode_within_field(engine_);
+    std::uniform_int_distribution<size_t>
+      opcode_within_field(0, opcodes_[opcode_field].size() - 1);
+    size_t index_1 = opcode_index - opcode_baseline;
+    assert(index_1 < opcodes_[opcode_field].size());
     size_t index_2 = opcode_within_field(engine_);
+    assert(index_2 < opcodes_[opcode_field].size());
     uint32 op_1 = opcodes_[opcode_field][index_1];
     opcodes_[opcode_field][index_1] = opcodes_[opcode_field][index_2];
     opcodes_[opcode_field][index_2] = op_1;
   } else {
-    size_t index = opcode_within_field(engine_);
+    size_t index = opcode_index - opcode_baseline;
+    assert(index < opcodes_[opcode_field].size());
     OpCode old_op = static_cast<OpCode>(
         opcodes_[opcode_field][index] & 0x000000ff);
     switch (old_op) {
