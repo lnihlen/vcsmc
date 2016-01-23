@@ -8,18 +8,8 @@ namespace vcsmc {
 
 class Image;
 
-// Class for loading and saving Image objects from supported image file formats,
-// currently only PNG.
-class ImageFile {
- public:
-  static std::unique_ptr<Image> Load(const std::string& file_name);
-  static bool Save(const Image* image, const std::string& file_name);
-
- private:
-  static std::unique_ptr<Image> LoadPNG(const std::string& file_name);
-
-  static bool SavePNG(const Image* image, const std::string& file_name);
-};
+std::unique_ptr<Image> LoadImage(const std::string& file_name);
+bool SaveImage(const Image* image, const std::string& file_name);
 
 }  // namespace vcsmc
 

@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Save output image.
-  if (!vcsmc::ImageFile::Save(output_image.get(), FLAGS_output_image)) {
+  if (!vcsmc::SaveImage(output_image.get(), FLAGS_output_image)) {
     fprintf(stderr, "error saving output image %s\n",
         FLAGS_output_image.c_str());
     return -1;

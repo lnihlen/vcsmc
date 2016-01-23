@@ -3,41 +3,13 @@
 #include <cassert>
 #include <png.h>
 #include <stdio.h>
-#include <string>
 
 #include "image.h"
 #include "types.h"
 
-namespace vcsmc {
+namespace {
 
-// static
-std::unique_ptr<Image> ImageFile::Load(const std::string& file_name) {
-  size_t ext_pos = file_name.find_last_of(".");
-  if (ext_pos == std::string::npos)
-    return nullptr;
-
-  std::string ext = file_name.substr(ext_pos);
-  if (ext == ".png")
-    return LoadPNG(file_name);
-
-  return nullptr;
-}
-
-// static
-bool ImageFile::Save(const Image* image, const std::string& file_name) {
-  size_t ext_pos = file_name.find_last_of(".");
-  if (ext_pos == std::string::npos)
-    return false;
-
-  std::string ext = file_name.substr(ext_pos);
-  if (ext == ".png")
-    return SavePNG(image, file_name);
-
-  return false;
-}
-
-// static
-std::unique_ptr<Image> ImageFile::LoadPNG(const std::string& file_name) {
+std::unique_ptr<vcsmc::Image> LoadPNG(const std::string& file_name) {
   // Code almost entirely copied from readpng.c by Greg Roelofs.
   FILE* png_file = fopen(file_name.c_str(), "rb");
   if (!png_file)
@@ -82,7 +54,7 @@ std::unique_ptr<Image> ImageFile::LoadPNG(const std::string& file_name) {
   png_bytepp row_pointers = (png_bytepp)malloc(height * sizeof(png_bytep));
   uint32 bytes_per_row = png_get_rowbytes(png_ptr, info_ptr);
 
-  std::unique_ptr<Image> image(new Image(width, height));
+  std::unique_ptr<vcsmc::Image> image(new vcsmc::Image(width, height));
   for (uint32 i = 0; i < height; ++i) {
     row_pointers[i] = reinterpret_cast<uint8*>(image->pixels_writeable())
          + (i * bytes_per_row);
@@ -95,8 +67,7 @@ std::unique_ptr<Image> ImageFile::LoadPNG(const std::string& file_name) {
   return std::move(image);
 }
 
-// static
-bool ImageFile::SavePNG(const Image* image, const std::string& file_name) {
+bool SavePNG(const vcsmc::Image* image, const std::string& file_name) {
   // Code almost entirely copied from writepng.c by Greg Roelofs.
   FILE* png_file = fopen(file_name.c_str(), "wb");
   if (!png_file)
@@ -137,6 +108,34 @@ bool ImageFile::SavePNG(const Image* image, const std::string& file_name) {
   free(row_pointers);
   fclose(png_file);
   return true;
+}
+
+}
+
+namespace vcsmc {
+
+std::unique_ptr<Image> LoadImage(const std::string& file_name) {
+  size_t ext_pos = file_name.find_last_of(".");
+  if (ext_pos == std::string::npos)
+    return nullptr;
+
+  std::string ext = file_name.substr(ext_pos);
+  if (ext == ".png")
+    return LoadPNG(file_name);
+
+  return nullptr;
+}
+
+bool SaveImage(const Image* image, const std::string& file_name) {
+  size_t ext_pos = file_name.find_last_of(".");
+  if (ext_pos == std::string::npos)
+    return false;
+
+  std::string ext = file_name.substr(ext_pos);
+  if (ext == ".png")
+    return SavePNG(image, file_name);
+
+  return false;
 }
 
 }  // namespace vcsmc

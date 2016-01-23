@@ -204,7 +204,7 @@ int main(int argc, char* argv[]) {
     generation_size = generation->size();
   }
 
-  std::unique_ptr<vcsmc::Image> target_image = vcsmc::ImageFile::Load(
+  std::unique_ptr<vcsmc::Image> target_image = vcsmc::LoadImage(
       FLAGS_target_image_file);
   if (!target_image) {
     fprintf(stderr, "error opening target_image_file \"%s\".\n",
@@ -288,7 +288,7 @@ int main(int argc, char* argv[]) {
     }
   }
   if (ideal_image) {
-    if (!vcsmc::ImageFile::Save(ideal_image.get(),
+    if (!vcsmc::SaveImage(ideal_image.get(),
           FLAGS_ideal_image_output_file)) {
       fprintf(stderr, "Error saving ideal image output file.\n");
       return -1;

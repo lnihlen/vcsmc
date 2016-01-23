@@ -7,9 +7,6 @@
 
 namespace vcsmc {
 
-class CLCommandQueue;
-class ColuStrip;
-
 // Defines a field of uint32 ABGR colors, has a width and height, etc. On
 // little-endian machines the bytes will be RGBA in order from lowest address
 // to highest, meaning that the A will end up in the most significant byte of
@@ -28,12 +25,11 @@ class Image {
     return pixels_[(y * width_) + x];
   }
 
- protected:
+ private:
   const uint32 width_;
   const uint32 height_;
   std::unique_ptr<uint32[]> pixels_;
 
- private:
   // Private default ctor means "don't call me."
   Image() : width_(0), height_(0), pixels_(nullptr) {}
 };

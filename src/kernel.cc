@@ -91,7 +91,7 @@ bool Kernel::SaveImage(const std::string& file_name) const {
     ++pix;
     ++sim;
   }
-  return ImageFile::Save(&image, file_name);
+  return vcsmc::SaveImage(&image, file_name);
 }
 
 std::string Kernel::GetRandomState() const {

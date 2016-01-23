@@ -1511,3 +1511,13 @@ c) model building - first we build _influence_map_ which is a per-pixel
 Edge building:
 
 convert stills/frame-01.png -lat 50 -canny 0x1+10%+30% -colorspace gray edges/frame-01.png
+
+===============================================================================
+
+Extract WAV:
+
+ffmpeg -i oni.mp4 -acodec pcm_f32le -ac 2 oni.wav
+
+downmix to mono:
+sox input.wav output.wav remix −
+sox oni.wav --rate 31440 oni_final.wav remix -
