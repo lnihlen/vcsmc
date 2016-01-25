@@ -26,6 +26,7 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/kernel.o                                                            \
     $(OUT)/range.o                                                             \
     $(OUT)/serialization.o                                                     \
+    $(OUT)/sound_file.o                                                        \
     $(OUT)/spec.o                                                              \
     $(OUT)/value_map.o
 
@@ -38,6 +39,7 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/serialization_unittests.o
 
 all: $(OUT)/gen                                                                \
+     $(OUT)/pcm                                                                \
      $(OUT)/sim                                                                \
 
 $(OUT)/%.o: %.cc $(DEPS)
@@ -48,6 +50,9 @@ $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 
 $(OUT)/gen: $(OBJ) $(OUT)/gen.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/pcm: $(OBJ) $(OUT)/pcm.o
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/sim: $(OBJ) $(OUT)/sim.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)

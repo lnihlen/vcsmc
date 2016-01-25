@@ -1516,8 +1516,22 @@ convert stills/frame-01.png -lat 50 -canny 0x1+10%+30% -colorspace gray edges/fr
 
 Extract WAV:
 
-ffmpeg -i oni.mp4 -acodec pcm_f32le -ac 2 oni.wav
+ffmpeg -i oni.mp4 -acodec pcm_s32le -ac 2 oni.wav
+
+signed 32 bit litte-endian
 
 downmix to mono:
 sox input.wav output.wav remix −
 sox oni.wav --rate 31440 oni_final.wav remix -
+
+0001 =  1 => 1001 = 9
+0000 =  0 => 1000 = 8
+1111 = -1 => 0111 = 7
+1110 = -2 => 0110 = 6
+1101 = -3 => 0101 = 5
+1100 = -4 => 0100 = 4
+1011 = -5 => 0011 = 3
+ ...
+1000 = -8 => 0000 = 0
+
+0xfffffff0
