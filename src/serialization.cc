@@ -278,7 +278,7 @@ vcsmc::SpecList ParseSpecListInternal(yaml_parser_t parser) {
     kReady,  // Inside of a Spec, but not midway through a key-value pair.
     kFirstCycle,  // Next scalar should be the numeric value of first_cycle.
     kHardDuration,  // Optional next scalar should be hard-coded duration.
-    kBytecode,   // Next scalar value should be the assembler code.
+    kAssembler,   // Next scalar value should be the assembler code.
     kDone,  // Stream is finished, exit parser loop.
   };
   ParserState state = kIdle;
@@ -319,8 +319,8 @@ vcsmc::SpecList ParseSpecListInternal(yaml_parser_t parser) {
         if (state == kReady) {
           if (scalar == "first_cycle") {
             state = kFirstCycle;
-          } else if (scalar == "bytecode") {
-            state = kBytecode;
+          } else if (scalar == "assembler") {
+            state = kAssembler;
           } else if (scalar == "hard_duration") {
             state = kHardDuration;
           } else {
@@ -329,7 +329,7 @@ vcsmc::SpecList ParseSpecListInternal(yaml_parser_t parser) {
         } else if (state == kFirstCycle) {
           first_cycle = strtoul(scalar.c_str(), NULL, 10);
           state = kReady;
-        } else if (state == kBytecode) {
+        } else if (state == kAssembler) {
           bytecode =
             vcsmc::AssembleString(scalar, &assembly_cycles, &assembly_length);
           if (!bytecode) return nullptr;

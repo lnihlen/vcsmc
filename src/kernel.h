@@ -79,14 +79,28 @@ class Kernel {
     MutateKernelJob(const std::shared_ptr<Kernel> original,
                     std::shared_ptr<Kernel> target,
                     size_t number_of_mutations)
-       : original_(original),
-         target_(target),
-         number_of_mutations_(number_of_mutations) {}
+        : original_(original),
+          target_(target),
+          number_of_mutations_(number_of_mutations) {}
     void Execute() override;
    private:
     const std::shared_ptr<Kernel> original_;
     std::shared_ptr<Kernel> target_;
     size_t number_of_mutations_;
+  };
+
+  // Given an existing Kernel and a new list of specs (typically audio) this
+  // will clobber the existing specs and regenerate the bytecode.
+  class ClobberSpecJob : public Job {
+   public:
+    ClobberSpecJob(std::shared_ptr<Kernel> target,
+                   SpecList specs)
+        : target_(target),
+          specs_(specs) {}
+    void Execute() override;
+   private:
+    std::shared_ptr<Kernel> target_;
+    SpecList specs_;
   };
 
  private:

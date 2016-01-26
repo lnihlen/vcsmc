@@ -18,7 +18,7 @@
 #include "sound_file.h"
 #include "spec.h"
 
-DEFINE_int32(half_line_offset, 33,
+DEFINE_int32(half_line_offset, 27,
     "Number of cycles to wait per half-line for audio spec.");
 
 DEFINE_string(input_audio_file, "",
@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
     for (uint32 j = 0; j < vcsmc::kScreenHeight * 2; ++j) {
       size_t chars = snprintf(buf, 1024,
           "- first_cycle: %d\n"
-          "  bytecode: |\n"
+          "  assembler: |\n"
           "    lda #$%x\n"
           "    sta AUDV0\n",
           spec_start, *pcm);

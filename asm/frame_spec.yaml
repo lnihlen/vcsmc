@@ -1,100 +1,59 @@
 - first_cycle: 0  # first scanline, turn off vblank, turn on vsync, init state.
-  bytecode: |  # TODO: s/bytecode/assembler
+  assembler: |
     lda #0
     sta VBLANK
-    ldx #2
-    stx VSYNC
+    lda #2
+    sta VSYNC
+- first_cycle: 38
+  assembler: |
+    lda #0
     sta RESP0
     sta RESP1
     sta NUSIZ0
     sta NUSIZ1
+- first_cycle: 76
+  assembler: |
+    lda #0
     sta COLUP0
     sta COLUP1
     sta COLUBK
     sta CTRLPF
+- first_cycle: 114
+  assembler: |
+    lda #0
     sta REFP0
     sta REFP1
     sta PF0
     sta PF1
+- first_cycle: 152
+  assembler: |
+    lda #0
     sta PF2
-    sta AUDC0
-    sta AUDC1
-    sta AUDF0
-    sta AUDF1
-    sta AUDV0
-    sta AUDV1
     sta GRP0
     sta GRP1
     sta ENAM0
+- first_cycle: 190
+  assembler: |
+    lda #0
     sta ENAM1
     sta ENABL
     sta VDELP0
     sta VDELP1
+- first_cycle: 228  # 3rd scanline, turn off vsync.
+  assembler: |
+    lda #0
+    sta VSYNC
     sta RESMP0
     sta RESMP1
     sta HMCLR
-- first_cycle: 228  # 3rd scanline, turn off vsync.
-  hard_duration: 1900
-  bytecode: |
+- first_cycle: 266
+  assembler: |
     lda #0
-    sta VSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
+    sta AUDC0
+    sta AUDC1
+    sta AUDF0
+    sta AUDF1
 - first_cycle: 17632 # 232nd scanline, turn on vblank wait for 29 frames.
-  hard_duration: 2204
-  bytecode: |
+  assembler: |
     lda #$42
     sta VBLANK
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-    sta WSYNC
-

@@ -72,6 +72,9 @@ DEFINE_string(global_minimum_output_file, "out/minimum.yaml",
     "Required file path to save global minimum error kernel to.");
 DEFINE_string(ideal_image_output_file, "out/ideal.png",
     "Optional file path to save ideal color fit image.");
+DEFINE_string(audio_spec_list_file, "",
+    "Optional file path for audio spec, will clobber any existing specs at "
+    "same time in existing kernels.");
 
 class ComputeColorErrorTableJob : public vcsmc::Job {
  public:
@@ -168,6 +171,16 @@ int main(int argc, char* argv[]) {
       seed_array[i] = urandom();
   }
 
+  vcsmc::SpecList audio_spec_list;
+  if (FLAGS_audio_spec_list_file != "") {
+    audio_spec_list = vcsmc::ParseSpecListFile(FLAGS_audio_spec_list_file);
+    if (!audio_spec_list) {
+      fprintf(stderr, "error parsing audio spec list file %s.\n",
+          FLAGS_audio_spec_list_file.c_str());
+      return -1;
+    }
+  }
+
   std::seed_seq master_seed(seed_array.begin(), seed_array.end());
   std::default_random_engine seed_engine(master_seed);
 
@@ -181,6 +194,38 @@ int main(int argc, char* argv[]) {
       fprintf(stderr, "Error parsing spec list file %s.\n",
           FLAGS_spec_list_file.c_str());
       return -1;
+    }
+
+    // Merge audio spec list into frame spec list.
+    if (audio_spec_list) {
+      vcsmc::SpecList merged(new std::vector<vcsmc::Spec>);
+      size_t frame_spec_index = 0;
+      size_t audio_spec_index = 0;
+      while (audio_spec_index < audio_spec_list->size() &&
+             frame_spec_index < spec_list->size()) {
+        if (audio_spec_list->at(audio_spec_index).range().start_time() <
+            spec_list->at(frame_spec_index).range().start_time()) {
+          merged->push_back(audio_spec_list->at(audio_spec_index));
+          ++audio_spec_index;
+        } else {
+          merged->push_back(spec_list->at(frame_spec_index));
+          ++frame_spec_index;
+        }
+      }
+      if (audio_spec_index < audio_spec_list->size()) {
+        assert(frame_spec_index == spec_list->size());
+        while (audio_spec_index < audio_spec_list->size()) {
+          merged->push_back(audio_spec_list->at(audio_spec_index));
+          ++audio_spec_index;
+        }
+      } else {
+        assert(audio_spec_index == audio_spec_list->size());
+        while (frame_spec_index < spec_list->size()) {
+          merged->push_back(spec_list->at(frame_spec_index));
+          ++frame_spec_index;
+        }
+      }
+      spec_list = merged;
     }
 
     generation.reset(new std::vector<std::shared_ptr<vcsmc::Kernel>>);
@@ -202,6 +247,13 @@ int main(int argc, char* argv[]) {
       return -1;
     }
     generation_size = generation->size();
+    if (audio_spec_list) {
+      for (int i = 0; i < generation_size; ++i) {
+        job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
+            new vcsmc::Kernel::ClobberSpecJob(generation->at(i),
+                                              audio_spec_list)));
+      }
+    }
   }
 
   std::unique_ptr<vcsmc::Image> target_image = vcsmc::LoadImage(

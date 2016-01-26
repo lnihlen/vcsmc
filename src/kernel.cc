@@ -135,9 +135,10 @@ void Kernel::GenerateRandomKernelJob::Execute() {
         // beginning of the next spec, and that the addition of the next spec
         // would exceed the bank. We presume an average binary size of about
         // one byte per cycle.
-        if (bytes_remaining < kBankPadding ||
-            (bytes_remaining < next_spec_size &&
-                cycles_remaining < kBankPadding)) {
+        if ((bytes_remaining < kBankPadding ||
+             (bytes_remaining < next_spec_size &&
+                cycles_remaining < kBankPadding)) &&
+             cycles_remaining > 4) {
           if (kernel_->opcodes_.back().size()) {
             kernel_->total_dynamic_opcodes_ += kernel_->opcodes_.back().size();
             kernel_->opcode_counts_.push_back(kernel_->total_dynamic_opcodes_);
@@ -210,6 +211,19 @@ void Kernel::MutateKernelJob::Execute() {
   target_->RegenerateBytecode(target_->bytecode_size_);
 }
 
+void Kernel::ClobberSpecJob::Execute() {
+  size_t target_spec_index = 0;
+  for (size_t i = 0; i < specs_->size(); ++i) {
+    while (target_spec_index < target_->specs_->size() &&
+           target_->specs_->at(target_spec_index).range().start_time() <
+              specs_->at(i).range().start_time()) {
+      ++target_spec_index;
+    }
+    target_->specs_->at(target_spec_index) = specs_->at(i);
+  }
+  target_->RegenerateBytecode(target_->bytecode_size_);
+}
+
 uint32 Kernel::GenerateRandomOpcode(uint32 cycles_remaining) {
   // As no possible instruction lasts only one cycle we cannot support a
   // situation where only one cycle is remaining.
@@ -233,15 +247,12 @@ uint32 Kernel::GenerateRandomOpcode(uint32 cycles_remaining) {
 uint32 Kernel::GenerateRandomLoad() {
   std::uniform_int_distribution<uint8> arg_distro(0, 255);
   uint8 arg = arg_distro(engine_);
-  std::uniform_int_distribution<int> op_distro(0, 2);
+  std::uniform_int_distribution<int> op_distro(0, 1);
   switch (op_distro(engine_)) {
     case 0:
-      return PackOpCode(OpCode::LDA_Immediate, arg, 0);
-
-    case 1:
       return PackOpCode(OpCode::LDX_Immediate, arg, 0);
 
-    case 2:
+    case 1:
       return PackOpCode(OpCode::LDY_Immediate, arg, 0);
 
     default:
@@ -291,15 +302,12 @@ uint32 Kernel::GenerateRandomStore() {
   }};
   std::uniform_int_distribution<size_t> tia_distro(0, kValidTIA.size() - 1);
   uint8 tia = kValidTIA[tia_distro(engine_)];
-  std::uniform_int_distribution<int> op_distro(0, 2);
+  std::uniform_int_distribution<int> op_distro(0, 1);
   switch (op_distro(engine_)) {
     case 0:
-      return PackOpCode(OpCode::STA_ZeroPage, tia, 0);
-
-    case 1:
       return PackOpCode(OpCode::STX_ZeroPage, tia, 0);
 
-    case 2:
+    case 1:
       return PackOpCode(OpCode::STY_ZeroPage, tia, 0);
 
     default:

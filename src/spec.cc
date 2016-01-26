@@ -14,4 +14,12 @@ Spec::Spec(const Spec& spec)
   std::memcpy(bytecode_.get(), spec.bytecode_.get(), spec.size_);
 }
 
+const Spec& Spec::operator=(const Spec& spec) {
+  range_ = spec.range_;
+  size_ = spec.size_;
+  bytecode_.reset(new uint8[spec.size_]);
+  std::memcpy(bytecode_.get(), spec.bytecode_.get(), spec.size_);
+  return *this;
+}
+
 }  // namespace vcsmc
