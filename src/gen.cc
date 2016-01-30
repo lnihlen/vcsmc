@@ -409,11 +409,11 @@ int main(int argc, char* argv[]) {
 
     if ((generation_count % FLAGS_save_count) == 0) {
       // Report statistics and save generation to disk.
-      printf("gen: %7d leader: %016llx score: %6.2f%% %s\n",
-          generation_count,
-          generation->at(0)->fingerprint(),
-          percent_error,
-          reroll ? "*" : "");
+      // printf("gen: %7d leader: %016llx score: %6.2f%% %s\n",
+      //    generation_count,
+      //    generation->at(0)->fingerprint(),
+      //    percent_error,
+      //    reroll ? "*" : "");
       reroll = false;
       SaveState(generation, global_minimum);
     }
@@ -466,8 +466,8 @@ int main(int argc, char* argv[]) {
     ++generation_count;
     if (FLAGS_max_generation_number > 0 &&
         generation_count > FLAGS_max_generation_number) {
-      printf("max generation count limit %d hit, exiting.\n",
-          FLAGS_max_generation_number);
+      // printf("max generation count limit %d hit, exiting.\n",
+      //    FLAGS_max_generation_number);
       break;
     }
   }
