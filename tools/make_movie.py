@@ -26,7 +26,7 @@ def parse_csv_file(frame_csv):
     if s[0] != 'frame' or s[1] != 'video':
       print 'skipping odd line: ' + line
     is_keyframe = s[2] == '1'
-    t = float(s[4])
+    t = float(s[5])
     frames.append((is_keyframe, t))
   return frames
 
@@ -39,6 +39,8 @@ def make_output_directory_structure(root_dir):
     os.makedirs(os.path.join(root_dir, 'stills'))
   if not os.path.exists(os.path.join(root_dir, 'kernels')):
     os.makedirs(os.path.join(root_dir, 'kernels'))
+  if not os.path.exists(os.path.join(root_dir, 'ideal')):
+    os.makedirs(os.path.join(root_dir, 'ideal'))
 
 def main(args):
   frames = parse_csv_file(args.frame_csv)
@@ -53,6 +55,11 @@ def main(args):
   current_frame = 0
   current_still = 0
   while current_frame < len(audio_frames):
+    print 'frame %d of %d, still %d of %d' \
+            % (current_frame + 1, \
+               len(audio_frames), \
+               current_still + 1, \
+               len(frames))
     # See if we need to advance image.
     frame_time = float(current_frame) * (1.0 / 60.0)
     reset_image = current_frame == 0
@@ -69,6 +76,8 @@ def main(args):
         'frame-%07d.png' % (current_frame))
     kernel_output_file = os.path.join(args.output_dir, 'kernels', \
         'frame-%07d.yaml' % (current_frame))
+    ideal_output_file = os.path.join(args.output_dir, 'ideal', \
+        'frame-%07d.png' % (current_frame))
     command_line = \
             [args.gen_path,
             '--target_percent_error=%d' % (quality),
@@ -76,7 +85,8 @@ def main(args):
             '--generation_output_file=%s' % (gen_output_file),
             '--image_output_file=%s' % (image_output_file),
             '--global_minimum_output_file=%s' % (kernel_output_file),
-            '--audio_spec_list_file=%s' % (audio_frames[current_frame])]
+            '--audio_spec_list_file=%s' % (audio_frames[current_frame]),
+            '--ideal_image_output_file=%s' % (ideal_output_file)]
     # Seeding on previous generation. We always seed on an existing generation
     # file if there is one.
     if os.path.exists(gen_output_file):

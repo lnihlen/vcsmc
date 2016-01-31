@@ -24,7 +24,7 @@ extern "C" {
 }
 
 DEFINE_int32(generation_size, 1000,
-    "Number of individuals to keep in an evolutionary programing generation.");
+    "Number of individuals to keep in an evolutionary programming generation.");
 DEFINE_int32(max_generation_number, 0,
     "Maximum number of generations of evolutionary programming to run. If zero "
     "the program will run until the minimum error percentage target is met.");
@@ -64,13 +64,13 @@ DEFINE_string(seed_generation_file, "",
 DEFINE_string(generation_output_file, "out/generation.yaml",
     "Optional path to output yaml file for generation saves.");
 DEFINE_string(image_output_file, "",
-    "Optional file to save minimum simulated image to.");
+    "Optional file to save minimum-error simulated image to.");
 DEFINE_string(input_error_weighting_bitmap, "",
     "Optional file to bitmap image of additional weight per-pixel to add to "
     "error distance computations.");
 DEFINE_string(global_minimum_output_file, "out/minimum.yaml",
     "Required file path to save global minimum error kernel to.");
-DEFINE_string(ideal_image_output_file, "out/ideal.png",
+DEFINE_string(ideal_image_output_file, "",
     "Optional file path to save ideal color fit image.");
 DEFINE_string(audio_spec_list_file, "",
     "Optional file path for audio spec, will clobber any existing specs at "
@@ -346,6 +346,10 @@ int main(int argc, char* argv[]) {
       return -1;
     }
   }
+
+  // Prevent divide-by-zero in completely fittable images.
+  if (min_total_error == 0.0)
+    min_total_error = 1.0;
 
   // Initialize simulator global state.
   init_z26_global_tables();
