@@ -15,10 +15,12 @@ LDFLAGS+=-L/usr/local/lib -Wl,-no_pie
 endif
 
 DEPS=constants.h image_file.h types.h
+
+COLOR_OBJ=$(OUT)/color.o                                                       \
+          $(OUT)/color_table.o                                                 \
+
 OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/bit_map.o                                                           \
-    $(OUT)/color.o                                                             \
-    $(OUT)/color_table.o                                                       \
     $(OUT)/gray_map.o                                                          \
     $(OUT)/image.o                                                             \
     $(OUT)/image_file.o                                                        \
@@ -38,29 +40,40 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/serialization_unittests.o
 
-all: $(OUT)/gen                                                                \
+all: $(OUT)/fit                                                                \
+     $(OUT)/gen                                                                \
      $(OUT)/pcm                                                                \
      $(OUT)/sim                                                                \
 
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
+$(OUT)/color_distance_table.o: $(OUT)/build_error_distances
+	$(OUT)/build_error_distances --output_directory=../out
+	$(CC) -c -o $@ $(OUT)/color_distance_table.cc $(CFLAGS)
+
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CC) -c -o $@ $< $(CFLAGS) -I$(GTEST_INCLUDE)
 
-$(OUT)/gen: $(OBJ) $(OUT)/gen.o
+$(OUT)/build_error_distances: $(COLOR_OBJ) $(OUT)/build_error_distances.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-$(OUT)/pcm: $(OBJ) $(OUT)/pcm.o
+$(OUT)/fit: $(OBJ) $(COLOR_OBJ) $(OUT)/fit.o $(OUT)/color_distance_table.o
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/gen: $(OBJ) $(COLOR_OBJ) $(OUT)/gen.o $(OUT)/color_distance_table.o
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/pcm: $(OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o $(OUT)/pcm.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-$(OUT)/sim: $(OBJ) $(OUT)/sim.o
+$(OUT)/sim: $(OBJ) $(COLOR_OBJ) $(OUT)/sim.o $(OUT)/color_distance_table.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
-    | $(OUTTESTS)/
+    $(COLOR_OBJ) $(OUT)/color_distance_table.o | $(OUTTESTS)/
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS) $(GTEST_LIB)
 
 $(OUTTESTS)/:

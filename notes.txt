@@ -1535,3 +1535,19 @@ sox oni.wav --rate 31440 oni_final.wav remix -
 1000 = -8 => 0000 = 0
 
 0xfffffff0
+
+===============================================================================
+
+Lot of work being done on duplicate frames.
+ffprobe -show_frames -count_frames -select_streams v -print_format csv test.mp4
+ffmpeg -i test.mp4 -s 320x192 -pix_fmt abgr -f image2 frames/frame-%07d.png
+New program fit computes ideal image, saves half-color bytemap of best-fit at
+320x240. Also computes fingerprint of bytemap, and can save ideal-color image
+as well. Refactor gen to only accept binary blob of already best-fit image.
+Then first thing make_movie does is enumerate through all frame images building
+a list of frame# to fingerprint. Then split out another piece of gen to do the
+audio resequencing? Just load the optimum kernel and supply new audio, then save
+out the new kernel in yaml/bin blob form. Python script has list of
+frames->fingerprint, which it saves when complete, then map of
+fingerprint->(current score), so that when recomputing at higher quality level
+it knows which frames require recomputation?

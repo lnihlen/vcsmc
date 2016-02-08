@@ -181,11 +181,11 @@ class GenerateBackgroundColorKernelJob : public vcsmc::Job {
       spec_cycles = 17632 - total_cycles;
       spec_size = spec_cycles / 2;
       bool need_jmp = false;
-      if ((total_size % vcsmc::kBankSize) + spec_size >
-          (vcsmc::kBankSize - vcsmc::kBankPadding - 5)) {
+      if ((total_size % vcsmc::kBankSize) + spec_size >=
+          (vcsmc::kBankSize - vcsmc::kBankPadding - 3)) {
         need_jmp = true;
-        spec_size = vcsmc::kBankSize - vcsmc::kBankPadding - 5 -
-            (total_size % vcsmc::kBankSize);
+        spec_size = vcsmc::kBankSize - vcsmc::kBankPadding -
+            (total_size % vcsmc::kBankSize) - 3;
         spec_cycles = spec_size * 2;
       }
       bytecode.reset(new uint8[spec_size]);
@@ -230,17 +230,17 @@ namespace vcsmc {
 TEST(GenerateRandomKernelJobTest, GeneratesValidRandomKernel) {
   SpecList specs = ParseSpecListString(
       "- first_cycle: 0\n"
-      "  bytecode: |\n"
+      "  assembler: |\n"
       "   lda #0\n"
       "   sta VBLANK\n"
       "   ldx #2\n"
       "   stx VSYNC\n"
       "- first_cycle: 228\n"
-      "  bytecode: |\n"
+      "  assembler: |\n"
       "    lda #0\n"
       "    sta VSYNC\n"
       "- first_cycle: 17632\n"
-      "  bytecode: |\n"
+      "  assembler: |\n"
       "    lda #$42\n"
       "    sta VBLANK\n");
   ASSERT_NE(nullptr, specs);
@@ -253,7 +253,7 @@ TEST(GenerateRandomKernelJobTest, GeneratesValidRandomKernel) {
 }
 
 TEST(ScoreKernelJobTest, SimulatesSimpleFrameKernel) {
-  vcsmc::JobQueue job_queue(0);
+  vcsmc::JobQueue job_queue(1);
   std::vector<std::shared_ptr<vcsmc::Kernel>> kernels;
 
   for (size_t i = 0; i < 128; ++i) {
@@ -269,19 +269,12 @@ TEST(ScoreKernelJobTest, SimulatesSimpleFrameKernel) {
 
   job_queue.Finish();
 
-  // Simulate and score, should produce a valid empty frame with background
-  // color.
-  std::vector<Kernel::ScoreKernelJob::ColorDistances> test_distances(128);
+  std::vector<std::unique_ptr<uint8[]>> test_targets(128);
   for (size_t i = 0; i < 128; ++i) {
-    // Build distance table that treats target background color as zero error,
-    // all other colors as nonzero.
-    for (size_t j = 0; j < 128; ++j) {
-      const double dist = (i == j) ? 0.0 : 1.0;
-      test_distances[i].emplace_back(
-          kTargetFrameWidthPixels * kFrameHeightPixels, dist);
-    }
+    test_targets[i].reset(new uint8[vcsmc::kFrameSizeBytes]);
+    std::memset(test_targets[i].get(), i, vcsmc::kFrameSizeBytes);
     job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
-          new vcsmc::Kernel::ScoreKernelJob(kernels[i], test_distances[i])));
+        new vcsmc::Kernel::ScoreKernelJob(kernels[i], test_targets[i].get())));
   }
 
   job_queue.Finish();

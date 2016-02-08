@@ -39,7 +39,6 @@ class Kernel {
   uint64 fingerprint() const { return fingerprint_; }
   bool score_valid() const { return score_valid_; }
   double score() const { return score_; }
-  const double* pixel_errors() const { return pixel_errors_.get(); }
   uint32 victories() const { return victories_; }
   const SpecList specs() const { return specs_; }
   const std::vector<std::vector<uint32>>& opcodes() const { return opcodes_; }
@@ -61,15 +60,14 @@ class Kernel {
   // target lab image.
   class ScoreKernelJob : public Job {
    public:
-    typedef std::vector<std::vector<double>> ColorDistances;
     ScoreKernelJob(std::shared_ptr<Kernel> kernel,
-        const ColorDistances& distances)
-        : kernel_(kernel), distances_(distances) {}
+        const uint8* target_colors)
+        : kernel_(kernel), target_colors_(target_colors) {}
     void Execute() override;
 
    private:
     std::shared_ptr<Kernel> kernel_;
-    const ColorDistances& distances_;
+    const uint8* target_colors_;
   };
 
   // Given a provided reference kernel, generate the target kernel as a copy of
@@ -111,7 +109,7 @@ class Kernel {
   // Given valid data in opcodes_ refills bytecode_ with the concatenated data
   // in opcodes_ and specs_, appends jumps and updates fingerprint_.
   void RegenerateBytecode(size_t bytecode_size);
-  void SimulateAndScore(const ScoreKernelJob::ColorDistances& distances);
+  void SimulateAndScore(const uint8* target_colors);
   void Mutate();
   // Given a number within [0, total_dynamic_opcodes_) returns the index of the
   // vector within opcodes_ that contains this value.
@@ -135,7 +133,6 @@ class Kernel {
   bool score_valid_;
   double score_;
   uint32 victories_;
-  std::unique_ptr<double[]> pixel_errors_;
 };
 
 typedef std::shared_ptr<std::vector<std::shared_ptr<Kernel>>> Generation;

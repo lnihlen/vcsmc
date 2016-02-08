@@ -13,6 +13,7 @@ extern "C" {
 
 #include "assembler.h"
 #include "color.h"
+#include "color_distance_table.h"
 #include "color_table.h"
 #include "image.h"
 #include "image_file.h"
@@ -138,7 +139,7 @@ void Kernel::GenerateRandomKernelJob::Execute() {
         if ((bytes_remaining < kBankPadding ||
              (bytes_remaining < next_spec_size &&
                 cycles_remaining < kBankPadding)) &&
-             cycles_remaining > 4) {
+             (cycles_remaining > 4 || cycles_remaining == 3)) {
           if (kernel_->opcodes_.back().size()) {
             kernel_->total_dynamic_opcodes_ += kernel_->opcodes_.back().size();
             kernel_->opcode_counts_.push_back(kernel_->total_dynamic_opcodes_);
@@ -181,7 +182,7 @@ void Kernel::GenerateRandomKernelJob::Execute() {
 }
 
 void Kernel::ScoreKernelJob::Execute() {
-  kernel_->SimulateAndScore(distances_);
+  kernel_->SimulateAndScore(target_colors_);
 }
 
 void Kernel::MutateKernelJob::Execute() {
@@ -319,7 +320,7 @@ uint32 Kernel::GenerateRandomStore() {
 }
 
 void Kernel::AppendJmpSpec(uint32 current_cycle, size_t current_bank_size) {
-  assert(current_bank_size < (kBankSize - kBankPadding - 3));
+  assert(current_bank_size <= (kBankSize - kBankPadding - 3));
   size_t bank_balance_size = kBankSize - current_bank_size;
   std::unique_ptr<uint8[]> bytecode(new uint8[bank_balance_size]);
   std::memset(bytecode.get() + 3, 0, bank_balance_size - 6);
@@ -383,19 +384,18 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
                               bytecode_size_);
 }
 
-void Kernel::SimulateAndScore(const ScoreKernelJob::ColorDistances& distances) {
+void Kernel::SimulateAndScore(const uint8* target_colors) {
   sim_frame_.reset(new uint8[kLibZ26ImageSizeBytes]);
   std::memset(sim_frame_.get(), 0, kLibZ26ImageSizeBytes);
   simulate_single_frame(bytecode_.get(), bytecode_size_, sim_frame_.get());
   score_ = 0.0;
   uint8* frame_pointer = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
-  pixel_errors_.reset(new double[kTargetFrameWidthPixels * kFrameHeightPixels]);
-  for (size_t i = 0; i < kTargetFrameWidthPixels * kFrameHeightPixels; ++i) {
+  for (size_t i = 0; i < kFrameSizeBytes; ++i) {
     *frame_pointer = *frame_pointer & 0x7f;
     assert(*frame_pointer < 128);
-    pixel_errors_.get()[i] = score_;
-    score_ += distances[*frame_pointer][i];
-    ++frame_pointer;
+    score_ += kColorDistanceNTSC[(target_colors[i] * 128) + *frame_pointer];
+    // Sim output has pixels doubled horizontally.
+    frame_pointer += 2;
   }
   score_valid_ = true;
 }

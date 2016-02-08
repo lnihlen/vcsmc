@@ -4,16 +4,24 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <fcntl.h>
 #include <gflags/gflags.h>
 #include <gperftools/profiler.h>
-#include <stdlib.h>
 #include <random>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <vector>
 
 #include "bit_map.h"
 #include "color.h"
 #include "color_table.h"
 #include "image.h"
 #include "image_file.h"
+#include "job.h"
 #include "job_queue.h"
 #include "kernel.h"
 #include "serialization.h"
@@ -22,6 +30,9 @@
 extern "C" {
 #include <libz26/libz26.h>
 }
+
+DEFINE_bool(print_stats, false,
+    "If true gen will print generation statistics to stdio periodically.");
 
 DEFINE_int32(generation_size, 1000,
     "Number of individuals to keep in an evolutionary programming generation.");
@@ -33,13 +44,8 @@ DEFINE_int32(tournament_size, 100,
 DEFINE_int32(worker_threads, 0,
     "Number of threads to create to work in parallel, set to 0 to pick based "
     "on hardware.");
-DEFINE_int32(target_percent_error, 10,
-    "Percentage above the minimum total error the program will attempt to "
-    "reach.");
 DEFINE_int32(save_count, 1000,
     "Number of generations to run before saving the results.");
-DEFINE_int32(error_bitmap_multiplier, 5,
-    "Multiplier to add to optional error weighting bitmap.");
 DEFINE_int32(stagnant_generation_count, 250,
     "Number of generations without score change before randomizing entire "
     "cohort. Set to zero to disable.");
@@ -47,13 +53,13 @@ DEFINE_int32(stagnant_mutation_count, 16,
     "Number of mutations to apply to each cohort member when re-randomizing "
     "stagnant cohort.");
 
+DEFINE_string(color_input_file, "",
+    "Required - best fit color map as computed by fit.");
 DEFINE_string(random_seed, "",
     "Hex string of seed for pseudorandom seed generation. If not provided one "
     "will be generated from hardware random device.");
 DEFINE_string(spec_list_file, "asm/frame_spec.yaml",
     "Required - path to spec list yaml file.");
-DEFINE_string(target_image_file, "",
-    "Required - path to target image file to score kernels against.");
 DEFINE_string(gperf_output_file, "",
     "Defining enables gperftools output to the provided profile path.");
 DEFINE_string(seed_generation_file, "",
@@ -65,49 +71,13 @@ DEFINE_string(generation_output_file, "out/generation.yaml",
     "Optional path to output yaml file for generation saves.");
 DEFINE_string(image_output_file, "",
     "Optional file to save minimum-error simulated image to.");
-DEFINE_string(input_error_weighting_bitmap, "",
-    "Optional file to bitmap image of additional weight per-pixel to add to "
-    "error distance computations.");
 DEFINE_string(global_minimum_output_file, "out/minimum.yaml",
     "Required file path to save global minimum error kernel to.");
-DEFINE_string(ideal_image_output_file, "",
-    "Optional file path to save ideal color fit image.");
 DEFINE_string(audio_spec_list_file, "",
     "Optional file path for audio spec, will clobber any existing specs at "
     "same time in existing kernels.");
-
-class ComputeColorErrorTableJob : public vcsmc::Job {
- public:
-  ComputeColorErrorTableJob(
-      const double* target_lab,
-      std::vector<double>& error_table,
-      size_t color_index,
-      const vcsmc::BitMap* error_weights)
-      : target_lab_(target_lab),
-        error_table_(error_table),
-        color_index_(color_index),
-        error_weights_(error_weights) {}
-  void Execute() override {
-    const double* atari_lab = vcsmc::kAtariNTSCLabColorTable +
-        (color_index_ * 4);
-    for (size_t i = 0;
-         i < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels; ++i) {
-      double error = vcsmc::Ciede2k(target_lab_, atari_lab);
-      if (error_weights_ &&
-          error_weights_->bit(i % vcsmc::kTargetFrameWidthPixels,
-                              i / vcsmc::kTargetFrameWidthPixels)) {
-        error *= static_cast<double>(FLAGS_error_bitmap_multiplier);
-      }
-      target_lab_ += 4;
-      error_table_.push_back(error);
-    }
-  }
- private:
-  const double* target_lab_;
-  std::vector<double>& error_table_;
-  size_t color_index_;
-  const vcsmc::BitMap* error_weights_;
-};
+DEFINE_string(target_error, "61440.0",
+    "Error at which to stop optimizing.");
 
 class CompeteKernelJob : public vcsmc::Job {
  public:
@@ -170,6 +140,21 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < vcsmc::kSeedSizeWords; ++i)
       seed_array[i] = urandom();
   }
+
+  int col_fd = open(FLAGS_color_input_file.c_str(), O_RDONLY);
+  if (col_fd < 0) {
+    fprintf(stderr, "error opening color input file %s.\n",
+        FLAGS_color_input_file.c_str());
+    return -1;
+  }
+  std::unique_ptr<uint8[]> target_colors(new uint8[vcsmc::kFrameSizeBytes]);
+  size_t bytes_read = read(col_fd, target_colors.get(), vcsmc::kFrameSizeBytes);
+  if (bytes_read != vcsmc::kFrameSizeBytes) {
+    fprintf(stderr, "file read error on color input file %s.\n",
+        FLAGS_color_input_file.c_str());
+    return -1;
+  }
+  close(col_fd);
 
   vcsmc::SpecList audio_spec_list;
   if (FLAGS_audio_spec_list_file != "") {
@@ -256,101 +241,6 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  std::unique_ptr<vcsmc::Image> target_image = vcsmc::LoadImage(
-      FLAGS_target_image_file);
-  if (!target_image) {
-    fprintf(stderr, "error opening target_image_file \"%s\".\n",
-        FLAGS_target_image_file.c_str());
-    return -1;
-  }
-  if (target_image->width() != vcsmc::kTargetFrameWidthPixels ||
-      target_image->height() != vcsmc::kFrameHeightPixels) {
-    fprintf(stderr, "Bad image dimensions %dx%d not %dx%d in %s\n",
-        target_image->width(),
-        target_image->height(),
-        vcsmc::kTargetFrameWidthPixels,
-        vcsmc::kFrameHeightPixels,
-        FLAGS_target_image_file.c_str());
-    return -1;
-  }
-
-  // Convert target image to Lab colors for scoring.
-  std::shared_ptr<double> target_lab(
-      new double[vcsmc::kTargetFrameWidthPixels *
-                 vcsmc::kFrameHeightPixels * 4]);
-  for (size_t i = 0;
-       i < (vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels); ++i) {
-    vcsmc::RGBAToLabA(reinterpret_cast<uint8*>(target_image->pixels() + i),
-        target_lab.get() + (i * 4));
-  }
-
-  std::unique_ptr<vcsmc::BitMap> error_weights;
-  if (FLAGS_input_error_weighting_bitmap != "") {
-    error_weights = vcsmc::BitMap::Load(FLAGS_input_error_weighting_bitmap);
-    if (!error_weights) {
-      fprintf(stderr, "error opening error weight image file %s.\n",
-          FLAGS_input_error_weighting_bitmap.c_str());
-      return -1;
-    }
-    if (error_weights->width() != vcsmc::kTargetFrameWidthPixels ||
-        error_weights->height() != vcsmc::kFrameHeightPixels) {
-      fprintf(stderr,
-          "Bad error weight image dimensions %dx%d not %dx%d in %s\n",
-          error_weights->width(),
-          error_weights->height(),
-          vcsmc::kTargetFrameWidthPixels,
-          vcsmc::kFrameHeightPixels,
-          FLAGS_input_error_weighting_bitmap.c_str());
-      return -1;
-    }
-  }
-
-  vcsmc::Kernel::ScoreKernelJob::ColorDistances color_distances(128);
-  for (size_t i = 0; i < vcsmc::kNTSCColors; ++i) {
-    job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(new ComputeColorErrorTableJob(
-        target_lab.get(), color_distances[i], i, error_weights.get())));
-  }
-
-  job_queue.Finish();
-
-  // Compute theoretical minimum error.
-  double min_total_error = 0.0;
-  std::unique_ptr<vcsmc::Image> ideal_image;
-  if (FLAGS_ideal_image_output_file != "") {
-    ideal_image.reset(new vcsmc::Image(vcsmc::kTargetFrameWidthPixels,
-          vcsmc::kFrameHeightPixels));
-  }
-  for (size_t i = 0;
-      i < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels; i += 2) {
-    double min_pixel_error = color_distances[0][i] + color_distances[0][i + 1];
-    size_t min_pixel_color = 0;
-    for (size_t j = 1; j < vcsmc::kNTSCColors; ++j) {
-      double sum = color_distances[j][i] + color_distances[j][i + 1];
-      if (sum < min_pixel_error) {
-        min_pixel_error = sum;
-        min_pixel_color = j;
-      }
-    }
-    min_total_error += min_pixel_error;
-    if (ideal_image) {
-      ideal_image->pixels_writeable()[i] =
-          vcsmc::kAtariNTSCABGRColorTable[min_pixel_color];
-      ideal_image->pixels_writeable()[i + 1] =
-          vcsmc::kAtariNTSCABGRColorTable[min_pixel_color];
-    }
-  }
-  if (ideal_image) {
-    if (!vcsmc::SaveImage(ideal_image.get(),
-          FLAGS_ideal_image_output_file)) {
-      fprintf(stderr, "Error saving ideal image output file.\n");
-      return -1;
-    }
-  }
-
-  // Prevent divide-by-zero in completely fittable images.
-  if (min_total_error == 0.0)
-    min_total_error = 1.0;
-
   // Initialize simulator global state.
   init_z26_global_tables();
 
@@ -360,8 +250,7 @@ int main(int argc, char* argv[]) {
     ProfilerStart(FLAGS_gperf_output_file.c_str());
   }
 
-  double percent_error = 0.0;
-  double target_percent_error = static_cast<double>(FLAGS_target_percent_error);
+  double target_error = strtod(FLAGS_target_error.c_str(), nullptr);
   int generation_count = 0;
   int streak = 0;
   double last_generation_score = 0.0;
@@ -369,13 +258,13 @@ int main(int argc, char* argv[]) {
 
   std::shared_ptr<vcsmc::Kernel> global_minimum = generation->at(0);
 
-  while (percent_error > target_percent_error || generation_count == 0) {
+  while (global_minimum->score() > target_error || generation_count == 0) {
     // Score all unscored kernels in the current generation.
     for (int j = 0; j < generation_size; ++j) {
       if (!generation->at(j)->score_valid()) {
         job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
               new vcsmc::Kernel::ScoreKernelJob(generation->at(j),
-                                                color_distances)));
+                                                target_colors.get())));
       }
     }
 
@@ -408,24 +297,22 @@ int main(int argc, char* argv[]) {
       global_minimum = generation->at(0);
     }
 
-    percent_error = ((generation->at(0)->score() - min_total_error) /
-        min_total_error) * 100.0;
-
     if ((generation_count % FLAGS_save_count) == 0) {
-      // Report statistics and save generation to disk.
-      // printf("gen: %7d leader: %016llx score: %6.2f%% %s\n",
-      //    generation_count,
-      //    generation->at(0)->fingerprint(),
-      //    percent_error,
-      //    reroll ? "*" : "");
+      if (FLAGS_print_stats) {
+        printf("gen: %7d leader: %016llx score: %f %s\n",
+            generation_count,
+            generation->at(0)->fingerprint(),
+            global_minimum->score(),
+            reroll ? "*" : "");
+      }
       reroll = false;
       SaveState(generation, global_minimum);
     }
 
-    if (fabs(last_generation_score - percent_error) < 0.00001) {
+    if (fabs(last_generation_score - global_minimum->score()) < 0.00001) {
       ++streak;
     } else {
-      last_generation_score = percent_error;
+      last_generation_score = global_minimum->score();
       streak = 0;
     }
 
@@ -470,8 +357,6 @@ int main(int argc, char* argv[]) {
     ++generation_count;
     if (FLAGS_max_generation_number > 0 &&
         generation_count > FLAGS_max_generation_number) {
-      // printf("max generation count limit %d hit, exiting.\n",
-      //    FLAGS_max_generation_number);
       break;
     }
   }
