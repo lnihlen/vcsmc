@@ -67,7 +67,7 @@ DEFINE_string(seed_generation_file, "",
     "the evolutionary programming algorithm. The generation size will be set "
     "to the number of kernels in the file. Any provided spec list will also be "
     "ignored as the kernels provide their own spec.");
-DEFINE_string(generation_output_file, "out/generation.yaml",
+DEFINE_string(generation_output_file, "",
     "Optional path to output yaml file for generation saves.");
 DEFINE_string(image_output_file, "",
     "Optional file to save minimum-error simulated image to.");
@@ -78,6 +78,7 @@ DEFINE_string(audio_spec_list_file, "",
     "same time in existing kernels.");
 DEFINE_string(target_error, "61440.0",
     "Error at which to stop optimizing.");
+DEFINE_string(append_kernel_binary, "", "Path to append kernel binary.");
 
 class CompeteKernelJob : public vcsmc::Job {
  public:
@@ -366,6 +367,10 @@ int main(int argc, char* argv[]) {
   }
 
   SaveState(generation, global_minimum);
+
+  if (FLAGS_append_kernel_binary != "") {
+    vcsmc::AppendKernelBinary(global_minimum, FLAGS_append_kernel_binary);
+  }
 
   return 0;
 }

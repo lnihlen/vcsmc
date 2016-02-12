@@ -466,6 +466,19 @@ bool SaveKernelToFile(std::shared_ptr<Kernel> kernel,
   return true;
 }
 
+bool AppendKernelBinary(std::shared_ptr<Kernel> kernel,
+    const std::string& file_name) {
+  int fd = open(file_name.c_str(),
+      O_APPEND | O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+  if (fd < 0) {
+    return false;
+  }
+  // Write kernel binary.
+  size_t bytes_written = write(fd, kernel->bytecode(), kernel->bytecode_size());
+  close(fd);
+  return bytes_written == kernel->bytecode_size();
+}
+
 SpecList ParseSpecListFile(const std::string& file_name) {
   yaml_parser_t parser;
   yaml_parser_initialize(&parser);

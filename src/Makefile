@@ -43,6 +43,7 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
 all: $(OUT)/fit                                                                \
      $(OUT)/gen                                                                \
      $(OUT)/pcm                                                                \
+     $(OUT)/respec                                                             \
      $(OUT)/sim                                                                \
 
 $(OUT)/%.o: %.cc $(DEPS)
@@ -65,6 +66,9 @@ $(OUT)/gen: $(OBJ) $(COLOR_OBJ) $(OUT)/gen.o $(OUT)/color_distance_table.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/pcm: $(OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o $(OUT)/pcm.o
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/respec: $(OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o $(OUT)/respec.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/sim: $(OBJ) $(COLOR_OBJ) $(OUT)/sim.o $(OUT)/color_distance_table.o
