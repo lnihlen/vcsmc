@@ -69,8 +69,9 @@ void JobQueue::ThreadWorkLoop() {
     {
       std::unique_lock<std::mutex> lock(active_mutex_);
       active_workers_--;
-      active_cv_.notify_one();
     }
+
+    active_cv_.notify_one();
   }
 }
 
