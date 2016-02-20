@@ -52,6 +52,8 @@ DEFINE_int32(stagnant_generation_count, 250,
 DEFINE_int32(stagnant_mutation_count, 16,
     "Number of mutations to apply to each cohort member when re-randomizing "
     "stagnant cohort.");
+DEFINE_int32(stagnant_count_limit, 0,
+    "If nonzero, terminate after the supplied number of randomizations.");
 
 DEFINE_string(color_input_file, "",
     "Required - best fit color map as computed by fit.");
@@ -256,6 +258,7 @@ int main(int argc, char* argv[]) {
   int streak = 0;
   double last_generation_score = 0.0;
   bool reroll = false;
+  int reroll_count = 0;
 
   std::shared_ptr<vcsmc::Kernel> global_minimum = generation->at(0);
 
@@ -335,6 +338,9 @@ int main(int argc, char* argv[]) {
       }
       job_queue.Finish();
     } else {
+      ++reroll_count;
+      if (reroll_count > FLAGS_stagnant_count_limit)
+        break;
       reroll = true;
       streak = 0;
       vcsmc::Generation mutated_generation(
