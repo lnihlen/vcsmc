@@ -87,10 +87,19 @@ bool Kernel::SaveImage(const std::string& file_name) const {
   Image image(kTargetFrameWidthPixels, kFrameHeightPixels);
   uint32* pix = image.pixels_writeable();
   const uint8* sim = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
-  for (size_t i = 0; i < kTargetFrameWidthPixels * kFrameHeightPixels; ++i) {
-    *pix = kAtariNTSCABGRColorTable[*sim];
+  for (size_t i = 0; i < kTargetFrameWidthPixels * kFrameHeightPixels; i += 2) {
+    uint32 color;
+    if (*sim >= 128) {
+      color = 0xff00ff00;  // Bright green for undefined pixel.
+    } else {
+      assert(*sim < 128);
+      color = kAtariNTSCABGRColorTable[*sim];
+    }
+    *pix = color;
     ++pix;
-    ++sim;
+    *pix = color;
+    ++pix;
+    sim += 2;
   }
   return vcsmc::SaveImage(&image, file_name);
 }
@@ -265,7 +274,7 @@ uint32 Kernel::GenerateRandomLoad() {
 }
 
 uint32 Kernel::GenerateRandomStore() {
-  std::array<uint8, 34> kValidTIA{{
+  std::array<uint8, 27> kValidTIA{{
     TIA::NUSIZ0,
     TIA::NUSIZ1,
     TIA::COLUP0,
@@ -288,18 +297,11 @@ uint32 Kernel::GenerateRandomStore() {
     TIA::ENAM0,
     TIA::ENAM1,
     TIA::ENABL,
-    TIA::HMP0,
-    TIA::HMP1,
-    TIA::HMM0,
-    TIA::HMM1,
-    TIA::HMBL,
     TIA::VDELP0,
     TIA::VDELP1,
     TIA::VDELBL,
     TIA::RESMP0,
     TIA::RESMP1,
-    TIA::HMOVE,
-    TIA::HMCLR
   }};
   std::uniform_int_distribution<size_t> tia_distro(0, kValidTIA.size() - 1);
   uint8 tia = kValidTIA[tia_distro(engine_)];
@@ -391,9 +393,12 @@ void Kernel::SimulateAndScore(const uint8* target_colors) {
   score_ = 0.0;
   uint8* frame_pointer = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
   for (size_t i = 0; i < kFrameSizeBytes; ++i) {
-    *frame_pointer = *frame_pointer & 0x7f;
-    assert(*frame_pointer < 128);
-    score_ += kColorDistanceNTSC[(target_colors[i] * 128) + *frame_pointer];
+    if (*frame_pointer >= 128) {
+      score_ += 1000.0;
+    } else {
+      assert(*frame_pointer < 128);
+      score_ += kColorDistanceNTSC[(target_colors[i] * 128) + *frame_pointer];
+    }
     // Sim output has pixels doubled horizontally.
     frame_pointer += 2;
   }

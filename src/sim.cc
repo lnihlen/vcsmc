@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
 
   std::unique_ptr<uint8[]> output_picture_bytes(
       new uint8[kLibZ26ImageSizeBytes]);
-  memset(output_picture_bytes.get(), 0xfe, kLibZ26ImageSizeBytes);
+  memset(output_picture_bytes.get(), 0, kLibZ26ImageSizeBytes);
 
   simulate_single_frame(frame_binary_bytes.get(), input_file_size,
       output_picture_bytes.get());

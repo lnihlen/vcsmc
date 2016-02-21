@@ -14,7 +14,7 @@ parser.add_argument('--frame_csv', required=True)
 parser.add_argument('--gen_path', default='out/gen')
 parser.add_argument('--output_dir', required=True)
 parser.add_argument('--respec_path', default='out/respec')
-parser.add_argument('--stagnant_limit', default=5)
+parser.add_argument('--stagnant_limit', default='5')
 parser.add_argument('--stills_dir', required=True)
 parser.add_argument('--verbose', default=True)
 
@@ -102,7 +102,7 @@ def main(args):
           '--global_minimum_output_file=%s' % (kernel_file),
           '--audio_spec_list_file=%s' % (audio_frames[current_frame]),
           '--target_error=0.0',
-          '--stagnant_count_limit=%d' % (args.stagnant_limit),
+          '--stagnant_count_limit=%s' % (args.stagnant_limit),
           '--append_kernel_binary=%s' % (movie_binary)]
       if args.verbose:
         command_line.append('--print_stats=true')
