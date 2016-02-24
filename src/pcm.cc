@@ -1,6 +1,7 @@
 // pcm - given an input mono wav file generates a series of audio frame spec
 // files for blending with kernel generation process.
 
+#include <array>
 #include <cassert>
 #include <fcntl.h>
 #include <gflags/gflags.h>
@@ -20,17 +21,29 @@
 
 DEFINE_int32(half_line_offset, 27,
     "Number of cycles to wait per half-line for audio spec.");
+DEFINE_int32(dither_max, 67108864,
+    "Will add +/- dither_max to the input signal before downsampling. "
+    "Supply a zero to disable.");
 
 DEFINE_string(input_audio_file, "",
     "Required - audio file to process, must be at 31440 Hz mono 32-bit wav.");
 DEFINE_string(preview_wav, "",
     "Optional - output preview audio file to save.");
 DEFINE_string(output_frame_spec, "",
-    "Required - spec string for saving individual frame speclists, "
+    "Required - spec string for saving individual frame spec lists, "
     "ex: frame-%05lu.spec.");
 
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, false);
+
+  std::array<uint32, vcsmc::kSeedSizeWords> seed_array;
+  std::random_device urandom;
+  for (size_t i = 0; i < vcsmc::kSeedSizeWords; ++i)
+    seed_array[i] = urandom();
+  std::seed_seq seed(seed_array.begin(), seed_array.end());
+  std::default_random_engine random_engine(seed);
+  std::uniform_int_distribution<int> dither(
+      -FLAGS_dither_max, FLAGS_dither_max);
 
   // Load input audio file.
   std::unique_ptr<vcsmc::Sound> input_wav =
@@ -49,6 +62,25 @@ int main(int argc, char* argv[]) {
     // Convert into unsigned first.
     uint32 uns = input_wav->samples()[i];
     uns = (uns & 0x7fffffff) | ((~uns) & 0x80000000);
+    if (FLAGS_dither_max != 0) {
+      int r = dither(random_engine);
+      if (r < 0) {
+        r = r * -1;
+        uint32 u = static_cast<uint32>(r);
+        if (u > uns) {
+          uns = 0;
+        } else {
+          uns = uns - u;
+        }
+      } else if (r > 0) {
+        uint32 u = static_cast<uint32>(r);
+        if (std::numeric_limits<uint32>::max() - uns <= u) {
+          uns = std::numeric_limits<uint32>::max();
+        } else {
+          uns = uns + u;
+        }
+      }
+    }
     // Truncate to upper 4 bits.
     pcm_bytes[i] = static_cast<uint8>((uns >> 28) & 0x0000000f);
   }
