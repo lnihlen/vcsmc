@@ -9,6 +9,7 @@ import sys
 
 parser = argparse.ArgumentParser(description='make a movie for vcsmc')
 parser.add_argument('--audio_dir', required=True)
+parser.add_argument('--debug', default=False)
 parser.add_argument('--fit_path', default='out/fit')
 parser.add_argument('--frame_csv', required=True)
 parser.add_argument('--gen_path', default='out/gen')
@@ -104,6 +105,9 @@ def main(args):
           '--target_error=0.0',
           '--stagnant_count_limit=%s' % (args.stagnant_limit),
           '--append_kernel_binary=%s' % (movie_binary)]
+      if args.debug:
+        command_line = ['lldb', '--batch', '--one-line', 'run', '--file'] + \
+            command_line[0:1] + ['--'] + command_line[1:]
       if args.verbose:
         command_line.append('--print_stats=true')
         print command_line
