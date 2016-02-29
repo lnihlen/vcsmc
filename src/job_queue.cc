@@ -12,13 +12,13 @@ JobQueue::JobQueue(size_t number_of_threads)
   }
   threads_.reserve(number_of_threads);
   for (size_t i = 0; i < number_of_threads; ++i) {
-    threads_.emplace_back(std::thread([=] { ThreadWorkLoop(); }));
+    threads_.emplace_back(std::thread([this] { ThreadWorkLoop(); }));
   }
 }
 
 JobQueue::~JobQueue() {
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
     exit_ = true;
   }
   cv_.notify_all();
@@ -28,7 +28,7 @@ JobQueue::~JobQueue() {
 }
 
 void JobQueue::Enqueue(std::unique_ptr<Job> job) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::unique_lock<std::mutex> lock(mutex_);
   queue_.emplace(std::move(job));
   cv_.notify_one();
 }
@@ -51,6 +51,7 @@ void JobQueue::ThreadWorkLoop() {
   while (true) {
     {
       std::unique_lock<std::mutex> lock(mutex_);
+      if (exit_) return;
       cv_.wait(lock, [this] { return (queue_.size() > 0 || exit_); });
       if (exit_) return;
       job = std::move(queue_.front());

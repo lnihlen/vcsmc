@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 
 parser = argparse.ArgumentParser(description='make a movie for vcsmc')
 parser.add_argument('--audio_dir', required=True)
@@ -111,7 +112,13 @@ def main(args):
       if args.verbose:
         command_line.append('--print_stats=true')
         print command_line
-      subprocess.call(command_line)
+      try:
+        subprocess.call(command_line)
+      except KeyboardInterrupt:
+        if args.debug:
+          time.sleep(3600)
+        else:
+          raise
     image_output_file = os.path.join(args.output_dir, 'stills', \
         'frame-%07d.png' % (current_frame))
     # Copy fit image into place in frames.
