@@ -92,10 +92,13 @@ int main(int argc, char* argv[]) {
   typedef std::vector<std::vector<double>> ColorDistances;
   ColorDistances color_distances(128);
 
+  job_queue.LockQueue();
   for (size_t i = 0; i < vcsmc::kNTSCColors; ++i) {
-    job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(new ComputeColorErrorTableJob(
-        target_lab.get(), color_distances[i], i)));
+    job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
+          new ComputeColorErrorTableJob(
+              target_lab.get(), color_distances[i], i)));
   }
+  job_queue.UnlockQueue();
 
   job_queue.Finish();
 

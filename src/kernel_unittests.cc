@@ -256,26 +256,30 @@ TEST(ScoreKernelJobTest, SimulatesSimpleFrameKernel) {
   vcsmc::JobQueue job_queue(1);
   std::vector<std::shared_ptr<vcsmc::Kernel>> kernels;
 
+  job_queue.LockQueue();
   for (size_t i = 0; i < 128; ++i) {
     char seed_char[64];
     snprintf(seed_char, 64, "trivial stable testing seed 0x%8lx", i);
     std::string seed_str(seed_char);
     std::seed_seq seed(seed_str.begin(), seed_str.end());
     kernels.emplace_back(new Kernel(seed));
-    job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
+    job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
           new GenerateBackgroundColorKernelJob(
             kernels[i], static_cast<uint8>(i * 2))));
   }
+  job_queue.UnlockQueue();
 
   job_queue.Finish();
 
   std::vector<std::unique_ptr<uint8[]>> test_targets(128);
+  job_queue.LockQueue();
   for (size_t i = 0; i < 128; ++i) {
     test_targets[i].reset(new uint8[vcsmc::kFrameSizeBytes]);
     std::memset(test_targets[i].get(), i, vcsmc::kFrameSizeBytes);
-    job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
+    job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
         new vcsmc::Kernel::ScoreKernelJob(kernels[i], test_targets[i].get())));
   }
+  job_queue.UnlockQueue();
 
   job_queue.Finish();
 

@@ -22,7 +22,16 @@ class JobQueue {
   explicit JobQueue(size_t number_of_threads);
   ~JobQueue();
 
-  void Enqueue(std::unique_ptr<Job> job);
+  // For shorter tasks, with only one thread queuing the work, it's quite
+  // possible for throughput to suffer as the single queuing thread cannot
+  // create tasks fast enough for all of the worker threads to stay busy.
+  // Therefore we provide methods to lock the queue, enqueue all of the pending
+  // jobs with EnqueueLocked(), and not wake up any sleeping workers until
+  // UnlockQueue() is called.
+  void LockQueue();
+  void EnqueueLocked(std::unique_ptr<Job> job);
+  void UnlockQueue();
+
   // Blocks calling thread until work queue is empty.
   void Finish();
 
@@ -33,11 +42,12 @@ class JobQueue {
 
   std::vector<std::thread> threads_;
 
-  std::mutex mutex_;
-  std::condition_variable cv_;
+  std::mutex queue_mutex_;
+  std::unique_lock<std::mutex> queue_lock_;
+  std::condition_variable queue_cv_;
+  std::condition_variable queue_empty_cv_;
   bool exit_;
   std::queue<std::unique_ptr<Job>> queue_;
-  std::condition_variable queue_size_cv_;
 
   std::mutex active_mutex_;
   std::condition_variable active_cv_;

@@ -217,17 +217,20 @@ int main(int argc, char* argv[]) {
     }
 
     generation.reset(new std::vector<std::shared_ptr<vcsmc::Kernel>>);
+
     // Generate FLAGS_generation_size number of random individuals.
+    job_queue.LockQueue();
     for (int i = 0; i < generation_size; ++i) {
       std::array<uint32, vcsmc::kSeedSizeWords> seed;
       for (size_t j = 0; j < vcsmc::kSeedSizeWords; ++j)
         seed[j] = seed_engine();
       std::seed_seq kernel_seed(seed.begin(), seed.end());
       generation->emplace_back(new vcsmc::Kernel(kernel_seed));
-      job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
+      job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
           new vcsmc::Kernel::GenerateRandomKernelJob(
               generation->at(i), spec_list)));
     }
+    job_queue.UnlockQueue();
   } else {
     generation = vcsmc::ParseGenerationFile(FLAGS_seed_generation_file);
     if (!generation) {
@@ -236,11 +239,13 @@ int main(int argc, char* argv[]) {
     }
     generation_size = generation->size();
     if (audio_spec_list) {
+      job_queue.LockQueue();
       for (int i = 0; i < generation_size; ++i) {
-        job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
+        job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
             new vcsmc::Kernel::ClobberSpecJob(generation->at(i),
                                               audio_spec_list)));
       }
+      job_queue.UnlockQueue();
     }
   }
 
@@ -264,26 +269,30 @@ int main(int argc, char* argv[]) {
 
   while (global_minimum->score() > target_error || generation_count == 0) {
     // Score all unscored kernels in the current generation.
+    job_queue.LockQueue();
     for (int j = 0; j < generation_size; ++j) {
       if (!generation->at(j)->score_valid()) {
-        job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
+        job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
               new vcsmc::Kernel::ScoreKernelJob(generation->at(j),
                                                 target_colors.get())));
       }
     }
+    job_queue.UnlockQueue();
 
     // Wait for simulation to finish.
     job_queue.Finish();
 
     // Conduct tournament based on scores.
+    job_queue.LockQueue();
     for (int j = 0; j < generation_size; ++j) {
       std::array<uint32, vcsmc::kSeedSizeWords> seed;
       for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
         seed[k] = seed_engine();
       std::seed_seq tourney_seed(seed.begin(), seed.end());
-      job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(new CompeteKernelJob(
+      job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(new CompeteKernelJob(
           generation, generation->at(j), tourney_seed, FLAGS_tournament_size)));
     }
+    job_queue.UnlockQueue();
 
     // Wait for tournament to finish.
     job_queue.Finish();
@@ -324,18 +333,20 @@ int main(int argc, char* argv[]) {
         streak < FLAGS_stagnant_generation_count) {
       // Replace lowest-scoring half of generation with mutated versions of
       // highest-scoring half of generation.
+      job_queue.LockQueue();
       for (int j = generation_size / 2; j < generation_size; ++j) {
         std::array<uint32, vcsmc::kSeedSizeWords> seed;
         for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
           seed[k] = seed_engine();
         std::seed_seq kernel_seed(seed.begin(), seed.end());
         generation->at(j).reset(new vcsmc::Kernel(kernel_seed));
-        job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
+        job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
               new vcsmc::Kernel::MutateKernelJob(
                 generation->at(j - (generation_size / 2)),
                 generation->at(j),
                 1)));
       }
+      job_queue.UnlockQueue();
       job_queue.Finish();
     } else {
       ++reroll_count;
@@ -345,18 +356,20 @@ int main(int argc, char* argv[]) {
       streak = 0;
       vcsmc::Generation mutated_generation(
           new std::vector<std::shared_ptr<vcsmc::Kernel>>);
+      job_queue.LockQueue();
       for (int j = 0; j < generation_size; ++j) {
         std::array<uint32, vcsmc::kSeedSizeWords> seed;
         for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
           seed[k] = seed_engine();
         std::seed_seq kernel_seed(seed.begin(), seed.end());
         mutated_generation->emplace_back(new vcsmc::Kernel(kernel_seed));
-        job_queue.Enqueue(std::unique_ptr<vcsmc::Job>(
+        job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
               new vcsmc::Kernel::MutateKernelJob(
                 generation->at(j),
                 mutated_generation->at(j),
                 FLAGS_stagnant_mutation_count)));
       }
+      job_queue.UnlockQueue();
       job_queue.Finish();
       generation = mutated_generation;
     }
