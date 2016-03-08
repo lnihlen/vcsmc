@@ -97,14 +97,18 @@ int main(int argc, char* argv[]) {
     }
 
     uint32 spec_start = static_cast<uint32>(FLAGS_half_line_offset);
+    uint8 last_pcm = 0xff;
     for (uint32 j = 0; j < vcsmc::kScreenHeight * 2; ++j) {
-      size_t chars = snprintf(buf, 1024,
-          "- first_cycle: %d\n"
-          "  assembler: |\n"
-          "    lda #$%x\n"
-          "    sta AUDV0\n",
-          spec_start, *pcm);
-      write(fd, buf, chars);
+      if (*pcm != last_pcm) {
+        size_t chars = snprintf(buf, 1024,
+            "- first_cycle: %d\n"
+            "  assembler: |\n"
+            "    lda #$%x\n"
+            "    sta AUDV0\n",
+            spec_start, *pcm);
+        write(fd, buf, chars);
+        last_pcm = *pcm;
+      }
       ++pcm;
       spec_start += vcsmc::kScanLineWidthCycles / 2;
     }

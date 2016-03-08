@@ -257,12 +257,15 @@ uint32 Kernel::GenerateRandomOpcode(uint32 cycles_remaining) {
 uint32 Kernel::GenerateRandomLoad() {
   std::uniform_int_distribution<uint8> arg_distro(0, 255);
   uint8 arg = arg_distro(engine_);
-  std::uniform_int_distribution<int> op_distro(0, 1);
+  std::uniform_int_distribution<int> op_distro(0, 2);
   switch (op_distro(engine_)) {
     case 0:
-      return PackOpCode(OpCode::LDX_Immediate, arg, 0);
+      return PackOpCode(OpCode::LDA_Immediate, arg, 0);
 
     case 1:
+      return PackOpCode(OpCode::LDX_Immediate, arg, 0);
+
+    case 2:
       return PackOpCode(OpCode::LDY_Immediate, arg, 0);
 
     default:
@@ -305,12 +308,15 @@ uint32 Kernel::GenerateRandomStore() {
   }};
   std::uniform_int_distribution<size_t> tia_distro(0, kValidTIA.size() - 1);
   uint8 tia = kValidTIA[tia_distro(engine_)];
-  std::uniform_int_distribution<int> op_distro(0, 1);
+  std::uniform_int_distribution<int> op_distro(0, 2);
   switch (op_distro(engine_)) {
     case 0:
-      return PackOpCode(OpCode::STX_ZeroPage, tia, 0);
+      return PackOpCode(OpCode::STA_ZeroPage, tia, 0);
 
     case 1:
+      return PackOpCode(OpCode::STX_ZeroPage, tia, 0);
+
+    case 2:
       return PackOpCode(OpCode::STY_ZeroPage, tia, 0);
 
     default:

@@ -15,10 +15,9 @@ parser.add_argument('--fit_path', default='out/fit')
 parser.add_argument('--frame_csv', required=True)
 parser.add_argument('--gen_path', default='out/gen')
 parser.add_argument('--output_dir', required=True)
-parser.add_argument('--respec_path', default='out/respec')
 parser.add_argument('--stagnant_limit', default='5')
 parser.add_argument('--stills_dir', required=True)
-parser.add_argument('--verbose', default=True)
+parser.add_argument('--verbose', default=False)
 
 # Returns list of tuples (is_keyframe (bool), presentation_time_s (double))
 def parse_csv_file(frame_csv):
@@ -82,49 +81,33 @@ def main(args):
         print command_line
       current_hash = subprocess.check_output(command_line)[:-1]
     kernel_file = os.path.join(args.output_dir, 'kernels', \
-        current_hash + '.yaml')
+        'frame-%07d.yaml' % (current_frame))
     fit_color_file = os.path.join(args.output_dir, 'fit', \
         current_hash + '.col')
-    fit_image_file = os.path.join(args.output_dir, 'kernels', \
-        current_hash + '.png')
-    if os.path.exists(kernel_file):
-      command_line = \
-          [args.respec_path,
-          '--input_kernel_file=%s' % (kernel_file),
-          '--audio_spec_file=%s' % (audio_frames[current_frame]),
-          '--append_kernel_binary=%s' % (movie_binary)]
-      if args.verbose:
-        print command_line
-      subprocess.call(command_line)
-    else:
-      command_line = \
-          [args.gen_path,
-          '--color_input_file=%s' % (fit_color_file),
-          '--image_output_file=%s' % (fit_image_file),
-          '--global_minimum_output_file=%s' % (kernel_file),
-          '--audio_spec_list_file=%s' % (audio_frames[current_frame]),
-          '--target_error=0.0',
-          '--stagnant_count_limit=%s' % (args.stagnant_limit),
-          '--append_kernel_binary=%s' % (movie_binary)]
-      if args.debug:
-        command_line = ['lldb', '--batch', '--one-line', 'run', '--file'] + \
-            command_line[0:1] + ['--'] + command_line[1:]
-      if args.verbose:
-        command_line.append('--print_stats=true')
-        print command_line
-      try:
-        subprocess.call(command_line)
-      except KeyboardInterrupt:
-        if args.debug:
-          time.sleep(3600)
-        else:
-          raise
     image_output_file = os.path.join(args.output_dir, 'stills', \
         'frame-%07d.png' % (current_frame))
-    # Copy fit image into place in frames.
+    command_line = \
+        [args.gen_path,
+        '--color_input_file=%s' % (fit_color_file),
+        '--image_output_file=%s' % (image_output_file),
+        '--global_minimum_output_file=%s' % (kernel_file),
+        '--audio_spec_list_file=%s' % (audio_frames[current_frame]),
+        '--target_error=0.0',
+        '--stagnant_count_limit=%s' % (args.stagnant_limit),
+        '--append_kernel_binary=%s' % (movie_binary)]
+    if args.debug:
+      command_line = ['lldb', '--batch', '--one-line', 'run', '--file'] + \
+          command_line[0:1] + ['--'] + command_line[1:]
     if args.verbose:
-      print 'copying %s to %s' % (fit_image_file, image_output_file)
-    shutil.copy(fit_image_file, image_output_file)
+      command_line.append('--print_stats=true')
+      print command_line
+    try:
+      subprocess.call(command_line)
+    except KeyboardInterrupt:
+      if args.debug:
+        time.sleep(3600)
+      else:
+        raise
     current_frame += 1
 
   return 0
