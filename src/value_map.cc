@@ -109,7 +109,7 @@ std::unique_ptr<uint8[]> ValueMap::LoadFromFile(const std::string& file_path,
   height_out = height;
   bit_depth_out = bit_depth;
   bytes_per_row_out = bytes_per_row;
-  return std::move(image_bytes);
+  return image_bytes;
 }
 
 }  // namespace vcsmc

@@ -595,7 +595,7 @@ std::unique_ptr<uint8[]> Base64Decode(const std::string& base64, size_t size) {
     assert(false);
   }
   assert(size == static_cast<size_t>(bytes - bytes_ptr.get()));
-  return std::move(bytes_ptr);
+  return bytes_ptr;
 }
 
 }  // namespace vcsmc

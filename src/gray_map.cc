@@ -43,7 +43,7 @@ std::unique_ptr<GrayMap> GrayMap::Load(const std::string& file_path) {
       }
     }
   }
-  return std::move(gray_map);
+  return gray_map;
 }
 
 void GrayMap::Save(const std::string& file_path) {

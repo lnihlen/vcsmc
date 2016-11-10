@@ -64,7 +64,7 @@ std::unique_ptr<vcsmc::Image> LoadPNG(const std::string& file_name) {
   png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
   fclose(png_file);
 
-  return std::move(image);
+  return image;
 }
 
 bool SavePNG(const vcsmc::Image* image, const std::string& file_name) {

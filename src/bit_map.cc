@@ -34,7 +34,7 @@ std::unique_ptr<BitMap> BitMap::Load(const std::string& file_path) {
   if (bit_depth == 8) {
     std::unique_ptr<BitMap> bitmap(new BitMap(width, height));
     bitmap->Pack(image_bytes.get(), bytes_per_row);
-    return std::move(bitmap);
+    return bitmap;
   } else {
     assert(bit_depth == 1);
     return std::unique_ptr<BitMap>(new BitMap(width, height,
