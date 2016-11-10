@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <chrono>
 #include <fcntl.h>
 #include <gflags/gflags.h>
 #include <gperftools/profiler.h>
@@ -265,9 +266,20 @@ int main(int argc, char* argv[]) {
   bool reroll = false;
   int reroll_count = 0;
 
+  uint64 scoring_time_us = 0;
+  uint64 scoring_count = 0;
+
+  uint64 tourney_time_us = 0;
+  uint64 tourney_count = 0;
+
+  uint64 mutate_time_us = 0;
+  uint64 mutate_count = 0;
+
   std::shared_ptr<vcsmc::Kernel> global_minimum = generation->at(0);
 
   while (global_minimum->score() > target_error || generation_count == 0) {
+    auto start_of_scoring = std::chrono::high_resolution_clock::now();
+
     // Score all unscored kernels in the current generation.
     job_queue.LockQueue();
     for (int j = 0; j < generation_size; ++j) {
@@ -275,12 +287,19 @@ int main(int argc, char* argv[]) {
         job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
               new vcsmc::Kernel::ScoreKernelJob(generation->at(j),
                                                 target_colors.get())));
+        ++scoring_count;
       }
     }
     job_queue.UnlockQueue();
 
     // Wait for simulation to finish.
     job_queue.Finish();
+    auto end_of_scoring = std::chrono::high_resolution_clock::now();
+
+    scoring_time_us += std::chrono::duration_cast<std::chrono::microseconds>(
+        end_of_scoring - start_of_scoring).count();
+
+    auto start_of_tourney = std::chrono::high_resolution_clock::now();
 
     // Conduct tournament based on scores.
     job_queue.LockQueue();
@@ -291,11 +310,16 @@ int main(int argc, char* argv[]) {
       std::seed_seq tourney_seed(seed.begin(), seed.end());
       job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(new CompeteKernelJob(
           generation, generation->at(j), tourney_seed, FLAGS_tournament_size)));
+      ++tourney_count;
     }
     job_queue.UnlockQueue();
 
     // Wait for tournament to finish.
     job_queue.Finish();
+    auto end_of_tourney = std::chrono::high_resolution_clock::now();
+
+    tourney_time_us += std::chrono::duration_cast<std::chrono::microseconds>(
+        end_of_tourney - start_of_tourney).count();
 
     // Sort generation by victories.
     std::sort(generation->begin(), generation->end(),
@@ -312,13 +336,23 @@ int main(int argc, char* argv[]) {
 
     if ((generation_count % FLAGS_save_count) == 0) {
       if (FLAGS_print_stats) {
-        printf("gen: %7d leader: %016llx score: %f %s\n",
+        printf("gen: %7d leader: %016llx score: %f %s | "
+               "sim: %llu tourney: %llu mutate: %llu\n",
             generation_count,
             generation->at(0)->fingerprint(),
             global_minimum->score(),
-            reroll ? "*" : "");
+            reroll ? "*" : "",
+            scoring_count ? scoring_count * 1000000 / scoring_time_us : 0,
+            tourney_count ? tourney_count * 1000000 / tourney_time_us : 0,
+            mutate_count ? mutate_count * 1000000 / mutate_time_us : 0);
       }
       reroll = false;
+      scoring_count = 0;
+      scoring_time_us = 0;
+      tourney_count = 0;
+      tourney_time_us = 0;
+      mutate_count = 0;
+      mutate_time_us = 0;
       SaveState(generation, global_minimum);
     }
 
@@ -329,6 +363,7 @@ int main(int argc, char* argv[]) {
       streak = 0;
     }
 
+    auto start_of_mutate = std::chrono::high_resolution_clock::now();
     if (FLAGS_stagnant_generation_count == 0 ||
         streak < FLAGS_stagnant_generation_count) {
       // Replace lowest-scoring half of generation with mutated versions of
@@ -345,6 +380,7 @@ int main(int argc, char* argv[]) {
                 generation->at(j - (generation_size / 2)),
                 generation->at(j),
                 1)));
+        ++mutate_count;
       }
       job_queue.UnlockQueue();
       job_queue.Finish();
@@ -368,11 +404,15 @@ int main(int argc, char* argv[]) {
                 generation->at(j),
                 mutated_generation->at(j),
                 FLAGS_stagnant_mutation_count)));
+        ++mutate_count;
       }
       job_queue.UnlockQueue();
       job_queue.Finish();
       generation = mutated_generation;
     }
+    auto end_of_mutate = std::chrono::high_resolution_clock::now();
+    mutate_time_us += std::chrono::duration_cast<std::chrono::microseconds>(
+        end_of_mutate - start_of_mutate).count();
 
     ++generation_count;
     if (FLAGS_max_generation_number > 0 &&
