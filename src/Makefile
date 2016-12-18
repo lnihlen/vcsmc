@@ -19,18 +19,19 @@ DEPS=constants.h image_file.h types.h
 COLOR_OBJ=$(OUT)/color.o                                                       \
           $(OUT)/color_table.o                                                 \
 
+IMAGE_OBJ=$(OUT)/bit_map.o                                                     \
+          $(OUT)/gray_map.o                                                    \
+          $(OUT)/image.o                                                       \
+          $(OUT)/image_file.o                                                  \
+          $(OUT)/value_map.o
+
 OBJ=$(OUT)/assembler.o                                                         \
-    $(OUT)/bit_map.o                                                           \
-    $(OUT)/gray_map.o                                                          \
-    $(OUT)/image.o                                                             \
-    $(OUT)/image_file.o                                                        \
     $(OUT)/job_queue.o                                                         \
     $(OUT)/kernel.o                                                            \
     $(OUT)/range.o                                                             \
     $(OUT)/serialization.o                                                     \
     $(OUT)/sound_file.o                                                        \
-    $(OUT)/spec.o                                                              \
-    $(OUT)/value_map.o
+    $(OUT)/spec.o
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
@@ -56,28 +57,34 @@ $(OUT)/color_distance_table.o: $(OUT)/build_error_distances
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CC) -c -o $@ $< $(CFLAGS) -I$(GTEST_INCLUDE)
 
-$(OUT)/build_error_distances: $(COLOR_OBJ) $(OUT)/build_error_distances.o
+$(OUT)/build_error_distances: $(IMAGE_OBJ) $(COLOR_OBJ)                        \
+                              $(OUT)/build_error_distances.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-$(OUT)/fit: $(OBJ) $(COLOR_OBJ) $(OUT)/fit.o $(OUT)/color_distance_table.o
+$(OUT)/fit: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/fit.o                      \
+            $(OUT)/color_distance_table.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-$(OUT)/gen: $(OBJ) $(COLOR_OBJ) $(OUT)/gen.o $(OUT)/color_distance_table.o
+$(OUT)/gen: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/gen.o                      \
+            $(OUT)/color_distance_table.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-$(OUT)/pcm: $(OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o $(OUT)/pcm.o
+$(OUT)/pcm: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o     \
+            $(OUT)/pcm.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-$(OUT)/respec: $(OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o $(OUT)/respec.o
+$(OUT)/respec: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o  \
+               $(OUT)/respec.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-$(OUT)/sim: $(OBJ) $(COLOR_OBJ) $(OUT)/sim.o $(OUT)/color_distance_table.o
+$(OUT)/sim: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/sim.o                      \
+            $(OUT)/color_distance_table.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
-    $(COLOR_OBJ) $(OUT)/color_distance_table.o | $(OUTTESTS)/
+    $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o | $(OUTTESTS)/
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS) $(GTEST_LIB)
 
 $(OUTTESTS)/:

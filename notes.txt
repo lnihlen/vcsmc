@@ -1551,3 +1551,26 @@ out the new kernel in yaml/bin blob form. Python script has list of
 frames->fingerprint, which it saves when complete, then map of
 fingerprint->(current score), so that when recomputing at higher quality level
 it knows which frames require recomputation?
+
+===============================================================================
+
+Things to do:
+1) Build high-performance dedicated workstation for frame generation.
+
+2) Optimize frame generation programming
+
+3) Use more human visual system relevant code for frame comparison
+  a) PSNR
+  b) MSSIM
+
+4) Cartridge hardware design
+  a) First iteration uses a big chunk of NVRAM to hold some frames and a small
+    CPLD/FPGA to handle the bank switching.
+
+5) Human auditory system modeling for audio quality evaluation.
+
+6) Deep learning/re-enforcement learning for audio frame generation.
+
+7) Deep learning strategy for video frame generation.
+
+8) More documentation and bibliography.

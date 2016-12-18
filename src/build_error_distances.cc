@@ -14,14 +14,48 @@
 #include "color.h"
 #include "color_table.h"
 #include "constants.h"
+#include "image.h"
+#include "image_file.h"
+
+DEFINE_bool(normalize, true,
+    "Normalize distance table values to [0, 1] range.");
+DEFINE_bool(generate_distance_image, true,
+    "Make the color distance image.");
+
+DEFINE_int32(image_sample_size_width, 16,
+    "Width of each color patch in distance image");
+DEFINE_int32(image_sample_size_height, 16,
+    "Height of each color patch in distance image");
+DEFINE_int32(image_sample_size_padding, 2,
+    "Number of pixels between each color patch in distance image");
 
 DEFINE_string(output_directory, "../out",
     "Output directory to save generated files to.");
 
+void blit(uint32* pixels, uint32 value, int count) {
+  for (int i = 0; i < count; ++i) {
+    *pixels = value;
+    ++pixels;
+  }
+}
+
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
-  // Save code file as we compute the distances.
+  // Build distances table.
+  std::unique_ptr<double[]> distances(new double[128*128]);
+  double max_distance = 0.0;
+  double* d = distances.get();
+  for (size_t i = 0; i < 128; ++i) {
+    const double* i_lab = vcsmc::kAtariNTSCLabColorTable + (i * 4);
+    for (size_t j = 0; j < 128; ++j) {
+      *d = vcsmc::Ciede2k(i_lab, vcsmc::kAtariNTSCLabColorTable + (j * 4));
+      max_distance = std::max(max_distance, *d);
+      ++d;
+    }
+  }
+
+  // Save code file of computed distances.
   std::string code_path = FLAGS_output_directory + "/" +
       "color_distance_table.cc";
   int fd = open(code_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC,
@@ -37,7 +71,7 @@ int main(int argc, char* argv[]) {
 
       "namespace vcsmc {\n\n"
 
-      "const double kColorDistanceNTSC[128*128] = {\n\n";
+      "const double kColorDistanceNTSC[128*128] = {\n";
 
   size_t bytes_written = write(fd, code_top_string.c_str(),
       code_top_string.size());
@@ -47,16 +81,10 @@ int main(int argc, char* argv[]) {
   }
 
   char buf[1024];
-  for (size_t i = 0; i < vcsmc::kNTSCColors; ++i) {
-    const double* i_lab = vcsmc::kAtariNTSCLabColorTable + (i * 4);
-    const double* j_lab = vcsmc::kAtariNTSCLabColorTable;
-    for (size_t j = 0; j < vcsmc::kNTSCColors; j += 2) {
-      size_t len = snprintf(buf, 1024, "%3.16f, %3.16f,\n",
-        vcsmc::Ciede2k(i_lab, j_lab),
-        vcsmc::Ciede2k(i_lab, j_lab + 4));
-      j_lab += 8;
-      write(fd, buf, len);
-    }
+  for (size_t i = 0; i < 128*128; ++i) {
+    size_t len = snprintf(buf, 1024, "  %.19g,\n",
+        FLAGS_normalize ? distances[i] / max_distance : distances[i]);
+    write(fd, buf, len);
   }
 
   std::string code_bottom_string =
@@ -64,5 +92,71 @@ int main(int argc, char* argv[]) {
   bytes_written = write(fd, code_bottom_string.c_str(),
       code_bottom_string.size());
   close(fd);
+
+  if (FLAGS_generate_distance_image) {
+    int image_width =
+      (FLAGS_image_sample_size_width + FLAGS_image_sample_size_padding) * 129 +
+      FLAGS_image_sample_size_padding;
+    int image_height =
+      (FLAGS_image_sample_size_height + FLAGS_image_sample_size_padding) * 129 +
+      FLAGS_image_sample_size_padding;
+    vcsmc::Image image(image_width, image_height);
+    const uint32 kPaddingColorABGR = 0xff000000;
+    uint32* pixels = image.pixels_writeable();
+
+    // Top padding is just padding color, do all lines at once.
+    blit(pixels, kPaddingColorABGR,
+        image_width * FLAGS_image_sample_size_padding);
+    pixels += image_width * FLAGS_image_sample_size_padding;
+
+    // Top left corner is left with padding in the sample patch.
+    for (int i = 0; i < FLAGS_image_sample_size_height; ++i) {
+      blit(pixels, kPaddingColorABGR, FLAGS_image_sample_size_width +
+          (2 * FLAGS_image_sample_size_padding));
+      pixels += FLAGS_image_sample_size_width +
+          (2 * FLAGS_image_sample_size_padding);
+      // Leave a patch of each color followed by padding.
+      for (int i = 0; i < 128; ++i) {
+        blit(pixels, vcsmc::kAtariNTSCABGRColorTable[i],
+            FLAGS_image_sample_size_width);
+        pixels += FLAGS_image_sample_size_width;
+        blit(pixels, kPaddingColorABGR, FLAGS_image_sample_size_padding);
+        pixels += FLAGS_image_sample_size_padding;
+      }
+    }
+
+    // Padding between top color row value rows.
+    blit(pixels, kPaddingColorABGR,
+        image_width * FLAGS_image_sample_size_padding);
+    pixels += image_width * FLAGS_image_sample_size_padding;
+
+    // Now do 128 value rows.
+    for (int i = 0; i < 128; ++i) {
+      for (int j = 0; j < FLAGS_image_sample_size_height; ++j) {
+        blit(pixels, kPaddingColorABGR, FLAGS_image_sample_size_padding);
+        pixels += FLAGS_image_sample_size_padding;
+        blit(pixels, vcsmc::kAtariNTSCABGRColorTable[i],
+            FLAGS_image_sample_size_width);
+        pixels += FLAGS_image_sample_size_width;
+        blit(pixels, kPaddingColorABGR, FLAGS_image_sample_size_padding);
+        pixels += FLAGS_image_sample_size_padding;
+        for (int k = 0; k < 128; ++k) {
+          uint32 bright = static_cast<uint32>(
+              255.0 * distances[(i * 128) + k] / max_distance);
+          uint32 color = 0xff000000 | (bright << 16) | (bright << 8) | bright;
+          blit(pixels, color, FLAGS_image_sample_size_width);
+          pixels += FLAGS_image_sample_size_width;
+          blit(pixels, kPaddingColorABGR, FLAGS_image_sample_size_padding);
+          pixels += FLAGS_image_sample_size_padding;
+        }
+      }
+      blit(pixels, kPaddingColorABGR,
+          image_width * FLAGS_image_sample_size_padding);
+      pixels += image_width * FLAGS_image_sample_size_padding;
+    }
+
+    vcsmc::SaveImage(&image, FLAGS_output_directory + "/color_distances.png");
+  }
+
   return 0;
 }
