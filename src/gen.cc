@@ -131,6 +131,7 @@ void SaveState(vcsmc::Generation generation,
 }
 
 int main(int argc, char* argv[]) {
+  auto program_start_time = std::chrono::high_resolution_clock::now();
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
   std::array<uint32, vcsmc::kSeedSizeWords> seed_array;
@@ -277,6 +278,8 @@ int main(int argc, char* argv[]) {
 
   std::shared_ptr<vcsmc::Kernel> global_minimum = generation->at(0);
 
+  auto epoch_time = std::chrono::high_resolution_clock::now();
+
   while (global_minimum->score() > target_error || generation_count == 0) {
     auto start_of_scoring = std::chrono::high_resolution_clock::now();
 
@@ -335,16 +338,23 @@ int main(int argc, char* argv[]) {
     }
 
     if ((generation_count % FLAGS_save_count) == 0) {
+      auto now = std::chrono::high_resolution_clock::now();
       if (FLAGS_print_stats) {
-        printf("gen: %7d leader: %016llx score: %f %s | "
-               "sim: %llu tourney: %llu mutate: %llu\n",
+        printf("gen: %7d leader: %016llx score: %14.4f "
+               "sim: %7llu tourney: %7llu mutate: %7llu "
+               "epoch: %7llu elapsed: %7llu"
+               "%s\n",
             generation_count,
             generation->at(0)->fingerprint(),
             global_minimum->score(),
-            reroll ? "*" : "",
             scoring_count ? scoring_count * 1000000 / scoring_time_us : 0,
             tourney_count ? tourney_count * 1000000 / tourney_time_us : 0,
-            mutate_count ? mutate_count * 1000000 / mutate_time_us : 0);
+            mutate_count ? mutate_count * 1000000 / mutate_time_us : 0,
+            std::chrono::duration_cast<std::chrono::seconds>(
+              now - epoch_time).count(),
+            std::chrono::duration_cast<std::chrono::seconds>(
+                now - program_start_time).count(),
+            reroll ? " reroll" : "");
       }
       reroll = false;
       scoring_count = 0;
@@ -354,6 +364,7 @@ int main(int argc, char* argv[]) {
       mutate_count = 0;
       mutate_time_us = 0;
       SaveState(generation, global_minimum);
+      epoch_time = now;
     }
 
     if (fabs(last_generation_score - global_minimum->score()) < 0.00001) {
