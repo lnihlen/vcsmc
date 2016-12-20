@@ -304,9 +304,12 @@ int main(int argc, char* argv[]) {
 
     auto start_of_tourney = std::chrono::high_resolution_clock::now();
 
-    // Conduct tournament based on scores.
+    // Conduct tournament based on scores while looking for new global minimum.
     job_queue.LockQueue();
     for (int j = 0; j < generation_size; ++j) {
+      if (generation->at(j)->score() < global_minimum->score()) {
+        global_minimum = generation->at(j);
+      }
       std::array<uint32, vcsmc::kSeedSizeWords> seed;
       for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
         seed[k] = seed_engine();
@@ -332,10 +335,6 @@ int main(int argc, char* argv[]) {
 
           return b->victories() < a->victories();
         });
-
-    if (generation->at(0)->score() < global_minimum->score()) {
-      global_minimum = generation->at(0);
-    }
 
     if ((generation_count % FLAGS_save_count) == 0) {
       auto now = std::chrono::high_resolution_clock::now();
