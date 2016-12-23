@@ -13,3 +13,6 @@
 [submodule "third_party/gperftools"]
 	path = third_party/gperftools
 	url = https://github.com/gperftools/gperftools.git
+[submodule "third_party/tbb"]
+	path = third_party/tbb
+	url = https://github.com/01org/tbb.git
