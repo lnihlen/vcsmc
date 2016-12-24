@@ -60,6 +60,10 @@ ifeq ($(UNAME), Darwin)
 TBB_LIB=$(TBB_OUT)/tbb_release/libtbb.dylib
 endif
 
+ifeq ($(UNAME), Linux)
+TBB_LIB=$(TBB_OUT)/tbb_release/libtbb.so
+endif
+
 tbb: | $(TBB_OUT) $(TBB_LIB)
 
 $(TBB_LIB): export tbb_build_dir=$(TBB_OUT)
