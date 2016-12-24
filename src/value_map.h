@@ -1,6 +1,7 @@
 #ifndef SRC_VALUE_MAP_H_
 #define SRC_VALUE_MAP_H_
 
+#include <memory>
 #include <string>
 
 #include "types.h"

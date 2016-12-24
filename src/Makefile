@@ -14,6 +14,10 @@ CFLAGS+=-I/usr/local/include
 LDFLAGS+=-L/usr/local/lib -Wl,-no_pie
 endif
 
+ifeq ($(UNAME), Linux)
+LDFLAGS+=-lpthread -lunwind
+endif
+
 DEPS=constants.h image_file.h types.h
 
 COLOR_OBJ=$(OUT)/color.o                                                       \

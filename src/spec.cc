@@ -1,5 +1,7 @@
 #include "spec.h"
 
+#include <cstring>
+
 namespace vcsmc {
 
 Spec::Spec(const Range& range, size_t size, std::unique_ptr<uint8[]> bytecode)

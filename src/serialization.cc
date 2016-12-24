@@ -419,7 +419,7 @@ bool SaveGenerationFile(Generation gen, const std::string& file_name) {
 bool SaveKernelToString(std::shared_ptr<Kernel> kernel,
     std::string& string_out) {
   char buf[128];
-  snprintf(buf, 128, "fingerprint: %016llx\n", kernel->fingerprint());
+  snprintf(buf, 128, "fingerprint: %016lx\n", kernel->fingerprint());
   string_out += std::string(buf);
   string_out += "seed: " + kernel->GetRandomState() + "\n";
   const SpecList specs = kernel->specs();

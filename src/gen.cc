@@ -339,9 +339,9 @@ int main(int argc, char* argv[]) {
     if ((generation_count % FLAGS_save_count) == 0) {
       auto now = std::chrono::high_resolution_clock::now();
       if (FLAGS_print_stats) {
-        printf("gen: %7d leader: %016llx score: %14.4f "
-               "sim: %7llu tourney: %7llu mutate: %7llu "
-               "epoch: %7llu elapsed: %7llu"
+        printf("gen: %7d leader: %016lx score: %14.4f "
+               "sim: %7lu tourney: %7lu mutate: %7lu "
+               "epoch: %7lu elapsed: %7lu"
                "%s\n",
             generation_count,
             generation->at(0)->fingerprint(),
