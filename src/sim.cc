@@ -2,6 +2,7 @@
 // program.
 
 #include <fcntl.h>
+#include <cstring>
 #include <gflags/gflags.h>
 #include <stdio.h>
 #include <stdio.h>

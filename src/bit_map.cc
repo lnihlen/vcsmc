@@ -1,6 +1,7 @@
 #include "bit_map.h"
 
 #include <cassert>
+#include <cstring>
 
 namespace vcsmc {
 

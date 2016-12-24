@@ -1,6 +1,7 @@
 #ifndef SRC_ASSEMBLER_H_
 #define SRC_ASSEMBLER_H_
 
+#include <memory>
 #include <string>
 #include <vector>
 

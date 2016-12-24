@@ -5,6 +5,7 @@
 #include <array>
 #include <cassert>
 #include <chrono>
+#include <cinttypes>
 #include <fcntl.h>
 #include <gflags/gflags.h>
 #include <gperftools/profiler.h>
@@ -339,9 +340,9 @@ int main(int argc, char* argv[]) {
     if ((generation_count % FLAGS_save_count) == 0) {
       auto now = std::chrono::high_resolution_clock::now();
       if (FLAGS_print_stats) {
-        printf("gen: %7d leader: %016llx score: %14.4f "
-               "sim: %7llu tourney: %7llu mutate: %7llu "
-               "epoch: %7llu elapsed: %7llu"
+        printf("gen: %7d leader: %016" PRIx64 " score: %14.4f "
+               "sim: %7" PRIu64 " tourney: %7" PRIu64 " mutate: %7" PRIu64  " "
+               "epoch: %7" PRIu64 " elapsed: %7" PRIu64
                "%s\n",
             generation_count,
             generation->at(0)->fingerprint(),

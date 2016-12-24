@@ -48,7 +48,7 @@ def make_output_directory_structure(root_dir):
 def main(args):
   frames = parse_csv_file(args.frame_csv)
   make_output_directory_structure(args.output_dir)
-  stills = glob.glob(os.path.join(args.stills_dir, '*.png'))
+  stills = sorted(glob.glob(os.path.join(args.stills_dir, '*.png')))
   if len(frames) != len(stills):
     print 'frame data %d/image file count %d mismatch' \
         % (len(frames), len(stills))

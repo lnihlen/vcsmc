@@ -2,8 +2,8 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cstdlib>
 #include <cctype>
+#include <cstdlib>
 
 namespace {
 
@@ -293,7 +293,7 @@ bool ProcessLine(const std::string& line, std::vector<uint32>* opcodes) {
   // All opcodes are 3 letters long, bail early if not so.
   if (opcode_str.length() != 3) return false;
   std::transform(opcode_str.begin(), opcode_str.end(), opcode_str.begin(),
-      std::tolower);
+      ::tolower);
 
   if (opcode_str == "jmp") {
     // jmp needs a short argument

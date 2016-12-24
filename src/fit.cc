@@ -2,6 +2,7 @@
 // color image and computes a fingerprint of it.
 
 #include <cassert>
+#include <cinttypes>
 #include <farmhash.h>
 #include <fcntl.h>
 #include <gflags/gflags.h>
@@ -128,7 +129,8 @@ int main(int argc, char* argv[]) {
       reinterpret_cast<const char*>(ideal_colors.get()),
         vcsmc::kFrameWidthPixels * vcsmc::kFrameHeightPixels);
   char buf[1024];
-  snprintf(buf, 1024, "%s/%016llx.col", FLAGS_output_dir.c_str(), fingerprint);
+  snprintf(buf, 1024, "%s/%016" PRIx64 ".col", FLAGS_output_dir.c_str(),
+      fingerprint);
   std::string file_name(buf);
   int fd = open(file_name.c_str(),
       O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
@@ -155,12 +157,12 @@ int main(int argc, char* argv[]) {
       *pixels = vcsmc::kAtariNTSCABGRColorTable[ideal_colors.get()[i]];
       ++pixels;
     }
-    snprintf(buf, 1024, "%s/%016llx.png", FLAGS_output_dir.c_str(),
+    snprintf(buf, 1024, "%s/%016" PRIx64 ".png", FLAGS_output_dir.c_str(),
         fingerprint);
     std::string image_file_name(buf);
     vcsmc::SaveImage(&ideal_image, image_file_name);
   }
 
-  printf("%016llx\n", fingerprint);
+  printf("%016" PRIx64 "\n", fingerprint);
   return 0;
 }
