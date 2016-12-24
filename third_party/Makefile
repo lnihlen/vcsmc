@@ -6,8 +6,9 @@ export GTEST_OUT=$(OUT)/gtest
 export GFLAGS_OUT=$(OUT)/gflags
 export LIBYAML_OUT=$(OUT)/libyaml
 export LIBZ26_OUT=$(OUT)/libz26
+export TBB_OUT=$(OUT)/tbb
 
-all: farmhash gperftools gtest gflags libyaml libz26
+all: farmhash gperftools gtest gflags libyaml libz26 tbb
 
 farmhash: $(FARMHASH_OUT)/lib/libfarmhash.a | $(FARMHASH_OUT)
 
@@ -55,6 +56,17 @@ libz26: | $(LIBZ26_OUT) $(LIBZ26_OUT)/libz26.o
 $(LIBZ26_OUT)/libz26.o:	libz26/
 	$(MAKE) -C libz26/
 
+ifeq ($(UNAME), Darwin)
+TBB_LIB=$(TBB_OUT)/tbb_release/libtbb.dylib
+endif
+
+tbb: | $(TBB_OUT) $(TBB_LIB)
+
+$(TBB_LIB): export tbb_build_dir=$(TBB_OUT)
+$(TBB_LIB): export tbb_build_prefix=tbb
+$(TBB_LIB):
+	$(MAKE) -C tbb/
+
 $(FARMHASH_OUT):
 	mkdir -p $(FARMHASH_OUT)
 
@@ -74,6 +86,9 @@ $(LIBZ26_OUT):
 	mkdir -p $(LIBZ26_OUT)
 	mkdir -p $(LIBZ26_OUT)/m4
 
+$(TBB_OUT):
+	mkdir -p $(TBB_OUT)
+
 .PHONY: clean
 clean:
 	rm -f $(FARMHASH_OUT)
@@ -83,3 +98,4 @@ clean:
 	rm -f $(GFLAGS_OUT)
 	rm -f $(LIBYAML_OUT)
 	rm -f $(LIBZ26_OUT)
+	rm -f $(TBB_OUT)

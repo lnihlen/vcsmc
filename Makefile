@@ -20,6 +20,7 @@ export LIBYAML_INCLUDE=$(CURDIR)/third_party/libyaml/include
 export LIBYAML_LIB=$(OUT)/libyaml/libyaml.a
 export LIBZ26_INCLUDE=$(CURDIR)/third_party/libz26/include
 export LIBZ26_LIB=$(OUT)/libz26/libz26.o
+export TBB_LIB=$(OUT)/tbb/tbb.a
 
 all: depends vcsmc tests
 
