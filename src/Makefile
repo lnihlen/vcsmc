@@ -14,7 +14,7 @@ LDFLAGS+=-L/usr/local/lib -Wl,-no_pie
 endif
 
 ifeq ($(UNAME), Linux)
-LDFLAGS+=-lunwind
+LDFLAGS+=-lpthread -lunwind
 endif
 
 DEPS=constants.h image_file.h types.h
