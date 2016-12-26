@@ -34,7 +34,7 @@ class Kernel {
   void ResetVictories() { victories_ = 0; }
   void AddVictory() { ++victories_; }
 
-  void GenerateRandom(const SpecList specs, TlsPrng& tls_prng);
+  void GenerateRandom(const SpecList specs, TlsPrngList::reference tls_prng);
   void ClobberSpec(const SpecList new_specs);
 
   const uint8* bytecode() const { return bytecode_.get(); }
@@ -119,15 +119,16 @@ class Kernel {
   };
 
  private:
-  uint32 GenerateRandomOpcode(uint32 cycles_remaining, TlsPrng& engine);
-  uint32 GenerateRandomLoad(TlsPrng& engine);
-  uint32 GenerateRandomStore(TlsPrng& engine);
+  uint32 GenerateRandomOpcode(uint32 cycles_remaining,
+      TlsPrngList::reference engine);
+  uint32 GenerateRandomLoad(TlsPrngList::reference engine);
+  uint32 GenerateRandomStore(TlsPrngList::reference engine);
   void AppendJmpSpec(uint32 current_cycle, size_t current_bank_size);
   // Given valid data in opcodes_ refills bytecode_ with the concatenated data
   // in opcodes_ and specs_, appends jumps and updates fingerprint_.
   void RegenerateBytecode(size_t bytecode_size);
   void SimulateAndScore(const uint8* target_colors);
-  void Mutate(TlsPrng& engine);
+  void Mutate(TlsPrngList::reference engine);
   // Given a number within [0, total_dynamic_opcodes_) returns the index of the
   // vector within opcodes_ that contains this value.
   size_t OpcodeFieldIndex(size_t opcode_index);

@@ -112,7 +112,8 @@ void Kernel::ClobberSpec(const SpecList new_specs) {
   RegenerateBytecode(bytecode_size_);
 }
 
-void Kernel::GenerateRandom(const SpecList specs, TlsPrng& tls_prng) {
+void Kernel::GenerateRandom(
+    const SpecList specs, TlsPrngList::reference tls_prng) {
   uint32 current_cycle = 0;
   size_t spec_list_index = 0;
   size_t total_byte_size = 0;
@@ -198,7 +199,7 @@ void Kernel::GenerateRandom(const SpecList specs, TlsPrng& tls_prng) {
 
 void Kernel::GenerateRandomKernelJob::operator()(
     const tbb::blocked_range<size_t>& r) const {
-  TlsPrng tls_prng = tls_prng_list_.local();
+  TlsPrngList::reference tls_prng = tls_prng_list_.local();
   for (size_t i = r.begin(); i < r.end(); ++i) {
     std::shared_ptr<Kernel> kernel = generation_->at(i);
     kernel->GenerateRandom(specs_, tls_prng);
@@ -214,7 +215,7 @@ void Kernel::ScoreKernelJob::operator()(
 
 void Kernel::MutateKernelJob::operator()(
     const tbb::blocked_range<size_t>& r) const {
-  TlsPrng tls_prng = tls_prng_list_.local();
+  TlsPrngList::reference tls_prng = tls_prng_list_.local();
   for (size_t i = r.begin(); i < r.end(); ++i) {
     std::shared_ptr<Kernel> original = source_generation_->at(i);
     std::shared_ptr<Kernel> target =
@@ -257,7 +258,8 @@ void Kernel::ClobberSpecJob::operator()(
   }
 }
 
-uint32 Kernel::GenerateRandomOpcode(uint32 cycles_remaining, TlsPrng& engine) {
+uint32 Kernel::GenerateRandomOpcode(
+    uint32 cycles_remaining, TlsPrngList::reference engine) {
   // As no possible instruction lasts only one cycle we cannot support a
   // situation where only one cycle is remaining.
   assert(cycles_remaining > 1);
@@ -277,7 +279,7 @@ uint32 Kernel::GenerateRandomOpcode(uint32 cycles_remaining, TlsPrng& engine) {
   return GenerateRandomStore(engine);
 }
 
-uint32 Kernel::GenerateRandomLoad(TlsPrng& engine) {
+uint32 Kernel::GenerateRandomLoad(TlsPrngList::reference engine) {
   std::uniform_int_distribution<uint8> arg_distro(0, 255);
   uint8 arg = arg_distro(engine);
   std::uniform_int_distribution<int> op_distro(0, 2);
@@ -299,7 +301,7 @@ uint32 Kernel::GenerateRandomLoad(TlsPrng& engine) {
   return 0;
 }
 
-uint32 Kernel::GenerateRandomStore(TlsPrng& engine) {
+uint32 Kernel::GenerateRandomStore(TlsPrngList::reference engine) {
   std::array<uint8, 27> kValidTIA{{
     TIA::NUSIZ0,
     TIA::NUSIZ1,
@@ -443,7 +445,7 @@ size_t Kernel::OpcodeFieldIndex(size_t opcode_index) {
   return opcode_field;
 }
 
-void Kernel::Mutate(TlsPrng& engine) {
+void Kernel::Mutate(TlsPrngList::reference engine) {
   // Pick a field of opcodes at random.
   std::uniform_int_distribution<size_t>
     opcode_index_distro(0, total_dynamic_opcodes_ - 1);

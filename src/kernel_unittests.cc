@@ -102,7 +102,7 @@ class GenerateBackgroundColorKernelJob {
       vcsmc::TlsPrngList& prng_list)
       : generation_(generation), prng_list_(prng_list) {}
   void operator()(const tbb::blocked_range<size_t>& r) const {
-    vcsmc::TlsPrng tls_prng = prng_list_.local();
+    vcsmc::TlsPrngList::reference tls_prng = prng_list_.local();
     for (size_t i = r.begin(); i < r.end(); ++i) {
       std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
       uint8 bg = i * 2;

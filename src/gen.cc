@@ -93,7 +93,7 @@ class CompeteKernelJob {
         prng_list_(prng_list),
         tourney_size_(tourney_size) {}
   void operator()(const tbb::blocked_range<size_t>& r) const {
-    vcsmc::TlsPrng engine = prng_list_.local();
+    vcsmc::TlsPrngList::reference engine = prng_list_.local();
     for (size_t i = r.begin(); i < r.end(); ++i) {
       std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
       assert(kernel->score_valid());
@@ -315,8 +315,8 @@ int main(int argc, char* argv[]) {
           static_cast<double>(generation_size);
       auto now = std::chrono::high_resolution_clock::now();
       if (FLAGS_print_stats) {
-        printf("gen: %7d leader: %016" PRIx64 " score: %14.12g div: %5.3f "
-               "sim: %7" PRIu64 " tourney: %7" PRIu64 " mutate: %7" PRIu64  " "
+        printf("gen: %7d leader: %016" PRIx64 " score: %.8f div: %5.3f "
+               "sim: %7" PRIu64 " tourney: %7" PRIu64 " mutate: %7" PRIu64 " "
                "epoch: %7" PRIu64 " elapsed: %7" PRIu64
                "%s\n",
             generation_count,

@@ -7,13 +7,17 @@
 namespace vcsmc {
 
 TlsPrng::TlsPrng() {
-  tbb::tbb_hash<tbb::tbb_thread::id> hasher;
-  uint32 hash = hasher(tbb::this_tbb_thread::get_id());
-  hash += std::chrono::system_clock::now().time_since_epoch().count();
-  engine_.seed(hash);
+  seed();
 }
 
 TlsPrng::~TlsPrng() {
+}
+
+void TlsPrng::seed(uint32 val) {
+  (void)val;
+  std::random_device urandom;
+  uint32 hash = urandom();
+  engine_.seed(hash);
 }
 
 }  // namespace vcsmc
