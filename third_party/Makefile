@@ -1,5 +1,3 @@
-export DCMT_OUT=$(OUT)/dcmt
-export DCMT_DIR=$(CURDIR)/dcmt
 export FARMHASH_OUT=$(OUT)/farmhash
 export FARMHASH_DIR=$(CURDIR)/farmhash
 export GPERF_OUT=$(OUT)/gperftools
@@ -10,14 +8,7 @@ export LIBYAML_OUT=$(OUT)/libyaml
 export LIBZ26_OUT=$(OUT)/libz26
 export TBB_OUT=$(OUT)/tbb
 
-all: dcmt farmhash gperftools gtest gflags libyaml libz26 tbb
-
-dcmt: | $(DCMT_OUT) $(DCMT_OUT)/libdcmt.a
-
-$(DCMT_OUT)/libdcmt.a:
-	$(MAKE) -C $(DCMT_DIR)/lib
-	$(MAKE) -C $(DCMT_DIR)/lib oclean
-	mv $(DCMT_DIR)/lib/libdcmt.a $(DCMT_OUT)
+all: farmhash gperftools gtest gflags libyaml libz26 tbb
 
 farmhash: $(FARMHASH_OUT)/lib/libfarmhash.a | $(FARMHASH_OUT)
 
@@ -73,10 +64,7 @@ $(TBB_TARGET): export tbb_build_dir=$(TBB_OUT)
 $(TBB_TARGET): export tbb_build_prefix=tbb
 $(TBB_TARGET):
 	$(MAKE) -C tbb/
-	cp $(TBB_OUT)/tbb_debug/*.$(DYLIB)* $(OUT)
-
-$(DCMT_OUT):
-	mkdir -p $(DCMT_OUT)
+	cp $(TBB_OUT)/tbb_release/*.$(DYLIB)* $(OUT)
 
 $(FARMHASH_OUT):
 	mkdir -p $(FARMHASH_OUT)

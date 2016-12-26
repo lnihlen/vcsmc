@@ -34,8 +34,8 @@ class Kernel {
   void ResetVictories() { victories_ = 0; }
   void AddVictory() { ++victories_; }
 
-  void GenerateRandom(SpecList specs, TlsPrng& tls_prng);
-  void ClobberSpec(SpecList new_specs);
+  void GenerateRandom(const SpecList specs, TlsPrng& tls_prng);
+  void ClobberSpec(const SpecList new_specs);
 
   const uint8* bytecode() const { return bytecode_.get(); }
   const std::vector<Range>& dynamic_areas() const { return dynamic_areas_; }
@@ -62,7 +62,7 @@ class Kernel {
 
    private:
     Generation generation_;
-    SpecList specs_;
+    const SpecList specs_;
     TlsPrngList& tls_prng_list_;
   };
 
@@ -115,7 +115,7 @@ class Kernel {
     void operator()(const tbb::blocked_range<size_t>& r) const;
    private:
     Generation generation_;
-    SpecList specs_;
+    const SpecList specs_;
   };
 
  private:

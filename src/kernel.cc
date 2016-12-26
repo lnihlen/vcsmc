@@ -27,7 +27,7 @@ Kernel::Kernel()
     total_dynamic_opcodes_(0),
     fingerprint_(0),
     score_valid_(false),
-    score_(0.0),
+    score_(1.0),
     victories_(0) {
 }
 
@@ -99,7 +99,7 @@ bool Kernel::SaveImage(const std::string& file_name) const {
   return vcsmc::SaveImage(&image, file_name);
 }
 
-void Kernel::ClobberSpec(SpecList new_specs) {
+void Kernel::ClobberSpec(const SpecList new_specs) {
   size_t target_spec_index = 0;
   for (size_t i = 0; i < new_specs->size(); ++i) {
     while (target_spec_index < specs_->size() &&
@@ -112,7 +112,7 @@ void Kernel::ClobberSpec(SpecList new_specs) {
   RegenerateBytecode(bytecode_size_);
 }
 
-void Kernel::GenerateRandom(SpecList specs, TlsPrng& tls_prng) {
+void Kernel::GenerateRandom(const SpecList specs, TlsPrng& tls_prng) {
   uint32 current_cycle = 0;
   size_t spec_list_index = 0;
   size_t total_byte_size = 0;
@@ -152,8 +152,6 @@ void Kernel::GenerateRandom(SpecList specs, TlsPrng& tls_prng) {
                 cycles_remaining < kBankPadding)) &&
              (cycles_remaining > 4 || cycles_remaining == 3)) {
           if (opcodes_.back().size()) {
-            total_dynamic_opcodes_ += opcodes_.back().size();
-            opcode_counts_.push_back(total_dynamic_opcodes_);
             opcode_ranges_.emplace_back(starting_cycle, current_cycle);
             opcodes_.emplace_back();
           }
@@ -179,8 +177,6 @@ void Kernel::GenerateRandom(SpecList specs, TlsPrng& tls_prng) {
       }
       if (opcodes_.back().size()) {
         opcode_ranges_.emplace_back(starting_cycle, current_cycle);
-        total_dynamic_opcodes_ += opcodes_.back().size();
-        opcode_counts_.push_back(total_dynamic_opcodes_);
       } else {
         opcodes_.pop_back();
       }
@@ -189,6 +185,14 @@ void Kernel::GenerateRandom(SpecList specs, TlsPrng& tls_prng) {
   assert(current_cycle == kScreenSizeCycles - 3);
   AppendJmpSpec(current_cycle, total_byte_size % kBankSize);
   total_byte_size += specs_->back().size();
+
+  // Calculate opcode_counts and total.
+  total_dynamic_opcodes_ = 0;
+  for (size_t i = 0; i < opcodes_.size(); ++i) {
+    total_dynamic_opcodes_ += opcodes_[i].size();
+    opcode_counts_.push_back(total_dynamic_opcodes_);
+  }
+
   RegenerateBytecode(total_byte_size);
 }
 
@@ -232,6 +236,7 @@ void Kernel::MutateKernelJob::operator()(
     target->bytecode_size_ = original->bytecode_size_;
 
     target->total_dynamic_opcodes_ = original->total_dynamic_opcodes_;
+    target->opcode_counts_.clear();
     std::copy(original->opcode_counts_.begin(),
         original->opcode_counts_.end(),
         std::back_inserter(target->opcode_counts_));
@@ -370,7 +375,7 @@ void Kernel::AppendJmpSpec(uint32 current_cycle, size_t current_bank_size) {
 void Kernel::RegenerateBytecode(size_t bytecode_size) {
   bytecode_size_ = bytecode_size;
   score_valid_ = false;
-  score_ = 0.0;
+  score_ = 1.0;
   bytecode_.reset(new uint8[bytecode_size]);
   dynamic_areas_.clear();
   uint32 current_cycle = 0;
@@ -418,7 +423,7 @@ void Kernel::SimulateAndScore(const uint8* target_colors) {
   uint8* frame_pointer = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
   for (size_t i = 0; i < kFrameSizeBytes; ++i) {
     if (*frame_pointer >= 128) {
-      score_ += 1000.0;
+      score_ += 1.0;
     } else {
       assert(*frame_pointer < 128);
       score_ += kColorDistanceNTSC[(target_colors[i] * 128) + *frame_pointer];
@@ -426,6 +431,7 @@ void Kernel::SimulateAndScore(const uint8* target_colors) {
     // Sim output has pixels doubled horizontally.
     frame_pointer += 2;
   }
+  score_ = score_ / static_cast<double>(kFrameWidthPixels * kFrameHeightPixels);
   score_valid_ = true;
 }
 

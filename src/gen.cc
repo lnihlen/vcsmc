@@ -10,6 +10,7 @@
 #include <gflags/gflags.h>
 #include <gperftools/profiler.h>
 #include <random>
+#include <set>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
@@ -95,6 +96,7 @@ class CompeteKernelJob {
     vcsmc::TlsPrng engine = prng_list_.local();
     for (size_t i = r.begin(); i < r.end(); ++i) {
       std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
+      assert(kernel->score_valid());
       kernel->ResetVictories();
       std::uniform_int_distribution<size_t> tourney_distro(
           0, generation_->size() - 1);
@@ -260,10 +262,16 @@ int main(int argc, char* argv[]) {
   tbb::blocked_range<size_t> back_half(generation_size / 2, generation_size);
   tbb::blocked_range<size_t> full_range(0, generation_size);
 
-  while (global_minimum->score() > target_error || generation_count == 0) {
+  bool full_range_sim_needed = true;
+
+  while (true) {
+    if (global_minimum->score() <= target_error && generation_count > 0) {
+      printf("target error reached, terminating.\n");
+      break;
+    }
     // Score all unscored kernels in the current generation.
     auto start_of_scoring = std::chrono::high_resolution_clock::now();
-    if (generation_count == 0) {
+    if (full_range_sim_needed) {
       tbb::parallel_for(full_range,
           vcsmc::Kernel::ScoreKernelJob(generation, target_colors.get()));
       scoring_count += generation_size;
@@ -299,15 +307,22 @@ int main(int argc, char* argv[]) {
     }
 
     if ((generation_count % FLAGS_save_count) == 0) {
+      std::set<uint64> fingerprint_set;
+      for (size_t i = 0; i < generation->size(); ++i) {
+        fingerprint_set.insert(generation->at(i)->fingerprint());
+      }
+      double diversity = static_cast<double>(fingerprint_set.size()) /
+          static_cast<double>(generation_size);
       auto now = std::chrono::high_resolution_clock::now();
       if (FLAGS_print_stats) {
-        printf("gen: %7d leader: %016" PRIx64 " score: %14.4f "
+        printf("gen: %7d leader: %016" PRIx64 " score: %14.12g div: %5.3f "
                "sim: %7" PRIu64 " tourney: %7" PRIu64 " mutate: %7" PRIu64  " "
                "epoch: %7" PRIu64 " elapsed: %7" PRIu64
                "%s\n",
             generation_count,
             generation->at(0)->fingerprint(),
             global_minimum->score(),
+            diversity,
             scoring_count ? scoring_count * 1000000 / scoring_time_us : 0,
             tourney_count ? tourney_count * 1000000 / tourney_time_us : 0,
             mutate_count ? mutate_count * 1000000 / mutate_time_us : 0,
@@ -328,7 +343,7 @@ int main(int argc, char* argv[]) {
       epoch_time = now;
     }
 
-    if (fabs(last_generation_score - global_minimum->score()) < 0.00001) {
+    if (last_generation_score == global_minimum->score()) {
       ++streak;
     } else {
       last_generation_score = global_minimum->score();
@@ -344,10 +359,13 @@ int main(int argc, char* argv[]) {
           vcsmc::Kernel::MutateKernelJob(generation, generation,
               generation_size / 2, 1, prng_list));
       mutate_count += generation_size / 2;
+      full_range_sim_needed = false;
     } else {
       ++reroll_count;
-      if (reroll_count > FLAGS_stagnant_count_limit)
+      if (reroll_count > FLAGS_stagnant_count_limit) {
+        printf("max reroll count reached, terminating.\n");
         break;
+      }
       reroll = true;
       streak = 0;
       vcsmc::Generation mutated_generation(
@@ -360,6 +378,7 @@ int main(int argc, char* argv[]) {
             FLAGS_stagnant_mutation_count, prng_list));
       generation = mutated_generation;
       mutate_count += generation_size;
+      full_range_sim_needed = true;
     }
     auto end_of_mutate = std::chrono::high_resolution_clock::now();
     mutate_time_us += std::chrono::duration_cast<std::chrono::microseconds>(
@@ -368,6 +387,7 @@ int main(int argc, char* argv[]) {
     ++generation_count;
     if (FLAGS_max_generation_number > 0 &&
         generation_count > FLAGS_max_generation_number) {
+      printf("max generation count reached, terminating.\n");
       break;
     }
   }

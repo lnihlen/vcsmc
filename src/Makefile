@@ -4,7 +4,7 @@
 CFLAGS+=-I. -I$(FARMHASH_INCLUDE) -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)      \
     -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE) -I$(TBB_INCLUDE) -I$(DCMT_INCLUDE)
 LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(FARMHASH_LIB) $(GPERF_LIB)      \
-    -L$(OUT) -ltbb_debug $(DCMT_LIB)
+    -L$(OUT) -ltbb
 OUTTESTS=$(OUT)/tests
 
 # OS X-specific build flags
