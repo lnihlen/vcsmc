@@ -14,51 +14,52 @@
 #include <unistd.h>
 #include <vector>
 
+#include "tbb/tbb.h"
+
 #include "color.h"
 #include "color_table.h"
 #include "constants.h"
 #include "image.h"
 #include "image_file.h"
-#include "job.h"
-#include "job_queue.h"
 
 DEFINE_bool(save_ideal_image, false,
     "If true, fit will save an image file of the ideal color fit image.");
 
-DEFINE_int32(worker_threads, 0,
-    "Number of threads to create to work in parallel, set to 0 to pick based "
-    "on hardware.");
-
 DEFINE_string(image_file, "", "Required image input file path.");
 DEFINE_string(output_dir, "", "Required output output index directory.");
 
-class ComputeColorErrorTableJob : public vcsmc::Job {
+typedef std::vector<std::vector<double>> ColorDistances;
+
+class ComputeColorErrorTableJob {
  public:
   ComputeColorErrorTableJob(
       const double* target_lab,
-      std::vector<double>& error_table,
-      size_t color_index)
+      ColorDistances& distances)
       : target_lab_(target_lab),
-        error_table_(error_table),
-        color_index_(color_index) {}
-  void Execute() override {
-    const double* atari_lab = vcsmc::kAtariNTSCLabColorTable +
-        (color_index_ * 4);
-    for (size_t i = 0;
-         i < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels; ++i) {
-      double error = vcsmc::Ciede2k(target_lab_, atari_lab);
-      target_lab_ += 4;
-      error_table_.push_back(error);
+        distances_(distances) {}
+  void operator()(const tbb::blocked_range<size_t>& r) const {
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      const double* atari_lab = vcsmc::kAtariNTSCLabColorTable + (i * 4);
+      std::vector<double>& error_table = distances_[i];
+      const double* target_lab = target_lab_;
+      for (size_t j = 0;
+           j < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels;
+           ++j) {
+        double error = vcsmc::Ciede2k(target_lab, atari_lab);
+        target_lab += 4;
+        error_table.push_back(error);
+      }
     }
   }
  private:
   const double* target_lab_;
-  std::vector<double>& error_table_;
-  size_t color_index_;
+  ColorDistances& distances_;
 };
 
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, false);
+
+  tbb::task_scheduler_init tbb_init;
 
   std::unique_ptr<vcsmc::Image> target_image = vcsmc::LoadImage(
       FLAGS_image_file);
@@ -88,20 +89,10 @@ int main(int argc, char* argv[]) {
         target_lab.get() + (i * 4));
   }
 
-  // Build color distance tables.
-  vcsmc::JobQueue job_queue(FLAGS_worker_threads);
-  typedef std::vector<std::vector<double>> ColorDistances;
-  ColorDistances color_distances(128);
+  ColorDistances color_distances(vcsmc::kNTSCColors);
 
-  job_queue.LockQueue();
-  for (size_t i = 0; i < vcsmc::kNTSCColors; ++i) {
-    job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
-          new ComputeColorErrorTableJob(
-              target_lab.get(), color_distances[i], i)));
-  }
-  job_queue.UnlockQueue();
-
-  job_queue.Finish();
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, vcsmc::kNTSCColors),
+      ComputeColorErrorTableJob(target_lab.get(), color_distances));
 
   // Compute theoretical minimum error color table.
   double min_total_error = 0.0;

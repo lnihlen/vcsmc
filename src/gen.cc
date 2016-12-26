@@ -18,16 +18,17 @@
 #include <unistd.h>
 #include <vector>
 
+#include "tbb/tbb.h"
+
 #include "bit_map.h"
 #include "color.h"
 #include "color_table.h"
 #include "image.h"
 #include "image_file.h"
-#include "job.h"
-#include "job_queue.h"
 #include "kernel.h"
 #include "serialization.h"
 #include "spec.h"
+#include "tls_prng.h"
 
 extern "C" {
 #include <libz26/libz26.h>
@@ -59,9 +60,6 @@ DEFINE_int32(stagnant_count_limit, 0,
 
 DEFINE_string(color_input_file, "",
     "Required - best fit color map as computed by fit.");
-DEFINE_string(random_seed, "",
-    "Hex string of seed for pseudorandom seed generation. If not provided one "
-    "will be generated from hardware random device.");
 DEFINE_string(spec_list_file, "asm/frame_spec.yaml",
     "Required - path to spec list yaml file.");
 DEFINE_string(gperf_output_file, "",
@@ -80,36 +78,37 @@ DEFINE_string(global_minimum_output_file, "out/minimum.yaml",
 DEFINE_string(audio_spec_list_file, "",
     "Optional file path for audio spec, will clobber any existing specs at "
     "same time in existing kernels.");
-DEFINE_string(target_error, "61440.0",
+DEFINE_string(target_error, "0.0",
     "Error at which to stop optimizing.");
 DEFINE_string(append_kernel_binary, "", "Path to append kernel binary.");
 
-class CompeteKernelJob : public vcsmc::Job {
+class CompeteKernelJob {
  public:
   CompeteKernelJob(
       const vcsmc::Generation generation,
-      std::shared_ptr<vcsmc::Kernel> kernel,
-      std::seed_seq& seed,
+      vcsmc::TlsPrngList& prng_list,
       size_t tourney_size)
       : generation_(generation),
-        kernel_(kernel),
-        engine_(seed),
+        prng_list_(prng_list),
         tourney_size_(tourney_size) {}
-  void Execute() override {
-    kernel_->ResetVictories();
-    std::uniform_int_distribution<size_t> tourney_distro(
-        0, generation_->size() - 1);
-    for (size_t i = 0; i < tourney_size_; ++i) {
-      size_t contestant_index = tourney_distro(engine_);
-      // Lower scores mean better performance.
-      if (generation_->at(contestant_index)->score() >= kernel_->score())
-        kernel_->AddVictory();
+  void operator()(const tbb::blocked_range<size_t>& r) const {
+    vcsmc::TlsPrng engine = prng_list_.local();
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      std::shared_ptr<vcsmc::Kernel> kernel;
+      kernel->ResetVictories();
+      std::uniform_int_distribution<size_t> tourney_distro(
+          0, generation_->size() - 1);
+      for (size_t j = 0; j < tourney_size_; ++j) {
+        size_t contestant_index = tourney_distro(engine);
+        // Lower scores mean better performance.
+        if (generation_->at(contestant_index)->score() >= kernel->score())
+          kernel->AddVictory();
+      }
     }
   }
  private:
   const vcsmc::Generation generation_;
-  std::shared_ptr<vcsmc::Kernel> kernel_;
-  std::default_random_engine engine_;
+  vcsmc::TlsPrngList& prng_list_;
   size_t tourney_size_;
 };
 
@@ -134,18 +133,6 @@ void SaveState(vcsmc::Generation generation,
 int main(int argc, char* argv[]) {
   auto program_start_time = std::chrono::high_resolution_clock::now();
   gflags::ParseCommandLineFlags(&argc, &argv, false);
-
-  std::array<uint32, vcsmc::kSeedSizeWords> seed_array;
-  if (FLAGS_random_seed.size() == vcsmc::kSeedSizeWords * 8) {
-    for (size_t i = 0; i < vcsmc::kSeedSizeWords; ++i) {
-      std::string word = FLAGS_random_seed.substr(i * 8, 8);
-      seed_array[i] = strtoul(word.c_str(), nullptr, 16);
-    }
-  } else {
-    std::random_device urandom;
-    for (size_t i = 0; i < vcsmc::kSeedSizeWords; ++i)
-      seed_array[i] = urandom();
-  }
 
   int col_fd = open(FLAGS_color_input_file.c_str(), O_RDONLY);
   if (col_fd < 0) {
@@ -172,13 +159,12 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  std::seed_seq master_seed(seed_array.begin(), seed_array.end());
-  std::default_random_engine seed_engine(master_seed);
+  tbb::task_scheduler_init tbb_init;
+  vcsmc::TlsPrngList prng_list;
+  int generation_size = FLAGS_generation_size;
 
-  vcsmc::JobQueue job_queue(FLAGS_worker_threads);
   vcsmc::Generation generation;
 
-  int generation_size = FLAGS_generation_size;
   if (FLAGS_seed_generation_file == "") {
     vcsmc::SpecList spec_list = vcsmc::ParseSpecListFile(FLAGS_spec_list_file);
     if (!spec_list) {
@@ -220,20 +206,14 @@ int main(int argc, char* argv[]) {
     }
 
     generation.reset(new std::vector<std::shared_ptr<vcsmc::Kernel>>);
+    for (int i = 0; i < generation_size; ++i) {
+      generation->emplace_back(new vcsmc::Kernel());
+    }
 
     // Generate FLAGS_generation_size number of random individuals.
-    job_queue.LockQueue();
-    for (int i = 0; i < generation_size; ++i) {
-      std::array<uint32, vcsmc::kSeedSizeWords> seed;
-      for (size_t j = 0; j < vcsmc::kSeedSizeWords; ++j)
-        seed[j] = seed_engine();
-      std::seed_seq kernel_seed(seed.begin(), seed.end());
-      generation->emplace_back(new vcsmc::Kernel(kernel_seed));
-      job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
-          new vcsmc::Kernel::GenerateRandomKernelJob(
-              generation->at(i), spec_list)));
-    }
-    job_queue.UnlockQueue();
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, generation_size),
+        vcsmc::Kernel::GenerateRandomKernelJob(
+            generation, spec_list, &prng_list));
   } else {
     generation = vcsmc::ParseGenerationFile(FLAGS_seed_generation_file);
     if (!generation) {
@@ -242,13 +222,8 @@ int main(int argc, char* argv[]) {
     }
     generation_size = generation->size();
     if (audio_spec_list) {
-      job_queue.LockQueue();
-      for (int i = 0; i < generation_size; ++i) {
-        job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
-            new vcsmc::Kernel::ClobberSpecJob(generation->at(i),
-                                              audio_spec_list)));
-      }
-      job_queue.UnlockQueue();
+      tbb::parallel_for(tbb::blocked_range<size_t>(0, generation_size),
+          vcsmc::Kernel::ClobberSpecJob(generation, audio_spec_list));
     }
   }
 
@@ -281,50 +256,32 @@ int main(int argc, char* argv[]) {
 
   auto epoch_time = std::chrono::high_resolution_clock::now();
 
+  tbb::blocked_range<size_t> front_half(0, generation_size / 2);
+  tbb::blocked_range<size_t> back_half(generation_size / 2, generation_size);
+  tbb::blocked_range<size_t> full_range(0, generation_size);
+
   while (global_minimum->score() > target_error || generation_count == 0) {
-    auto start_of_scoring = std::chrono::high_resolution_clock::now();
-
     // Score all unscored kernels in the current generation.
-    job_queue.LockQueue();
-    for (int j = 0; j < generation_size; ++j) {
-      if (!generation->at(j)->score_valid()) {
-        job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
-              new vcsmc::Kernel::ScoreKernelJob(generation->at(j),
-                                                target_colors.get())));
-        ++scoring_count;
-      }
+    auto start_of_scoring = std::chrono::high_resolution_clock::now();
+    if (generation_count == 0) {
+      tbb::parallel_for(full_range,
+          vcsmc::Kernel::ScoreKernelJob(generation, target_colors.get()));
+      scoring_count += generation_size;
+    } else {
+      tbb::parallel_for(back_half,
+          vcsmc::Kernel::ScoreKernelJob(generation, target_colors.get()));
+      scoring_count += generation_size / 2;
     }
-    job_queue.UnlockQueue();
-
-    // Wait for simulation to finish.
-    job_queue.Finish();
     auto end_of_scoring = std::chrono::high_resolution_clock::now();
-
     scoring_time_us += std::chrono::duration_cast<std::chrono::microseconds>(
         end_of_scoring - start_of_scoring).count();
 
+    // Conduct tournament based on scores.
     auto start_of_tourney = std::chrono::high_resolution_clock::now();
-
-    // Conduct tournament based on scores while looking for new global minimum.
-    job_queue.LockQueue();
-    for (int j = 0; j < generation_size; ++j) {
-      if (generation->at(j)->score() < global_minimum->score()) {
-        global_minimum = generation->at(j);
-      }
-      std::array<uint32, vcsmc::kSeedSizeWords> seed;
-      for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
-        seed[k] = seed_engine();
-      std::seed_seq tourney_seed(seed.begin(), seed.end());
-      job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(new CompeteKernelJob(
-          generation, generation->at(j), tourney_seed, FLAGS_tournament_size)));
-      ++tourney_count;
-    }
-    job_queue.UnlockQueue();
-
-    // Wait for tournament to finish.
-    job_queue.Finish();
+    tbb::parallel_for(full_range,
+        CompeteKernelJob(generation, prng_list, FLAGS_tournament_size));
     auto end_of_tourney = std::chrono::high_resolution_clock::now();
-
+    tourney_count += generation_size;
     tourney_time_us += std::chrono::duration_cast<std::chrono::microseconds>(
         end_of_tourney - start_of_tourney).count();
 
@@ -336,6 +293,10 @@ int main(int argc, char* argv[]) {
 
           return b->victories() < a->victories();
         });
+
+    if (generation->at(0)->score() < global_minimum->score()) {
+      global_minimum = generation->at(0);
+    }
 
     if ((generation_count % FLAGS_save_count) == 0) {
       auto now = std::chrono::high_resolution_clock::now();
@@ -379,22 +340,10 @@ int main(int argc, char* argv[]) {
         streak < FLAGS_stagnant_generation_count) {
       // Replace lowest-scoring half of generation with mutated versions of
       // highest-scoring half of generation.
-      job_queue.LockQueue();
-      for (int j = generation_size / 2; j < generation_size; ++j) {
-        std::array<uint32, vcsmc::kSeedSizeWords> seed;
-        for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
-          seed[k] = seed_engine();
-        std::seed_seq kernel_seed(seed.begin(), seed.end());
-        generation->at(j).reset(new vcsmc::Kernel(kernel_seed));
-        job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
-              new vcsmc::Kernel::MutateKernelJob(
-                generation->at(j - (generation_size / 2)),
-                generation->at(j),
-                1)));
-        ++mutate_count;
-      }
-      job_queue.UnlockQueue();
-      job_queue.Finish();
+      tbb::parallel_for(front_half,
+          vcsmc::Kernel::MutateKernelJob(generation, generation,
+              generation_size / 2, 1, prng_list));
+      mutate_count += generation_size / 2;
     } else {
       ++reroll_count;
       if (reroll_count > FLAGS_stagnant_count_limit)
@@ -403,23 +352,14 @@ int main(int argc, char* argv[]) {
       streak = 0;
       vcsmc::Generation mutated_generation(
           new std::vector<std::shared_ptr<vcsmc::Kernel>>);
-      job_queue.LockQueue();
-      for (int j = 0; j < generation_size; ++j) {
-        std::array<uint32, vcsmc::kSeedSizeWords> seed;
-        for (size_t k = 0; k < vcsmc::kSeedSizeWords; ++k)
-          seed[k] = seed_engine();
-        std::seed_seq kernel_seed(seed.begin(), seed.end());
-        mutated_generation->emplace_back(new vcsmc::Kernel(kernel_seed));
-        job_queue.EnqueueLocked(std::unique_ptr<vcsmc::Job>(
-              new vcsmc::Kernel::MutateKernelJob(
-                generation->at(j),
-                mutated_generation->at(j),
-                FLAGS_stagnant_mutation_count)));
-        ++mutate_count;
+      for (int i = 0; i < generation_size; ++i) {
+        mutated_generation->emplace_back(new vcsmc::Kernel());
       }
-      job_queue.UnlockQueue();
-      job_queue.Finish();
+      tbb::parallel_for(full_range,
+          vcsmc::Kernel::MutateKernelJob(generation, mutated_generation, 0,
+            FLAGS_stagnant_mutation_count, prng_list));
       generation = mutated_generation;
+      mutate_count += generation_size;
     }
     auto end_of_mutate = std::chrono::high_resolution_clock::now();
     mutate_time_us += std::chrono::duration_cast<std::chrono::microseconds>(

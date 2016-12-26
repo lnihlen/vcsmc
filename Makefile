@@ -3,11 +3,24 @@
 export CC=clang
 # If changing CFLAGS it is good to change them in the .ycm_extra_conf.py file
 # (also versioned) so that YCM will pick up the correct flags.
-export CFLAGS=-std=c++11 -Wall -Wextra -Werror -O2 -g
+# Also note that right now all the third_party/ builds have hard-coded CFLAGS
+# of their own and don't follow this variable.
+export CFLAGS=-std=c++11 -Wall -Wextra -Werror -O0 -g
 export LDFLAGS=
 export LIBS=-lstdc++
 export OUT=$(CURDIR)/out
+export UNAME:=$(shell uname)
 
+ifeq ($(UNAME), Darwin)
+export DYLIB=dylib
+endif
+
+ifeq ($(UNAME), Linux)
+export DYLIB=so
+endif
+
+export DCMT_LIB=$(OUT)/dcmt/libdcmt.a
+export DCMT_INCLUDE=$(CURDIR)/third_party/dcmt/include
 export FARMHASH_LIB=$(OUT)/farmhash/lib/libfarmhash.a
 export FARMHASH_INCLUDE=$(OUT)/farmhash/include
 export GPERF_LIB=$(OUT)/gperftools/lib/libprofiler.a
@@ -20,7 +33,7 @@ export LIBYAML_INCLUDE=$(CURDIR)/third_party/libyaml/include
 export LIBYAML_LIB=$(OUT)/libyaml/libyaml.a
 export LIBZ26_INCLUDE=$(CURDIR)/third_party/libz26/include
 export LIBZ26_LIB=$(OUT)/libz26/libz26.o
-export TBB_LIB=$(OUT)/tbb/tbb.a
+export TBB_INCLUDE=$(CURDIR)/third_party/tbb/include
 
 all: depends vcsmc tests
 

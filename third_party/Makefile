@@ -1,3 +1,5 @@
+export DCMT_OUT=$(OUT)/dcmt
+export DCMT_DIR=$(CURDIR)/dcmt
 export FARMHASH_OUT=$(OUT)/farmhash
 export FARMHASH_DIR=$(CURDIR)/farmhash
 export GPERF_OUT=$(OUT)/gperftools
@@ -8,7 +10,14 @@ export LIBYAML_OUT=$(OUT)/libyaml
 export LIBZ26_OUT=$(OUT)/libz26
 export TBB_OUT=$(OUT)/tbb
 
-all: farmhash gperftools gtest gflags libyaml libz26 tbb
+all: dcmt farmhash gperftools gtest gflags libyaml libz26 tbb
+
+dcmt: | $(DCMT_OUT) $(DCMT_OUT)/libdcmt.a
+
+$(DCMT_OUT)/libdcmt.a:
+	$(MAKE) -C $(DCMT_DIR)/lib
+	$(MAKE) -C $(DCMT_DIR)/lib oclean
+	mv $(DCMT_DIR)/lib/libdcmt.a $(DCMT_OUT)
 
 farmhash: $(FARMHASH_OUT)/lib/libfarmhash.a | $(FARMHASH_OUT)
 
@@ -56,20 +65,18 @@ libz26: | $(LIBZ26_OUT) $(LIBZ26_OUT)/libz26.o
 $(LIBZ26_OUT)/libz26.o:	libz26/
 	$(MAKE) -C libz26/
 
-ifeq ($(UNAME), Darwin)
-TBB_LIB=$(TBB_OUT)/tbb_release/libtbb.dylib
-endif
+TBB_TARGET:=$(OUT)/libtbb.$(DYLIB)
 
-ifeq ($(UNAME), Linux)
-TBB_LIB=$(TBB_OUT)/tbb_release/libtbb.so
-endif
+tbb: | $(TBB_OUT) $(TBB_TARGET)
 
-tbb: | $(TBB_OUT) $(TBB_LIB)
-
-$(TBB_LIB): export tbb_build_dir=$(TBB_OUT)
-$(TBB_LIB): export tbb_build_prefix=tbb
-$(TBB_LIB):
+$(TBB_TARGET): export tbb_build_dir=$(TBB_OUT)
+$(TBB_TARGET): export tbb_build_prefix=tbb
+$(TBB_TARGET):
 	$(MAKE) -C tbb/
+	cp $(TBB_OUT)/tbb_debug/*.$(DYLIB)* $(OUT)
+
+$(DCMT_OUT):
+	mkdir -p $(DCMT_OUT)
 
 $(FARMHASH_OUT):
 	mkdir -p $(FARMHASH_OUT)
@@ -92,9 +99,11 @@ $(LIBZ26_OUT):
 
 $(TBB_OUT):
 	mkdir -p $(TBB_OUT)
+	echo $(TBB_TARGET)
 
 .PHONY: clean
 clean:
+	rm -f $(DCMT_OUT)
 	rm -f $(FARMHASH_OUT)
 	cd $(GPERF_DIR); git clean -dxf
 	rm -f $(GPERF_OUT)

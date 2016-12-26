@@ -229,7 +229,7 @@ vcsmc::Generation ParseGenerationInternal(yaml_parser_t parser) {
             return nullptr;
           }
           gen->emplace_back(new vcsmc::Kernel(
-                seed_str, spec_list, dynamic_areas, packed_opcodes));
+                spec_list, dynamic_areas, packed_opcodes));
           fingerprint = 0;
           seed_str = "";
           spec_list.reset(new std::vector<vcsmc::Spec>());
@@ -422,7 +422,6 @@ bool SaveKernelToString(std::shared_ptr<Kernel> kernel,
   char buf[128];
   snprintf(buf, 128, "fingerprint: %016" PRIx64 "\n", kernel->fingerprint());
   string_out += std::string(buf);
-  string_out += "seed: " + kernel->GetRandomState() + "\n";
   const SpecList specs = kernel->specs();
   string_out += "specs:\n";
   for (size_t j = 0; j < specs->size(); ++j) {

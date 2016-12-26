@@ -2,11 +2,10 @@
 # Dependencies: libpng, clang, OpenCL
 # tools dependencies: python colormath, Wand, ImageMagick
 CFLAGS+=-I. -I$(FARMHASH_INCLUDE) -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)      \
-    -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE)
-LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(FARMHASH_LIB) $(GPERF_LIB)
+    -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE) -I$(TBB_INCLUDE) -I$(DCMT_INCLUDE)
+LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(FARMHASH_LIB) $(GPERF_LIB)      \
+    -L$(OUT) -ltbb_debug $(DCMT_LIB)
 OUTTESTS=$(OUT)/tests
-
-UNAME:=$(shell uname)
 
 # OS X-specific build flags
 ifeq ($(UNAME), Darwin)
@@ -15,7 +14,7 @@ LDFLAGS+=-L/usr/local/lib -Wl,-no_pie
 endif
 
 ifeq ($(UNAME), Linux)
-LDFLAGS+=-lpthread -lunwind
+LDFLAGS+=-lunwind
 endif
 
 DEPS=constants.h image_file.h types.h
@@ -30,17 +29,16 @@ IMAGE_OBJ=$(OUT)/bit_map.o                                                     \
           $(OUT)/value_map.o
 
 OBJ=$(OUT)/assembler.o                                                         \
-    $(OUT)/job_queue.o                                                         \
     $(OUT)/kernel.o                                                            \
     $(OUT)/range.o                                                             \
     $(OUT)/serialization.o                                                     \
     $(OUT)/sound_file.o                                                        \
-    $(OUT)/spec.o
+    $(OUT)/spec.o                                                              \
+    $(OUT)/tls_prng.o
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
          $(OUTTESTS)/color_unittests.o                                         \
-         $(OUTTESTS)/job_queue_unittests.o                                     \
          $(OUTTESTS)/kernel_unittests.o                                        \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/serialization_unittests.o
