@@ -112,90 +112,92 @@ void Kernel::ClobberSpec(SpecList new_specs) {
   RegenerateBytecode(bytecode_size_);
 }
 
+void Kernel::GenerateRandom(SpecList specs, TlsPrng& tls_prng) {
+  uint32 current_cycle = 0;
+  size_t spec_list_index = 0;
+  size_t total_byte_size = 0;
+  // We reserve 3 cycles at the end for the jmp instruction taking us back to
+  // the top.
+  while (current_cycle < kScreenSizeCycles - 3) {
+    uint32 next_spec_start_time = spec_list_index < specs->size() ?
+        specs->at(spec_list_index).range().start_time() :
+        kScreenSizeCycles - 3;
+    size_t next_spec_size = spec_list_index < specs->size() ?
+        specs->at(spec_list_index).size() : 0;
+    if (current_cycle == next_spec_start_time) {
+      assert(spec_list_index < specs->size());
+      // Copy the spec to the kernel speclist.
+      specs_->emplace_back(specs->at(spec_list_index));
+      current_cycle = specs->at(spec_list_index).range().end_time();
+      assert((total_byte_size % kBankSize) + next_spec_size <
+             (kBankSize - kBankPadding));
+      total_byte_size += next_spec_size;
+      ++spec_list_index;
+    } else {
+      uint32 starting_cycle = current_cycle;
+      opcodes_.emplace_back();
+      uint32 cycles_remaining = next_spec_start_time - current_cycle;
+      size_t bytes_remaining =
+        (total_byte_size % kBankSize) + kBankPadding < kBankSize ?
+        kBankSize - ((total_byte_size % kBankSize) + kBankPadding) : 0;
+      while (cycles_remaining > 0) {
+        // Two possibilities for the generation of a jmp spec, used for bank
+        // switching. First is that we have filled the bank within the
+        // threshold. The second is that we are within a few cycles from the
+        // beginning of the next spec, and that the addition of the next spec
+        // would exceed the bank. We presume an average binary size of about
+        // one byte per cycle.
+        if ((bytes_remaining < kBankPadding ||
+             (bytes_remaining < next_spec_size &&
+                cycles_remaining < kBankPadding)) &&
+             (cycles_remaining > 4 || cycles_remaining == 3)) {
+          if (opcodes_.back().size()) {
+            total_dynamic_opcodes_ += opcodes_.back().size();
+            opcode_counts_.push_back(total_dynamic_opcodes_);
+            opcode_ranges_.emplace_back(starting_cycle, current_cycle);
+            opcodes_.emplace_back();
+          }
+          AppendJmpSpec(current_cycle, total_byte_size % kBankSize);
+          const Spec& jmp_spec = specs_->back();
+          current_cycle += jmp_spec.range().Duration();
+          starting_cycle = current_cycle;
+          assert(cycles_remaining >= jmp_spec.range().Duration());
+          cycles_remaining -= jmp_spec.range().Duration();
+          total_byte_size += jmp_spec.size();
+          assert(0 == total_byte_size % kBankSize);
+          bytes_remaining = kBankSize - kBankPadding;
+        } else {
+          uint32 op = GenerateRandomOpcode(cycles_remaining, tls_prng);
+          uint32 cycles = OpCodeCycles(op);
+          cycles_remaining -= cycles;
+          current_cycle += cycles;
+          size_t op_size = OpCodeBytes(op);
+          bytes_remaining -= op_size;
+          total_byte_size += op_size;
+          opcodes_.back().push_back(op);
+        }
+      }
+      if (opcodes_.back().size()) {
+        opcode_ranges_.emplace_back(starting_cycle, current_cycle);
+        total_dynamic_opcodes_ += opcodes_.back().size();
+        opcode_counts_.push_back(total_dynamic_opcodes_);
+      } else {
+        opcodes_.pop_back();
+      }
+    }
+  }
+  assert(current_cycle == kScreenSizeCycles - 3);
+  AppendJmpSpec(current_cycle, total_byte_size % kBankSize);
+  total_byte_size += specs_->back().size();
+  RegenerateBytecode(total_byte_size);
+}
+
 void Kernel::GenerateRandomKernelJob::operator()(
     const tbb::blocked_range<size_t>& r) const {
   TlsPrng tls_prng = tls_prng_list_.local();
   for (size_t i = r.begin(); i < r.end(); ++i) {
     std::shared_ptr<Kernel> kernel = generation_->at(i);
-    uint32 current_cycle = 0;
-    size_t spec_list_index = 0;
-    size_t total_byte_size = 0;
-    // We reserve 3 cycles at the end for the jmp instruction taking us back to
-    // the top.
-    while (current_cycle < kScreenSizeCycles - 3) {
-      uint32 next_spec_start_time = spec_list_index < specs_->size() ?
-          specs_->at(spec_list_index).range().start_time() :
-          kScreenSizeCycles - 3;
-      size_t next_spec_size = spec_list_index < specs_->size() ?
-          specs_->at(spec_list_index).size() : 0;
-      if (current_cycle == next_spec_start_time) {
-        assert(spec_list_index < specs_->size());
-        // Copy the spec to the kernel speclist.
-        kernel->specs_->emplace_back(specs_->at(spec_list_index));
-        current_cycle = specs_->at(spec_list_index).range().end_time();
-        assert((total_byte_size % kBankSize) + next_spec_size <
-               (kBankSize - kBankPadding));
-        total_byte_size += next_spec_size;
-        ++spec_list_index;
-      } else {
-        uint32 starting_cycle = current_cycle;
-        kernel->opcodes_.emplace_back();
-        uint32 cycles_remaining = next_spec_start_time - current_cycle;
-        size_t bytes_remaining =
-          (total_byte_size % kBankSize) + kBankPadding < kBankSize ?
-          kBankSize - ((total_byte_size % kBankSize) + kBankPadding) : 0;
-        while (cycles_remaining > 0) {
-          // Two possibilities for the generation of a jmp spec, used for bank
-          // switching. First is that we have filled the bank within the
-          // threshold. The second is that we are within a few cycles from the
-          // beginning of the next spec, and that the addition of the next spec
-          // would exceed the bank. We presume an average binary size of about
-          // one byte per cycle.
-          if ((bytes_remaining < kBankPadding ||
-               (bytes_remaining < next_spec_size &&
-                  cycles_remaining < kBankPadding)) &&
-               (cycles_remaining > 4 || cycles_remaining == 3)) {
-            if (kernel->opcodes_.back().size()) {
-              kernel->total_dynamic_opcodes_ += kernel->opcodes_.back().size();
-              kernel->opcode_counts_.push_back(kernel->total_dynamic_opcodes_);
-              kernel->opcode_ranges_.emplace_back(starting_cycle,
-                  current_cycle);
-              kernel->opcodes_.emplace_back();
-            }
-            kernel->AppendJmpSpec(current_cycle, total_byte_size % kBankSize);
-            const Spec& jmp_spec = kernel->specs_->back();
-            current_cycle += jmp_spec.range().Duration();
-            starting_cycle = current_cycle;
-            assert(cycles_remaining >= jmp_spec.range().Duration());
-            cycles_remaining -= jmp_spec.range().Duration();
-            total_byte_size += jmp_spec.size();
-            assert(0 == total_byte_size % kBankSize);
-            bytes_remaining = kBankSize - kBankPadding;
-          } else {
-            uint32 op = kernel->GenerateRandomOpcode(
-                cycles_remaining, tls_prng);
-            uint32 cycles = OpCodeCycles(op);
-            cycles_remaining -= cycles;
-            current_cycle += cycles;
-            size_t op_size = OpCodeBytes(op);
-            bytes_remaining -= op_size;
-            total_byte_size += op_size;
-            kernel->opcodes_.back().push_back(op);
-          }
-        }
-        if (kernel->opcodes_.back().size()) {
-          kernel->opcode_ranges_.emplace_back(starting_cycle, current_cycle);
-          kernel->total_dynamic_opcodes_ += kernel->opcodes_.back().size();
-          kernel->opcode_counts_.push_back(kernel->total_dynamic_opcodes_);
-        } else {
-          kernel->opcodes_.pop_back();
-        }
-      }
-    }
-    assert(current_cycle == kScreenSizeCycles - 3);
-    kernel->AppendJmpSpec(current_cycle, total_byte_size % kBankSize);
-    total_byte_size += kernel->specs_->back().size();
-    kernel->RegenerateBytecode(total_byte_size);
+    kernel->GenerateRandom(specs_, tls_prng);
   }
 }
 

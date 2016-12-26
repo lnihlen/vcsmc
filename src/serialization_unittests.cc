@@ -7,6 +7,7 @@
 #include "kernel.h"
 #include "serialization.h"
 #include "spec.h"
+#include "tls_prng.h"
 
 namespace vcsmc {
 
@@ -47,11 +48,9 @@ TEST(SerializationTest, ParseGenerationStringSingle) {
       "    lda #$42\n"
       "    sta VBLANK\n");
   ASSERT_NE(nullptr, specs);
-  std::string seed_str = "serialization test seed";
-  std::seed_seq seed(seed_str.begin(), seed_str.end());
-  std::shared_ptr<Kernel> kernel(new Kernel(seed));
-  Kernel::GenerateRandomKernelJob job(kernel, specs);
-  job.Execute();
+  std::shared_ptr<Kernel> kernel(new Kernel);
+  TlsPrng tls_prng;
+  kernel->GenerateRandom(specs, tls_prng);
   std::string kernel_str;
   ASSERT_EQ(true, SaveKernelToString(kernel, kernel_str));
   Generation gen = ParseGenerationString(kernel_str);

@@ -34,6 +34,7 @@ class Kernel {
   void ResetVictories() { victories_ = 0; }
   void AddVictory() { ++victories_; }
 
+  void GenerateRandom(SpecList specs, TlsPrng& tls_prng);
   void ClobberSpec(SpecList new_specs);
 
   const uint8* bytecode() const { return bytecode_.get(); }
