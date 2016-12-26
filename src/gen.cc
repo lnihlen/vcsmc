@@ -94,7 +94,7 @@ class CompeteKernelJob {
   void operator()(const tbb::blocked_range<size_t>& r) const {
     vcsmc::TlsPrng engine = prng_list_.local();
     for (size_t i = r.begin(); i < r.end(); ++i) {
-      std::shared_ptr<vcsmc::Kernel> kernel;
+      std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
       kernel->ResetVictories();
       std::uniform_int_distribution<size_t> tourney_distro(
           0, generation_->size() - 1);
@@ -213,7 +213,7 @@ int main(int argc, char* argv[]) {
     // Generate FLAGS_generation_size number of random individuals.
     tbb::parallel_for(tbb::blocked_range<size_t>(0, generation_size),
         vcsmc::Kernel::GenerateRandomKernelJob(
-            generation, spec_list, &prng_list));
+            generation, spec_list, prng_list));
   } else {
     generation = vcsmc::ParseGenerationFile(FLAGS_seed_generation_file);
     if (!generation) {
