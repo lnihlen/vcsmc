@@ -56,16 +56,15 @@ libz26: | $(LIBZ26_OUT) $(LIBZ26_OUT)/libz26.o
 $(LIBZ26_OUT)/libz26.o:	libz26/
 	$(MAKE) -C libz26/
 
-ifeq ($(UNAME), Darwin)
-TBB_LIB=$(TBB_OUT)/tbb_release/libtbb.dylib
-endif
+TBB_TARGET:=$(OUT)/libtbb.$(DYLIB)
 
-tbb: | $(TBB_OUT) $(TBB_LIB)
+tbb: | $(TBB_OUT) $(TBB_TARGET)
 
-$(TBB_LIB): export tbb_build_dir=$(TBB_OUT)
-$(TBB_LIB): export tbb_build_prefix=tbb
-$(TBB_LIB):
+$(TBB_TARGET): export tbb_build_dir=$(TBB_OUT)
+$(TBB_TARGET): export tbb_build_prefix=tbb
+$(TBB_TARGET):
 	$(MAKE) -C tbb/
+	cp $(TBB_OUT)/tbb_release/*.$(DYLIB)* $(OUT)
 
 $(FARMHASH_OUT):
 	mkdir -p $(FARMHASH_OUT)
@@ -88,9 +87,11 @@ $(LIBZ26_OUT):
 
 $(TBB_OUT):
 	mkdir -p $(TBB_OUT)
+	echo $(TBB_TARGET)
 
 .PHONY: clean
 clean:
+	rm -f $(DCMT_OUT)
 	rm -f $(FARMHASH_OUT)
 	cd $(GPERF_DIR); git clean -dxf
 	rm -f $(GPERF_OUT)

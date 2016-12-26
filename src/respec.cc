@@ -31,9 +31,7 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  std::unique_ptr<vcsmc::Job> job(new vcsmc::Kernel::ClobberSpecJob(
-        generation->at(0), audio_spec_list));
-  job->Execute();
+  generation->at(0)->ClobberSpec(audio_spec_list);
 
   if (FLAGS_output_kernel_file != "") {
     vcsmc::SaveKernelToFile(generation->at(0), FLAGS_output_kernel_file);

@@ -52,7 +52,6 @@ vcsmc::Generation ParseGenerationInternal(yaml_parser_t parser) {
     kIdle,              // Between kernel documents.
     kKernel,            // Parsing a kernel but between mappings.
     kFingerprint,       // Parsing a kernel fingerprint mapping.
-    kSeed,              // Parsing a kernel seed mapping.
     kSpecSequenceMap,   // Parsing a specs sequence mapping.
     kSpecSequence,      // Parsing a spec sequence.
     kSpec,              // Parsing a spec but between mappings.
@@ -72,7 +71,6 @@ vcsmc::Generation ParseGenerationInternal(yaml_parser_t parser) {
   vcsmc::Generation gen(new std::vector<std::shared_ptr<vcsmc::Kernel>>());
   std::string scalar;
   uint64 fingerprint = 0;
-  std::string seed_str;
   uint32 first_cycle = vcsmc::kInfinity;
   uint32 last_cycle = vcsmc::kInfinity;
   size_t spec_size = 0;
@@ -122,8 +120,6 @@ vcsmc::Generation ParseGenerationInternal(yaml_parser_t parser) {
           // Top-level mapping of kernel elements.
           if (scalar == "fingerprint") {
             state = kFingerprint;
-          } else if (scalar == "seed") {
-            state = kSeed;
           } else if (scalar == "specs") {
             state = kSpecSequenceMap;
           } else if (scalar == "opcode_ranges") {
@@ -133,9 +129,6 @@ vcsmc::Generation ParseGenerationInternal(yaml_parser_t parser) {
           }
         } else if (state == kFingerprint) {
           fingerprint = strtoull(scalar.c_str(), NULL, 16);
-          state = kKernel;
-        } else if (state == kSeed) {
-          seed_str = scalar;
           state = kKernel;
         } else if (state == kSpec) {
           // Spec mapping elements.
@@ -221,7 +214,6 @@ vcsmc::Generation ParseGenerationInternal(yaml_parser_t parser) {
           state = kRangeSequence;
         } else if (state == kKernel) {
           if (fingerprint == 0           ||
-              seed_str == ""             ||
               spec_list->size() == 0     ||
               dynamic_areas.size() == 0  ||
               packed_opcodes.size() == 0 ||
@@ -229,9 +221,8 @@ vcsmc::Generation ParseGenerationInternal(yaml_parser_t parser) {
             return nullptr;
           }
           gen->emplace_back(new vcsmc::Kernel(
-                seed_str, spec_list, dynamic_areas, packed_opcodes));
+                spec_list, dynamic_areas, packed_opcodes));
           fingerprint = 0;
-          seed_str = "";
           spec_list.reset(new std::vector<vcsmc::Spec>());
           dynamic_areas.clear();
           packed_opcodes.clear();
@@ -422,7 +413,6 @@ bool SaveKernelToString(std::shared_ptr<Kernel> kernel,
   char buf[128];
   snprintf(buf, 128, "fingerprint: %016" PRIx64 "\n", kernel->fingerprint());
   string_out += std::string(buf);
-  string_out += "seed: " + kernel->GetRandomState() + "\n";
   const SpecList specs = kernel->specs();
   string_out += "specs:\n";
   for (size_t j = 0; j < specs->size(); ++j) {

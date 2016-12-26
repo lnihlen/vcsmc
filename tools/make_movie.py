@@ -53,7 +53,7 @@ def main(args):
     print 'frame data %d/image file count %d mismatch' \
         % (len(frames), len(stills))
     sys.exit(-1)
-  audio_frames = glob.glob(os.path.join(args.audio_dir, '*.spec'))
+  audio_frames = sorted(glob.glob(os.path.join(args.audio_dir, '*.spec')))
   current_frame = 0
   current_still = 0
   current_hash = None
