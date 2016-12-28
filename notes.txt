@@ -1574,3 +1574,13 @@ Things to do:
 7) Deep learning strategy for video frame generation.
 
 8) More documentation and bibliography.
+
+===============================================================================
+
+ffmpeg -i test.mp4 -s 320x192 -pix_fmt abgr -f image2 frames/frame-%03d.png
+ffprobe -show_frames -count_frames -select_streams v -print_format csv         \
+   test.mp4 > test.csv
+ffmpeg -i test.mp4 -acodec pcm_s32le -ac 2 test_origin.wav
+sox test_origin.wav test_mono.wav remix -
+sox rogue_one_mono.wav --rate 31440 rogue_one_final.wav
+
