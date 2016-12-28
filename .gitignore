@@ -1,3 +1,4 @@
 .*.swp
 out/
 .ycm_extra_conf.pyc
+.DS_Store
