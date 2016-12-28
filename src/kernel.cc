@@ -430,10 +430,9 @@ void Kernel::SimulateAndScore(const uint8* target_colors) {
       assert(*frame_pointer < 128);
       score_ += kColorDistanceNTSC[(target_colors[i] * 128) + *frame_pointer];
     }
-    // Sim output has pixels doubled horizontally.
-    frame_pointer += 2;
+    ++frame_pointer;
   }
-  score_ = score_ / static_cast<double>(kFrameWidthPixels * kFrameHeightPixels);
+  score_ = score_ / static_cast<double>(kFrameSizeBytes);
   score_valid_ = true;
 }
 
