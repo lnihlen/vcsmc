@@ -5,6 +5,9 @@
 
 namespace vcsmc {
 
+// Maximum Lab value in our Lab definition.
+const double kMaxLab = 100.0;
+
 // Given four bytes of rgba color pointed to by |rgba| stores four doubles of
 // LabA converted color values at |laba|.
 void RGBAToLabA(const uint8* rgba, double* laba);

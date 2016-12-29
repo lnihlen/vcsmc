@@ -24,6 +24,8 @@
 
 DEFINE_bool(save_ideal_image, false,
     "If true, fit will save an image file of the ideal color fit image.");
+DEFINE_bool(adjust_contrast, true,
+    "If true, fit will expand contrast to maximum range.");
 
 DEFINE_string(image_file, "", "Required image input file path.");
 DEFINE_string(output_dir, "", "Required output output index directory.");
@@ -82,6 +84,26 @@ int main(int argc, char* argv[]) {
   for (size_t i = 0; i < vcsmc::kFrameSizeBytes; ++i) {
     vcsmc::RGBAToLabA(reinterpret_cast<uint8*>(target_image->pixels() + i),
         target_lab.get() + (i * 4));
+  }
+
+  if (FLAGS_adjust_contrast) {
+    double min_lab = vcsmc::kMaxLab;
+    double max_lab = 0.0;
+    double* lab_ptr = target_lab.get();
+    for (size_t i = 0; i < vcsmc::kFrameSizeBytes; ++i) {
+      min_lab = std::min(*lab_ptr, min_lab);
+      max_lab = std::max(*lab_ptr, max_lab);
+      lab_ptr += 4;
+    }
+
+    double scale = vcsmc::kMaxLab / (max_lab - min_lab);
+    lab_ptr = target_lab.get();
+    for (size_t i = 0; i < vcsmc::kFrameSizeBytes; ++i) {
+      double L = *lab_ptr;
+      L = (L - min_lab) * scale;
+      *lab_ptr = L;
+      lab_ptr += 4;
+    }
   }
 
   ColorDistances color_distances(vcsmc::kNTSCColors);

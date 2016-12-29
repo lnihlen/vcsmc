@@ -45,9 +45,6 @@ DEFINE_int32(max_generation_number, 0,
     "the program will run until the minimum error percentage target is met.");
 DEFINE_int32(tournament_size, 100,
     "Number of kernels each should compete against.");
-DEFINE_int32(worker_threads, 0,
-    "Number of threads to create to work in parallel, set to 0 to pick based "
-    "on hardware.");
 DEFINE_int32(save_count, 1000,
     "Number of generations to run before saving the results.");
 DEFINE_int32(stagnant_generation_count, 250,
