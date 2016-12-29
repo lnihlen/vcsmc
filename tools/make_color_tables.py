@@ -1,5 +1,5 @@
 # Script to make the .cc tables of the Atari colors in RGB and L*ab color
-# spaces. Also generates the test data used in the OpenCL conversion test data.
+# spaces. Also generates the histogram for Luminosity remapping.
 # relies on the colormath module
 
 import sys
@@ -148,7 +148,7 @@ def main(argv):
   for color_rgb in atari_colors_rgb:
     atari_colors_lab.append(convert_color(color_rgb, LabColor))
 
-  output_file = file('../src/color_table.cc', 'w')
+  output_file = file('src/color_table.cc', 'w')
   output_file.write(
 """// generated file, do not edit. edit make_color_tables.py instead!
 #include "color_table.h"
@@ -173,7 +173,8 @@ const double kAtariNTSCLabColorTable[128 * 4] = {
 """)
   lab_strings = []
   for color_lab in atari_colors_lab:
-    lab_strings.append('  %.32g, %.32g, %.32g, 1.0' % (color_lab.lab_l, color_lab.lab_a, color_lab.lab_b))
+    lab_strings.append('  %.32g, %.32g, %.32g, 1.0' % \
+        (color_lab.lab_l, color_lab.lab_a, color_lab.lab_b))
 
   output_file.write(',\n'.join(lab_strings))
   output_file.write("""

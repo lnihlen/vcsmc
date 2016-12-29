@@ -21,6 +21,7 @@ DEPS=constants.h image_file.h types.h
 
 COLOR_OBJ=$(OUT)/color.o                                                       \
           $(OUT)/color_table.o                                                 \
+          $(OUT)/lab_histogram.o
 
 IMAGE_OBJ=$(OUT)/bit_map.o                                                     \
           $(OUT)/gray_map.o                                                    \
