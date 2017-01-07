@@ -18,6 +18,7 @@ parser.add_argument('--output_dir', required=True)
 parser.add_argument('--stagnant_limit', default='5')
 parser.add_argument('--stills_dir', required=True)
 parser.add_argument('--verbose', default=False)
+parser.add_argument('--start_at_frame', default=0)
 
 # Returns list of tuples (is_keyframe (bool), presentation_time_s (double))
 def parse_csv_file(frame_csv):
@@ -57,13 +58,14 @@ def main(args):
   current_frame = 0
   current_still = 0
   current_hash = None
+  start_at_frame = int(args.start_at_frame)
   # Path to final output binary.
   movie_binary = os.path.join(args.output_dir, 'vcsmc.bin')
   while current_frame < len(audio_frames):
     print 'frame %d of %d, still %d of %d' \
-            % (current_frame + 1, \
+            % (current_frame, \
                len(audio_frames), \
-               current_still + 1, \
+               current_still, \
                len(frames))
     # See if we need to advance image.
     frame_time = float(current_frame) * (1.0 / 60.0)
@@ -71,6 +73,12 @@ def main(args):
         frame_time >= frames[current_still + 1][1]:
       current_still += 1
       current_hash = None
+    if current_frame < start_at_frame:
+      if args.verbose:
+        print 'current_frame %d less than starting frame %d, skipping.' \
+            % (current_frame, start_at_frame)
+      current_frame += 1
+      continue
     # Compute hash of frame if currently unknown.
     if not current_hash:
       command_line = \
