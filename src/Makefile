@@ -43,7 +43,8 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/serialization_unittests.o
 
-all: $(OUT)/fit                                                                \
+all: $(OUT)/find_ciede_max_distance                                            \
+     $(OUT)/fit                                                                \
      $(OUT)/gen                                                                \
      $(OUT)/pcm                                                                \
      $(OUT)/respec                                                             \
@@ -62,6 +63,10 @@ $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 $(OUT)/build_error_distances: $(IMAGE_OBJ) $(COLOR_OBJ)                        \
                               $(OUT)/build_error_distances.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+
+$(OUT)/find_ciede_max_distance: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ)               \
+            $(OUT)/color_distance_table.o $(OUT)/find_ciede_max_distance.o
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 $(OUT)/fit: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/fit.o                      \
             $(OUT)/color_distance_table.o
