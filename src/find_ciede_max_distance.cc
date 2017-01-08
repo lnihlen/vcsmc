@@ -80,9 +80,11 @@ int main(int argc, char* argv[]) {
     total_evals += evals;
     uint64 rate = (evals * 100000) / time_us;
     uint64 eta = (kTotalEvals - evals) / rate;
-
-    printf("rate per second: %" PRIu64 ", eta in seconds: %" PRIu64 "\n",
-        rate, eta);
+    double completion = (static_cast<double>(total_evals) * 100.0) /
+        static_cast<double>(kTotalEvals);
+    printf("percent done: %3.7f, rate per second: %" PRIu64 
+        ", eta in seconds: %" PRIu64 "\n",
+        completion, rate, eta);
 
     start_range = end_range;
     end_range = std::min(start_range + kStepSize, kStopColorABGR + 1);
