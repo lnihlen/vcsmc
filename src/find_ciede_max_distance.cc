@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
     double completion = (static_cast<double>(total_evals) * 100.0) /
         static_cast<double>(kTotalEvals);
     printf("percent done: %3.7f, rate per second: %" PRIu64 
-        ", eta in seconds: %" PRIu64 "\n",
+        ", eta in seconds: %" PRIu64 " ",
         completion, rate, eta);
     MaxDistance md = max_distances.combine(
         [](const MaxDistance& md_a, const MaxDistance& md_b) {
@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
           return md_b;
         });
 
-    printf("max distance: %.19g, bgr_a: %6x, bgr_b: %6x\n",
+    printf("max distance: %.19g, bgr_a: %06x, bgr_b: %06x\n",
         md.distance, md.color_a, md.color_b);
 
     start_range = end_range;
