@@ -25,7 +25,7 @@ const double kClockRateHz = 76.0 * 262.0 * 60.0;
 // Computed by exploring distance between all 128 Atari colors and all possible
 // 24 bit RGB colors in find_ciede_max_distance.cc. If the Atari palette changes
 // this value will need to be recomputed.
-const double kMaxCiede2kDistance = 109.1780286805052782;
+const double kMaxCiede2kDistance = 118.1280906395963655;
 
 // Screen vertical dimensions/timing constants.
 const uint32 kVSyncScanLines = 3;

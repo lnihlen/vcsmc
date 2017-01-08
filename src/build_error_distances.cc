@@ -44,18 +44,14 @@ int main(int argc, char* argv[]) {
 
   // Build distances table.
   std::unique_ptr<double[]> distances(new double[128*128]);
-  double max_distance = 0.0;
   double* d = distances.get();
   for (size_t i = 0; i < 128; ++i) {
     const double* i_lab = vcsmc::kAtariNTSCLabColorTable + (i * 4);
     for (size_t j = 0; j < 128; ++j) {
       *d = vcsmc::Ciede2k(i_lab, vcsmc::kAtariNTSCLabColorTable + (j * 4));
-      max_distance = std::max(max_distance, *d);
       ++d;
     }
   }
-
-  printf("max distance: %.19g\n", max_distance);
 
   // Save code file of computed distances.
   std::string code_path = FLAGS_output_directory + "/" +
@@ -85,7 +81,8 @@ int main(int argc, char* argv[]) {
   char buf[1024];
   for (size_t i = 0; i < 128*128; ++i) {
     size_t len = snprintf(buf, 1024, "  %.19g,\n",
-        FLAGS_normalize ? distances[i] / max_distance : distances[i]);
+        FLAGS_normalize ?
+            distances[i] / vcsmc::kMaxCiede2kDistance : distances[i]);
     write(fd, buf, len);
   }
 
@@ -144,7 +141,7 @@ int main(int argc, char* argv[]) {
         pixels += FLAGS_image_sample_size_padding;
         for (int k = 0; k < 128; ++k) {
           uint32 bright = static_cast<uint32>(
-              255.0 * distances[(i * 128) + k] / max_distance);
+              255.0 * distances[(i * 128) + k] / vcsmc::kMaxCiede2kDistance);
           uint32 color = 0xff000000 | (bright << 16) | (bright << 8) | bright;
           blit(pixels, color, FLAGS_image_sample_size_width);
           pixels += FLAGS_image_sample_size_width;
