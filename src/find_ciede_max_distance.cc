@@ -85,18 +85,18 @@ int main(int argc, char* argv[]) {
     printf("percent done: %3.7f, rate per second: %" PRIu64 
         ", eta in seconds: %" PRIu64 "\n",
         completion, rate, eta);
+    MaxDistance md = max_distances.combine(
+        [](const MaxDistance& md_a, const MaxDistance& md_b) {
+          if (md_a.distance > md_b.distance) return md_a;
+          return md_b;
+        });
+
+    printf("max distance: %.19g, abgr_a: %x, abgr_b: %x\n",
+        md.distance, md.color_a, md.color_b);
 
     start_range = end_range;
     end_range = std::min(start_range + kStepSize, kStopColorABGR + 1);
   }
 
-  MaxDistance md = max_distances.combine(
-      [](const MaxDistance& md_a, const MaxDistance& md_b) {
-        if (md_a.distance > md_b.distance) return md_a;
-        return md_b;
-      });
-
-  printf("max distance: %.19g, abgr_a: %x, abgr_b: %x\n",
-      md.distance, md.color_a, md.color_b);
   return 0;
 }
