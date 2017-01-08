@@ -13,8 +13,8 @@
 
 static const uint32 kStartColorABGR = 0x00000000;
 static const uint32 kStopColorABGR = 0x00ffffff;
-static const uint64 kTotalEvals = (kStopColorABGR - kStartColorABGR) *
-  ((kStopColorABGR - kStartColorABGR) / 2);
+static const uint64 kTotalEvals = static_cast<uint64>(kStopColorABGR) *
+    static_cast<uint64>(kStopColorABGR / 2);
 static const uint32 kStepSize = 255;
 
 struct MaxDistance {
