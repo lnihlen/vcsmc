@@ -55,6 +55,8 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  printf("max distance: %.19g\n", max_distance);
+
   // Save code file of computed distances.
   std::string code_path = FLAGS_output_directory + "/" +
       "color_distance_table.cc";
