@@ -3,6 +3,7 @@
 // distances to [0, 1] range.
 
 #include <chrono>
+#include <cinttypes>
 #include <stdio.h>
 
 #include "tbb/tbb.h"
@@ -77,7 +78,8 @@ int main(int argc, char* argv[]) {
     uint64 rate = (evals * 100000) / time_us;
     uint64 eta = (kTotalEvals - evals) / rate;
 
-    printf("rate per second: %llu, eta in seconds: %llu\n", rate, eta);
+    printf("rate per second: %" PRIu64 ", eta in seconds: %" PRIu64 "\n",
+        rate, eta);
 
     start_range = end_range;
     end_range = std::min(start_range + kStepSize, kStopColorABGR + 1);
