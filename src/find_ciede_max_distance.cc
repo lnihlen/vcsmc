@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
           return md_b;
         });
 
-    printf("max distance: %.19g, abgr_a: %x, abgr_b: %x\n",
+    printf("max distance: %.19g, bgr_a: %6x, bgr_b: %6x\n",
         md.distance, md.color_a, md.color_b);
 
     start_range = end_range;
