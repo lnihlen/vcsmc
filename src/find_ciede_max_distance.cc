@@ -62,19 +62,22 @@ int main(int argc, char* argv[]) {
   MaxDistances max_distances;
   uint32 start_range = kStartColorABGR;
   uint32 end_range = start_range + kStepSize;
-  uint64 evals = 0;
+  uint64 total_evals = 0;
 
-  auto start_of_run = std::chrono::high_resolution_clock::now();
   while (start_range < kStopColorABGR) {
+    auto start_of_run = std::chrono::high_resolution_clock::now();
     tbb::parallel_for(
         tbb::blocked_range<uint32>(start_range, end_range),
         SearchABGRJob(max_distances));
     auto end_of_run = std::chrono::high_resolution_clock::now();
     uint64 time_us = std::chrono::duration_cast<std::chrono::microseconds>(
         end_of_run - start_of_run).count();
+
+    uint64 evals = 0;
     for (uint32 i = start_range; i < end_range; ++i) {
       evals += kStopColorABGR - i;
     }
+    total_evals += evals;
     uint64 rate = (evals * 100000) / time_us;
     uint64 eta = (kTotalEvals - evals) / rate;
 
