@@ -1582,5 +1582,8 @@ ffprobe -show_frames -count_frames -select_streams v -print_format csv         \
    test.mp4 > test.csv
 ffmpeg -i test.mp4 -acodec pcm_s32le -ac 2 test_origin.wav
 sox test_origin.wav test_mono.wav remix -
-sox rogue_one_mono.wav --rate 31440 rogue_one_final.wav
+sox test_mono.wav --rate 31440 test_final.wav
+
+reassembly:
+ffmpeg -r 60 -pix_fmt abgr -s 320x192 -f image2 -i frame-%7d.png test_out.mp4
 
