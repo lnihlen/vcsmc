@@ -1,5 +1,6 @@
 #include "mssim.h"
 
+#include <algorithm>
 #include <memory>
 
 #include "constants.h"
@@ -22,56 +23,52 @@ const double kC2 = (0.03 * 100.0) * (0.03 * 100.0);
 // TODO: optimize.
 double Mssim(const double* lab_a, const double* lab_b, uint32 image_width,
     uint32 image_height) {
+  uint32 image_values = image_width * image_height;
+
+  std::unique_ptr<double> means_a(new double[image_values * 3]);
+  std::unique_ptr<double> means_b(new double[image_values * 3]);
+
   // First we compute the local means of each pixel channel in both images. The
   // local mean averages the pixel at x,y in each channel with the
-  // kWindowSize - 1 pixels to the right and below. We elide computation of
-  // pixels with less than a full window.
-  if (image_width < kWindowSize || image_height < kWindowSize)
-    return 0.0;
-
-  uint32 mssim_image_width = image_width - kWindowSize + 1;
-  uint32 mssim_image_height = image_height - kWindowSize + 1;
-  uint32 mssim_values = mssim_image_width * mssim_image_height;
-
-  std::unique_ptr<double> means_a(new double[mssim_values * 3]);
-  std::unique_ptr<double> means_b(new double[mssim_values * 3]);
-
+  // kWindowSize - 1 pixels to the right and below.
   double* mu_a = means_a.get();
   double* mu_b = means_b.get();
-  for (uint32 i = 0; i < mssim_image_height; ++i) {
-    for (uint32 j = 0; j < mssim_image_width; ++j) {
-      const double* a = lab_a + (((i * image_width) + j) * 4);
-      const double* b = lab_b + (((i * image_width) + j) * 4);
-      *(mu_a)     = 0.0;
-      *(mu_a + 1) = 0.0;
-      *(mu_a + 2) = 0.0;
-      *(mu_b)     = 0.0;
-      *(mu_b + 1) = 0.0;
-      *(mu_b + 2) = 0.0;
-      for (uint32 k = 0; k < kWindowSize; ++k) {
-        for (uint32 l = 0; l < kWindowSize; ++l) {
-          *(mu_a) += *a;
-          ++a;
-          *(mu_a + 1) += *a;
-          ++a;
-          *(mu_a + 2) += *a;
-          a += 2;
-          *(mu_b) += *b;
-          ++b;
-          *(mu_b + 1) += *b;
-          ++b;
-          *(mu_b + 2) += *b;
-          b += 2;
+  for (uint32 i = 0; i < image_height; ++i) {
+    for (uint32 j = 0; j < image_width; ++j) {
+      uint32 offset = ((i * image_width) + j) * 4;
+      const double* a = lab_a + offset;
+      const double* b = lab_b + offset;
+      mu_a[0] = 0.0;
+      mu_a[1] = 0.0;
+      mu_a[2] = 0.0;
+      mu_b[0] = 0.0;
+      mu_b[1] = 0.0;
+      mu_b[2] = 0.0;
+      uint32 n = 0;
+      for (uint32 k = 0; k < std::min(kWindowSize, image_height - i); ++k) {
+        for (uint32 l = 0; l < std::min(kWindowSize, image_width - j); ++l) {
+          mu_a[0] += a[0];
+          mu_a[1] += a[1];
+          mu_a[2] += a[2];
+          a += 4;
+
+          mu_b[0] += b[0];
+          mu_b[1] += b[1];
+          mu_b[2] += b[2];
+          b += 4;
+
+          ++n;
         }
         a += (image_width - kWindowSize) * 4;
         b += (image_width - kWindowSize) * 4;
       }
-      *(mu_a) /= static_cast<double>(kWindowSize * kWindowSize);
-      *(mu_a + 1) /= static_cast<double>(kWindowSize * kWindowSize);
-      *(mu_a + 2) /= static_cast<double>(kWindowSize * kWindowSize);
-      *(mu_b) /= static_cast<double>(kWindowSize * kWindowSize);
-      *(mu_b + 1) /= static_cast<double>(kWindowSize * kWindowSize);
-      *(mu_b + 2) /= static_cast<double>(kWindowSize * kWindowSize);
+      double n_d = static_cast<double>(n);
+      mu_a[0] /= n_d;
+      mu_a[1] /= n_d;
+      mu_a[2] /= n_d;
+      mu_b[0] /= n_d;
+      mu_b[1] /= n_d;
+      mu_b[2] /= n_d;
       mu_a += 3;
       mu_b += 3;
     }
@@ -80,69 +77,69 @@ double Mssim(const double* lab_a, const double* lab_b, uint32 image_width,
   // Now that we have the means we use that to compute the squared standard
   // deviation and the covariance in each window, following the same procedure
   // as above.
-  std::unique_ptr<double> stddev_a(new double[mssim_values * 3]);
-  std::unique_ptr<double> stddev_b(new double[mssim_values * 3]);
-  std::unique_ptr<double> covariance_ab(new double[mssim_values * 3]);
+  std::unique_ptr<double> stddev_a(new double[image_values * 3]);
+  std::unique_ptr<double> stddev_b(new double[image_values * 3]);
+  std::unique_ptr<double> covariance_ab(new double[image_values * 3]);
 
   double* std_a = stddev_a.get();
   double* std_b = stddev_b.get();
   double* cov_ab = covariance_ab.get();
-  for (uint32 i = 0; i < mssim_image_height; ++i) {
-    for (uint32 j = 0; j < mssim_image_width; ++j) {
-      const double* a = lab_a + (((i * image_width) + j) * 4);
-      const double* b = lab_b + (((i * image_width) + j) * 4);
-      mu_a = means_a.get() + (((i * mssim_image_width) + j) * 3);
-      mu_b = means_b.get() + (((i * mssim_image_width) + j) * 3);
-      *(std_a)     = 0.0;
-      *(std_a + 1) = 0.0;
-      *(std_a + 2) = 0.0;
-      *(std_b)     = 0.0;
-      *(std_b + 1) = 0.0;
-      *(std_b + 2) = 0.0;
-      for (uint32 k = 0; k < kWindowSize; ++k) {
-        for (uint32 l = 0; l < kWindowSize; ++l) {
-          double a_del_L = *a - *mu_a;
-          ++a;
-          ++mu_a;
-          double a_del_a = *a - *mu_a;
-          ++a;
-          ++mu_a;
-          double a_del_b = *a - *mu_a;
-          a += 2;
-          ++mu_a;
-          double b_del_L = *b - *mu_b;
-          ++b;
-          ++mu_b;
-          double b_del_a = *b - *mu_b;
-          ++b;
-          ++mu_b;
-          double b_del_b = *b - *mu_b;
-          b += 2;
-          ++mu_b;
-          *(std_a) += (a_del_L * a_del_L);
-          *(std_a + 1) += (a_del_a * a_del_a);
-          *(std_a + 2) += (a_del_b * a_del_b);
-          *(std_b) += (b_del_L * b_del_L);
-          *(std_b + 1) += (b_del_a * b_del_a);
-          *(std_b + 2) += (b_del_b * b_del_b);
-          *(cov_ab) = (a_del_L * b_del_L);
-          *(cov_ab + 1) = (a_del_a * b_del_a);
-          *(cov_ab + 2) = (a_del_b * b_del_b);
+  for (uint32 i = 0; i < image_height; ++i) {
+    for (uint32 j = 0; j < image_width; ++j) {
+      uint32 offset = ((i * image_width) + j) * 4;
+      const double* a = lab_a + offset;
+      const double* b = lab_b + offset;
+      uint32 mu_offset = ((i * image_width) + j) * 3;
+      mu_a = means_a.get() + mu_offset;
+      mu_b = means_b.get() + mu_offset;
+      std_a[0] = 0.0;
+      std_a[1] = 0.0;
+      std_a[2] = 0.0;
+      std_b[0] = 0.0;
+      std_b[1] = 0.0;
+      std_b[2] = 0.0;
+      uint32 n = 0;
+      for (uint32 k = 0; k < std::min(kWindowSize, image_height - i); ++k) {
+        for (uint32 l = 0; l < std::min(kWindowSize, image_width - j); ++l) {
+          double a_del_L = a[0] - mu_a[0];
+          double a_del_a = a[1] - mu_a[1];
+          double a_del_b = a[2] - mu_a[2];
+          a += 4;
+          mu_a += 3;
+
+          double b_del_L = b[0] - mu_b[0];
+          double b_del_a = b[1] - mu_b[1];
+          double b_del_b = b[2] - mu_b[2];
+          b += 4;
+          mu_b += 3;
+
+          std_a[0] += (a_del_L * a_del_L);
+          std_a[1] += (a_del_a * a_del_a);
+          std_a[2] += (a_del_b * a_del_b);
+          std_b[0] += (b_del_L * b_del_L);
+          std_b[1] += (b_del_a * b_del_a);
+          std_b[2] += (b_del_b * b_del_b);
+          cov_ab[0] += (a_del_L * b_del_L);
+          cov_ab[1] += (a_del_a * b_del_a);
+          cov_ab[2] += (a_del_b * b_del_b);
+
+          ++n;
         }
         a += (image_width - kWindowSize) * 4;
         b += (image_width - kWindowSize) * 4;
-        mu_a += (mssim_image_width - kWindowSize) * 3;
-        mu_b += (mssim_image_width - kWindowSize) * 3;
+        mu_a += (image_width - kWindowSize) * 3;
+        mu_b += (image_width - kWindowSize) * 3;
       }
-      *(std_a) /= static_cast<double>((kWindowSize * kWindowSize) - 1);
-      *(std_a + 1) /= static_cast<double>((kWindowSize * kWindowSize) - 1);
-      *(std_a + 2) /= static_cast<double>((kWindowSize * kWindowSize) - 1);
-      *(std_b) /= static_cast<double>((kWindowSize * kWindowSize) - 1);
-      *(std_b + 1) /= static_cast<double>((kWindowSize * kWindowSize) - 1);
-      *(std_b + 2) /= static_cast<double>((kWindowSize * kWindowSize) - 1);
-      *(cov_ab) /= static_cast<double>((kWindowSize * kWindowSize) - 1);
-      *(cov_ab + 1) /= static_cast<double>((kWindowSize * kWindowSize) - 1);
-      *(cov_ab + 2) /= static_cast<double>((kWindowSize * kWindowSize) - 1);
+      double n_d = std::max(1.0, static_cast<double>(n) - 1.0);
+      std_a[0] /= n_d;
+      std_a[1] /= n_d;
+      std_a[2] /= n_d;
+      std_b[0] /= n_d;
+      std_b[1] /= n_d;
+      std_b[2] /= n_d;
+      cov_ab[0] /= n_d;
+      cov_ab[1] /= n_d;
+      cov_ab[2] /= n_d;
       std_a += 3;
       std_b += 3;
       cov_ab += 3;
@@ -159,7 +156,7 @@ double Mssim(const double* lab_a, const double* lab_b, uint32 image_width,
   std_a = stddev_a.get();
   std_b = stddev_b.get();
   cov_ab = covariance_ab.get();
-  for (uint32 i = 0; i < mssim_image_width * mssim_image_height; ++i) {
+  for (uint32 i = 0; i < image_values; ++i) {
     L_mssim += (((2 * *mu_a * *mu_b) + kC1) * ((2 * *cov_ab) + kC2)) /
         (((*mu_a * *mu_a) + (*mu_b * *mu_b) + kC1) *
             ((*std_a * *std_a) + (*std_b * *std_b) + kC2));
@@ -185,9 +182,9 @@ double Mssim(const double* lab_a, const double* lab_b, uint32 image_width,
     ++std_b;
     ++cov_ab;
   }
-  L_mssim /= static_cast<double>(mssim_image_width * mssim_image_height);
-  a_mssim /= static_cast<double>(mssim_image_width * mssim_image_height);
-  b_mssim /= static_cast<double>(mssim_image_width * mssim_image_height);
+  L_mssim /= static_cast<double>(image_values);
+  a_mssim /= static_cast<double>(image_values);
+  b_mssim /= static_cast<double>(image_values);
 
   return (L_mssim * kLabLWeight) +
          (a_mssim * kLabaWeight) +

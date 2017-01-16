@@ -70,13 +70,13 @@ class Kernel {
   // target lab image.
   class ScoreKernelJob {
    public:
-    ScoreKernelJob(Generation generation, const uint8* target_colors)
-        : generation_(generation), target_colors_(target_colors) {}
+    ScoreKernelJob(Generation generation, const double* target_lab)
+        : generation_(generation), target_lab_(target_lab) {}
     void operator()(const tbb::blocked_range<size_t>& r) const;
 
    private:
     Generation generation_;
-    const uint8* target_colors_;
+    const double* target_lab_;
   };
 
   // Given a provided reference kernel, generate the target kernel as a copy of
@@ -127,7 +127,7 @@ class Kernel {
   // Given valid data in opcodes_ refills bytecode_ with the concatenated data
   // in opcodes_ and specs_, appends jumps and updates fingerprint_.
   void RegenerateBytecode(size_t bytecode_size);
-  void SimulateAndScore(const uint8* target_colors);
+  void SimulateAndScore(const double* target_lab);
   void Mutate(TlsPrngList::reference engine);
   // Given a number within [0, total_dynamic_opcodes_) returns the index of the
   // vector within opcodes_ that contains this value.

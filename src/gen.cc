@@ -56,8 +56,8 @@ DEFINE_int32(stagnant_mutation_count, 16,
 DEFINE_int32(stagnant_count_limit, 0,
     "If nonzero, terminate after the supplied number of randomizations.");
 
-DEFINE_string(color_input_file, "",
-    "Required - best fit color map as computed by fit.");
+DEFINE_string(input_image_file, "",
+    "Required - the input png file to fit against.");
 DEFINE_string(spec_list_file, "asm/frame_spec.yaml",
     "Required - path to spec list yaml file.");
 DEFINE_string(gperf_output_file, "",
@@ -133,20 +133,24 @@ int main(int argc, char* argv[]) {
   auto program_start_time = std::chrono::high_resolution_clock::now();
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
-  int col_fd = open(FLAGS_color_input_file.c_str(), O_RDONLY);
-  if (col_fd < 0) {
-    fprintf(stderr, "error opening color input file %s.\n",
-        FLAGS_color_input_file.c_str());
+  // Read input image, vet, and convert to Lab color.
+  std::unique_ptr<vcsmc::Image> input_image = vcsmc::LoadImage(
+      FLAGS_input_image_file);
+  if (!input_image) {
+    fprintf(stderr, "error opening input image file %s.\n",
+        FLAGS_input_image_file.c_str());
     return -1;
   }
-  std::unique_ptr<uint8[]> target_colors(new uint8[vcsmc::kFrameSizeBytes]);
-  size_t bytes_read = read(col_fd, target_colors.get(), vcsmc::kFrameSizeBytes);
-  if (bytes_read != vcsmc::kFrameSizeBytes) {
-    fprintf(stderr, "file read error on color input file %s.\n",
-        FLAGS_color_input_file.c_str());
-    return -1;
+  if (input_image->width() != vcsmc::kTargetFrameWidthPixels ||
+      input_image->height() != vcsmc::kFrameHeightPixels) {
+    fprintf(stderr, "bad image dimensions on input image file %s.\n",
+        FLAGS_input_image_file.c_str());
   }
-  close(col_fd);
+  std::unique_ptr<double> input_lab(new double[vcsmc::kFrameSizeBytes * 4]);
+  for (uint32 i = 0; i < vcsmc::kFrameSizeBytes; ++i) {
+    vcsmc::RGBAToLabA(reinterpret_cast<uint8*>(input_image->pixels() + i),
+        input_lab.get() + (i * 4));
+  }
 
   vcsmc::SpecList audio_spec_list;
   if (FLAGS_audio_spec_list_file != "") {
@@ -270,11 +274,11 @@ int main(int argc, char* argv[]) {
     auto start_of_scoring = std::chrono::high_resolution_clock::now();
     if (full_range_sim_needed) {
       tbb::parallel_for(full_range,
-          vcsmc::Kernel::ScoreKernelJob(generation, target_colors.get()));
+          vcsmc::Kernel::ScoreKernelJob(generation, input_lab.get()));
       scoring_count += generation_size;
     } else {
       tbb::parallel_for(back_half,
-          vcsmc::Kernel::ScoreKernelJob(generation, target_colors.get()));
+          vcsmc::Kernel::ScoreKernelJob(generation, input_lab.get()));
       scoring_count += generation_size / 2;
     }
     auto end_of_scoring = std::chrono::high_resolution_clock::now();

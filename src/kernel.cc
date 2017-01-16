@@ -16,6 +16,7 @@ extern "C" {
 #include "color_table.h"
 #include "image.h"
 #include "image_file.h"
+#include "mssim.h"
 
 namespace vcsmc {
 
@@ -209,7 +210,7 @@ void Kernel::GenerateRandomKernelJob::operator()(
 void Kernel::ScoreKernelJob::operator()(
     const tbb::blocked_range<size_t>& r) const {
   for (size_t i = r.begin(); i < r.end(); ++i) {
-    generation_->at(i)->SimulateAndScore(target_colors_);
+    generation_->at(i)->SimulateAndScore(target_lab_);
   }
 }
 
@@ -417,22 +418,31 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
                               bytecode_size_);
 }
 
-void Kernel::SimulateAndScore(const uint8* target_colors) {
+void Kernel::SimulateAndScore(const double* target_lab) {
   sim_frame_.reset(new uint8[kLibZ26ImageSizeBytes]);
   std::memset(sim_frame_.get(), 0, kLibZ26ImageSizeBytes);
   simulate_single_frame(bytecode_.get(), bytecode_size_, sim_frame_.get());
-  score_ = 0.0;
+  // Convert sim output to Lab for scoring with MSSIM.
+  std::unique_ptr<double> sim_lab(new double[kFrameSizeBytes * 4]);
+  double* lab = sim_lab.get();
   uint8* frame_pointer = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
   for (size_t i = 0; i < kFrameSizeBytes; ++i) {
     if (*frame_pointer >= 128) {
-      score_ += 1.0;
+      lab[0] = 0.0;
+      lab[1] = 0.0;
+      lab[2] = 0.0;
     } else {
-      assert(*frame_pointer < 128);
-      score_ += kColorDistanceNTSC[(target_colors[i] * 128) + *frame_pointer];
+      lab[0] = kAtariNTSCLabColorTable[*frame_pointer * 4];
+      lab[1] = kAtariNTSCLabColorTable[(*frame_pointer * 4) + 1];
+      lab[2] = kAtariNTSCLabColorTable[(*frame_pointer * 4) + 2];
     }
+    lab[3] = 1.0;
     ++frame_pointer;
+    lab += 4;
   }
-  score_ = score_ / static_cast<double>(kFrameSizeBytes);
+
+  score_ = 1.0 - Mssim(sim_lab.get(), target_lab, kTargetFrameWidthPixels,
+      kFrameHeightPixels);
   score_valid_ = true;
 }
 
