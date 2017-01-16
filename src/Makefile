@@ -30,6 +30,7 @@ IMAGE_OBJ=$(OUT)/bit_map.o                                                     \
 
 OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/kernel.o                                                            \
+    $(OUT)/mssim.o                                                             \
     $(OUT)/range.o                                                             \
     $(OUT)/serialization.o                                                     \
     $(OUT)/sound_file.o                                                        \

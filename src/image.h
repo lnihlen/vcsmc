@@ -13,6 +13,7 @@ namespace vcsmc {
 // the uint32.
 class Image {
  public:
+  Image() = delete;
   // Constructs an Image that owns a pixel array.
   Image(uint32 width, uint32 height);
   ~Image();
@@ -29,9 +30,6 @@ class Image {
   const uint32 width_;
   const uint32 height_;
   std::unique_ptr<uint32[]> pixels_;
-
-  // Private default ctor means "don't call me."
-  Image() : width_(0), height_(0), pixels_(nullptr) {}
 };
 
 }  // namespace vcsmc
