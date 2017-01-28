@@ -161,7 +161,7 @@ bool SaveWAV(const vcsmc::Sound* sound, const std::string& file_name) {
   UnpackUInt16(4, riff_header + 32);  // Block size in bytes.
   UnpackUInt16(32, riff_header + 34);  // 32 bits per sample.
   UnpackUInt16(22, riff_header + 36);  // 22 bytes in the extension.
-  UnpackUInt16(4, riff_header + 38);  // 32 valid bits per sample.
+  UnpackUInt16(32, riff_header + 38);  // 32 valid bits per sample.
   UnpackUInt32(0x00000004, riff_header + 40);  // Speaker position mask.
   UnpackUInt32(0x00000001, riff_header + 44);  // GUID word 1.
   UnpackUInt32(0x00100000, riff_header + 48);  // GUID word 2.
