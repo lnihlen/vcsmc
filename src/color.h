@@ -8,9 +8,9 @@ namespace vcsmc {
 // Maximum Lab value in our Lab definition.
 const double kMaxLab = 100.0;
 
-// Given four bytes of rgba color pointed to by |rgba| stores four doubles of
-// LabA converted color values at |laba|.
-void RGBAToLabA(const uint8* rgba, double* laba);
+// Given four bytes of rgba color pointed to by |rgba| stores three floats of
+// L*a*b* converted color values at |lab|.
+void RGBAToLabA(const uint8* rgba, float* lab);
 
 // Given input colors in L*a*b* color space returns the CIEDE2000 delta E value,
 // a nonlinear color distance based on the human vision response.

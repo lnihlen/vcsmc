@@ -70,13 +70,21 @@ class Kernel {
   // target lab image.
   class ScoreKernelJob {
    public:
-    ScoreKernelJob(Generation generation, const double* target_lab)
-        : generation_(generation), target_lab_(target_lab) {}
+    ScoreKernelJob(Generation generation,
+                   const float* target_lab_device,
+                   const float* target_mean_device,
+                   const float* target_stddevsq_device)
+        : generation_(generation),
+          target_lab_device_(target_lab_device),
+          target_mean_device_(target_mean_device),
+          target_stddevsq_device_(target_stddevsq_device) {}
     void operator()(const tbb::blocked_range<size_t>& r) const;
 
    private:
     Generation generation_;
-    const double* target_lab_;
+    const float* target_lab_device_;
+    const float* target_mean_device_;
+    const float* target_stddevsq_device_;
   };
 
   // Given a provided reference kernel, generate the target kernel as a copy of

@@ -5,9 +5,11 @@
 #include <cstring>
 #include <random>
 
-#include <farmhash.h>
+#include "cuda.h"
+#include "cuda_runtime.h"
+#include "farmhash.h"
 extern "C" {
-#include <libz26/libz26.h>
+#include "libz26/libz26.h"
 }
 
 #include "assembler.h"
@@ -423,8 +425,8 @@ void Kernel::SimulateAndScore(const double* target_lab) {
   std::memset(sim_frame_.get(), 0, kLibZ26ImageSizeBytes);
   simulate_single_frame(bytecode_.get(), bytecode_size_, sim_frame_.get());
   // Convert sim output to Lab for scoring with MSSIM.
-  std::unique_ptr<double> sim_lab(new double[kFrameSizeBytes * 4]);
-  double* lab = sim_lab.get();
+  std::unique_ptr<float> sim_lab(new float[kFrameSizeBytes * 3]);
+  float* lab = sim_lab.get();
   uint8* frame_pointer = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
   for (size_t i = 0; i < kFrameSizeBytes; ++i) {
     if (*frame_pointer >= 128) {
@@ -432,14 +434,22 @@ void Kernel::SimulateAndScore(const double* target_lab) {
       lab[1] = 0.0;
       lab[2] = 0.0;
     } else {
-      lab[0] = kAtariNTSCLabColorTable[*frame_pointer * 4];
-      lab[1] = kAtariNTSCLabColorTable[(*frame_pointer * 4) + 1];
-      lab[2] = kAtariNTSCLabColorTable[(*frame_pointer * 4) + 2];
+      lab[0] = kAtariNTSCLabColorTable[*frame_pointer * 3];
+      lab[1] = kAtariNTSCLabColorTable[(*frame_pointer * 3) + 1];
+      lab[2] = kAtariNTSCLabColorTable[(*frame_pointer * 3) + 2];
     }
-    lab[3] = 1.0;
     ++frame_pointer;
-    lab += 4;
+    lab += 3;
   }
+  const int kLabBufferSize = kFrameSizeBytes * sizeof(float) * 3;
+  float* sim_lab_device;
+  cudaMalloc(&sim_lab_device, kLabBufferSize);
+  float* sim_mean_device;
+  cudaMalloc(&sim_mean_device, kLabBufferSize);
+  float* sim_stddevsq_device;
+  cudaMalloc(&sim_stddevsq_device, kLabBuffserSize);
+  float* sim_cov_out;
+  cudaMalloc(&sim_cov_out, kLabBuffserSize);
 
   score_ = 1.0 - Mssim(sim_lab.get(), target_lab, kTargetFrameWidthPixels,
       kFrameHeightPixels);

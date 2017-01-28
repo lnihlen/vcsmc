@@ -7,53 +7,46 @@
 
 namespace {
 
-inline double gamma_compand(double V) {
-  return V <= 0.04045 ? V / 12.92 : pow((V + 0.055) / 1.055, 2.4);
+inline float gamma_compand(float V) {
+  return V <= 0.04045 ? V / 12.92 : powf((V + 0.055) / 1.055, 2.4);
 }
 
-const double kEpsilon = 216.0 / 24389.0;
-const double kKappa = 24389.0 / 27.0;
+const float kEpsilon = 216.0 / 24389.0;
+const float kKappa = 24389.0 / 27.0;
 
-inline double f(double x) {
-  return x > kEpsilon ? pow(x, 1.0 / 3.0) : ((kKappa * x) + 16.0) / 116.0;
+inline float f(float x) {
+  return x > kEpsilon ? powf(x, 1.0 / 3.0) : ((kKappa * x) + 16.0) / 116.0;
 }
 
 }
 
 namespace vcsmc {
 
-void RGBAToLabA(const uint8* rgba, double* alab) {
-  double R = static_cast<double>(rgba[0]) / 255.0;
-  double G = static_cast<double>(rgba[1]) / 255.0;
-  double B = static_cast<double>(rgba[2]) / 255.0;
-  double A = static_cast<double>(rgba[3]) / 255.0;
-
-  double r = gamma_compand(R);
-  double g = gamma_compand(G);
-  double b = gamma_compand(B);
+void RGBAToLab(const uint8* rgba, float* lab) {
+  float r = gamma_compand(static_cast<double>(rgba[0]) / 255.0);
+  float g = gamma_compand(static_cast<double>(rgba[1]) / 255.0);
+  float b = gamma_compand(static_cast<double>(rgba[2]) / 255.0);
 
   // D65 reference white, Xr=0.95047, Yr=1.0, Zr=1.08883
-  double X = (0.4124564 * r) + (0.3575761 * g) + (0.1804375 * b);
-  double Y = (0.2126729 * r) + (0.7151522 * g) + (0.0721750 * b);
-  double Z = (0.0193339 * r) + (0.1191920 * g) + (0.9503041 * b);
-  double x = X / 0.95047;
-  double y = Y;
-  double z = Z / 1.08883;
+  float X = (0.4124564 * r) + (0.3575761 * g) + (0.1804375 * b);
+  float Y = (0.2126729 * r) + (0.7151522 * g) + (0.0721750 * b);
+  float Z = (0.0193339 * r) + (0.1191920 * g) + (0.9503041 * b);
+  float x = X / 0.95047;
+  float y = Y;
+  float z = Z / 1.08883;
 
-  double f_x = f(x);
-  double f_y = f(y);
-  double f_z = f(z);
+  float f_x = f(x);
+  float f_y = f(y);
+  float f_z = f(z);
 
-  double L_star = (116.0 * f_y) - 16.0;
-  double a_star = 500.0 * (f_x - f_y);
-  double b_star = 200.0 * (f_y - f_z);
+  float L_star = (116.0 * f_y) - 16.0;
+  float a_star = 500.0 * (f_x - f_y);
+  float b_star = 200.0 * (f_y - f_z);
 
-  alab[0] = L_star;
-  alab[1] = a_star;
-  alab[2] = b_star;
-  alab[3] = A;
+  lab[0] = L_star;
+  lab[1] = a_star;
+  lab[2] = b_star;
 }
-
 
 double Ciede2k(const double* laba_1, const double* laba_2) {
   double L_star_1 = laba_1[0];

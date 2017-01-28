@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Script to make the .cc tables of the Atari colors in RGB and L*ab color
 # spaces. Also generates the histogram for Luminosity remapping.
 # relies on the colormath module
@@ -169,11 +171,11 @@ const uint32 kAtariNTSCABGRColorTable[128] = {
   output_file.write("""
 };
 
-const double kAtariNTSCLabColorTable[128 * 4] = {
+const float kAtariNTSCLabColorTable[128 * 3] = {
 """)
   lab_strings = []
   for color_lab in atari_colors_lab:
-    lab_strings.append('  %.32g, %.32g, %.32g, 1.0' % \
+    lab_strings.append('  %.19g, %.19g, %.19g' % \
         (color_lab.lab_l, color_lab.lab_a, color_lab.lab_b))
 
   output_file.write(',\n'.join(lab_strings))

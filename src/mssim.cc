@@ -7,6 +7,130 @@
 
 namespace vcsmc {
 
+#define WINDOW_SIZE 8
+#define C1 ((0.01 * 100.0) * (0.01 * 100.0))
+#define C2 ((0.03 * 100.0) * (0.03 * 100.0))
+#define WEIGHT_L 0.5
+#define WEIGHT_A 0.25
+#define WEIGHT_B 0.25
+
+__global__ void ComputeLocalMean(const float3 lab_in[width, height],
+                                 float3[width][height] mean_out) {
+  int x = (blockIdx.x * blockDim.x) + threadIdx.x;
+  int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  if (x >= width || y >= height)
+    return;
+  float3 mean = make_float3(0.0, 0.0, 0.0);
+  int n = 0;
+  for (int i = 0; i < min(WINDOW_SIZE, height - y); ++i) {
+    for (int j = 0; j < min(WINDOW_SIZE, width - x); ++j) {
+      mean += lab_in[j][i];
+      ++n;
+    }
+  }
+  mean = mean / __int2float_rn(n);
+  mean_out[x][y] = mean;
+}
+
+__global__ void ComputeLocalStdDevSquared(const float3 lab_in[width, height],
+                                          const float3 mean_in[width, height],
+                                          float3 stddevsq_out[width, height]) {
+  int x = (blockIdx.x * blockDim.x) + threadIdx.x;
+  int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  if (x >= width || y >= height)
+    return;
+  float3 std_dev = make_float3(0.0, 0.0, 0.0);
+  int n = 0;
+  for (int i = 0; i < min(WINDOW_SIZE, height - y); ++i) {
+    for (int j = 0; j < min(WINDOW_SIZE, width - x); ++j) {
+      float3 del = lab_in[j][i] - mean_in[j][i];
+      std_dev += del * del;
+      ++n;
+    }
+  }
+  n = max(1, n - 1);
+  std_dev = std_dev / __int2float_rn(n);
+  stddevsq_out = std_dev;
+}
+
+__global__ void ComputeLocalCovariance(const float3 lab_a_in[width, height],
+                                       const float3 mean_a_in[width, height],
+                                       const float3 lab_b_in[width, height],
+                                       const float3 mean_b_in[width, height],
+                                       float3 cov_ab_out[width, height]) {
+  int x = (blockIdx.x * blockDim.x) + threadIdx.x;
+  int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  if (x >= width || y >= height)
+    return;
+  float3 cov = make_float3(0.0, 0.0, 0.0);
+  int n = 0;
+  for (int i = 0; i < min(WINDOW_SIZE, height - y); ++i) {
+    for (int j = 0; j < min(WINDOW_SIZE, width - x); ++j) {
+      float3 del_a = lab_a_in[j][i] - mean_a_in[j][i];
+      float3 del_b = lab_b_in[j][i] - mean_b_in[j][i];
+      cov += del_a * del_b;
+    }
+  }
+  n = max(1, n - 1);
+  cov = cov / __int2float_rn(n);
+  cov_ab_out[x][y] = cov;
+}
+
+__global__ void ComputeSSIM(const float3 mean_a_in[width, height],
+                            const float3 stddevsq_a_in[width, height],
+                            const float3 mean_b_in[width, height],
+                            const float3 stddevsq_b_in[width, height],
+                            const float3 cov_ab_in[width, height],
+                            float* ssim_out) {
+  int x = (blockIdx.x * blockDim.x) + threadIdx.x;
+  int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  if (x >= width || y >= height)
+    return;
+  float3 mean_a = mean_a_in[x][y];
+  float3 mean_b = mean_b_in[x][y];
+  float3 ssim =
+      (((2.0 * mean_a * mean_b) + C1) * ((2 * cov_ab_in[x][y]) + C2)) /
+          (((mean_a * mean_a) + (mean_b * mean_b) + C1) *
+           (stddevsq_a[x][y] + stddevsq_b[x][y] + C2));
+  ssim_out[(y * width) + x] =
+      (WEIGHT_L * ssim.x) + (WEIGHT_A * ssim.y) + (WEIGHT_B * ssim.z);
+}
+
+// 320 * 192 = 61440 = 256 * 240
+// Block size assumed to be 256, grid size 120. Each block needs 256 floats
+// of shared storage. Output will be 120 floats.
+__global__ void ComputeBlockSum(const float* ssim_in, float* block_sum_out) {
+  extern __shared__ float block_shared[];
+  int thread_id = threadIdx.x;
+  int global_id = (blockIdx.x * blockDim.x * 2) + thread_id;
+  block_shared[thread_id] =
+      ssim_in[global_id] + ssim_in[gloabl_id + blockDim.x];
+  __syncthreads();
+
+  if (thread_id < 128) {
+    block_shared[thread_id] += block_shared[thread_id + 128];
+  }
+  __syncthreads();
+
+  if (thread_id < 64) {
+    block_shared[thread_id] += block_shared[thread_id + 64];
+  }
+  __syncthreads();
+
+  if (thread_id < 32) {
+    block_shared[thread_id] += block_shared[thread_id + 32];
+    block_shared[thread_id] += block_shared[thread_id + 16];
+    block_shared[thread_id] += block_shared[thread_id + 8];
+    block_shared[thread_id] += block_shared[thread_id + 4];
+    block_shared[thread_id] += block_shared[thread_id + 2];
+    block_shared[thread_id] += block_shared[thread_id + 1];
+  }
+
+  if (thread_id == 0) {
+    block_sum_out[blockIdx.x] = block_shared[0];
+  }
+}
+
 // These three constants should total to 1.0.
 const double kLabLWeight = 0.8;
 const double kLabaWeight = 0.1;
@@ -159,7 +283,7 @@ double Mssim(const double* lab_a, const double* lab_b, uint32 image_width,
   for (uint32 i = 0; i < image_values; ++i) {
     L_mssim += (((2 * *mu_a * *mu_b) + kC1) * ((2 * *cov_ab) + kC2)) /
         (((*mu_a * *mu_a) + (*mu_b * *mu_b) + kC1) *
-            ((*std_a * *std_a) + (*std_b * *std_b) + kC2));
+            (*std_a + *std_b + kC2));
     ++mu_a;
     ++mu_b;
     ++std_a;
@@ -167,7 +291,7 @@ double Mssim(const double* lab_a, const double* lab_b, uint32 image_width,
     ++cov_ab;
     a_mssim += (((2 * *mu_a * *mu_b) + kC1) * ((2 * *cov_ab) + kC2)) /
         (((*mu_a * *mu_a) + (*mu_b * *mu_b) + kC1) *
-            ((*std_a * *std_a) + (*std_b * *std_b) + kC2));
+            (*std_a + *std_b + kC2));
     ++mu_a;
     ++mu_b;
     ++std_a;
@@ -175,7 +299,7 @@ double Mssim(const double* lab_a, const double* lab_b, uint32 image_width,
     ++cov_ab;
     b_mssim += (((2 * *mu_a * *mu_b) + kC1) * ((2 * *cov_ab) + kC2)) /
         (((*mu_a * *mu_a) + (*mu_b * *mu_b) + kC1) *
-            ((*std_a * *std_a) + (*std_b * *std_b) + kC2));
+            (*std_a + *std_b + kC2));
     ++mu_a;
     ++mu_b;
     ++std_a;

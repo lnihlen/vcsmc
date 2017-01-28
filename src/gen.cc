@@ -19,6 +19,8 @@
 #include <unistd.h>
 #include <vector>
 
+#include "cuda.h"
+#include "cuda_runtime.h"
 #include "tbb/tbb.h"
 
 #include "bit_map.h"
@@ -146,11 +148,28 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "bad image dimensions on input image file %s.\n",
         FLAGS_input_image_file.c_str());
   }
-  std::unique_ptr<double> input_lab(new double[vcsmc::kFrameSizeBytes * 4]);
+  std::unique_ptr<float> input_lab(new float[vcsmc::kFrameSizeBytes * 3]);
   for (uint32 i = 0; i < vcsmc::kFrameSizeBytes; ++i) {
-    vcsmc::RGBAToLabA(reinterpret_cast<uint8*>(input_image->pixels() + i),
-        input_lab.get() + (i * 4));
+    vcsmc::RGBAToLab(reinterpret_cast<uint8*>(input_image->pixels() + i),
+        input_lab.get() + (i * 3));
   }
+  // Copy input Lab colors to device, compute mean and stddev asynchronously.
+  const int kLabBufferSize = vcsmc::kFrameSizeBytes * sizeof(float) * 3;
+  float* input_lab_device;
+  cudaMalloc(&input_lab_device, kLabBufferSize);
+  float* input_mean_device;
+  cudaMalloc(&input_mean_device, kLabBufferSize);
+  float* input_stddevsq_device;
+  cudaMalloc(&input_stddevsq_device, kLabBufferSize);
+  cudaMemcpyAsync(input_lab_device, input_lab.get(), kLabBufferSize,
+      cudaMemcpyHostToDevice, 0);
+  dim3 dim_block(16, 16);
+  dim3 dim_grid(vcsmc::kTargetFrameWidthPixels / 16,
+                vcsmc::kFrameHeightPixels / 16);
+  vcsmc::ComputeLocalMean<<<dim_block, dim_grid, 0>>>(input_lab_device,
+      input_mean_device);
+  vcsmc::ComputeLocalStdDevSquared<<<dim_block, dim_grid, 0>>>(
+      input_lab_device, input_mean_device, input_stddevsq_device);
 
   vcsmc::SpecList audio_spec_list;
   if (FLAGS_audio_spec_list_file != "") {
@@ -238,6 +257,10 @@ int main(int argc, char* argv[]) {
         FLAGS_gperf_output_file.c_str());
     ProfilerStart(FLAGS_gperf_output_file.c_str());
   }
+
+  // Make sure input image computations are all complete before starting
+  // outer sim loop.
+  cudaDeviceSynchronize();
 
   double target_error = strtod(FLAGS_target_error.c_str(), nullptr);
   int generation_count = 0;
