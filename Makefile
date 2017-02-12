@@ -13,14 +13,13 @@ export UNAME:=$(shell uname)
 
 ifeq ($(UNAME), Darwin)
 export DYLIB=dylib
+export NVCC=/Developer/NVIDIA/CUDA-8.0/bin/nvcc -Wno-deprecated-gpu-targets
 endif
 
 ifeq ($(UNAME), Linux)
 export DYLIB=so
 endif
 
-export DCMT_LIB=$(OUT)/dcmt/libdcmt.a
-export DCMT_INCLUDE=$(CURDIR)/third_party/dcmt/include
 export FARMHASH_LIB=$(OUT)/farmhash/lib/libfarmhash.a
 export FARMHASH_INCLUDE=$(OUT)/farmhash/include
 export GPERF_LIB=$(OUT)/gperftools/lib/libprofiler.a

@@ -3,6 +3,8 @@
 
 #include <memory>
 
+#include "cuda.h"
+#include "cuda_runtime.h"
 #include "tbb/tbb.h"
 
 #include "range.h"
@@ -31,11 +33,12 @@ class Kernel {
   // Save the simulated kernel image to provided png filename.
   bool SaveImage(const std::string& file_name) const;
 
-  void ResetVictories() { victories_ = 0; }
-  void AddVictory() { ++victories_; }
-
+  void FinalizeScore();
   void GenerateRandom(const SpecList specs, TlsPrngList::reference tls_prng);
   void ClobberSpec(const SpecList new_specs);
+
+  void ResetVictories() { victories_ = 0; }
+  void AddVictory() { ++victories_; }
 
   const uint8* bytecode() const { return bytecode_.get(); }
   const std::vector<Range>& dynamic_areas() const { return dynamic_areas_; }
@@ -66,6 +69,23 @@ class Kernel {
     TlsPrngList& tls_prng_list_;
   };
 
+  struct ScoreState {
+   public:
+    ScoreState();
+    ~ScoreState();
+    ScoreState(const ScoreState&) = delete;
+
+    cudaStream_t stream;
+    float* sim_lab_device;
+    float* sim_mean_device;
+    float* sim_stddevsq_device;
+    float* sim_cov_device;
+    float* ssim_device;
+    float* block_sum_device;
+  };
+
+  typedef tbb::enumerable_thread_specific<ScoreState> ScoreStateList;
+
   // Score an unscored kernel by simulating it and then comparing it to the
   // target lab image.
   class ScoreKernelJob {
@@ -73,11 +93,13 @@ class Kernel {
     ScoreKernelJob(Generation generation,
                    const float* target_lab_device,
                    const float* target_mean_device,
-                   const float* target_stddevsq_device)
+                   const float* target_stddevsq_device,
+                   ScoreStateList& score_state_list)
         : generation_(generation),
           target_lab_device_(target_lab_device),
           target_mean_device_(target_mean_device),
-          target_stddevsq_device_(target_stddevsq_device) {}
+          target_stddevsq_device_(target_stddevsq_device),
+          score_state_list_(score_state_list) {}
     void operator()(const tbb::blocked_range<size_t>& r) const;
 
    private:
@@ -85,6 +107,19 @@ class Kernel {
     const float* target_lab_device_;
     const float* target_mean_device_;
     const float* target_stddevsq_device_;
+    ScoreStateList& score_state_list_;
+  };
+
+  // As we now use CUDA to compute almost all of the score asynchronously we
+  // wait for all GPU work to complete and then call this on each kernel to
+  // finish computation.
+  class FinalizeScoreJob {
+   public:
+    FinalizeScoreJob(Generation generation) : generation_(generation) {}
+    void operator()(const tbb::blocked_range<size_t>& r) const;
+
+   private:
+    Generation generation_;
   };
 
   // Given a provided reference kernel, generate the target kernel as a copy of
@@ -135,7 +170,10 @@ class Kernel {
   // Given valid data in opcodes_ refills bytecode_ with the concatenated data
   // in opcodes_ and specs_, appends jumps and updates fingerprint_.
   void RegenerateBytecode(size_t bytecode_size);
-  void SimulateAndScore(const double* target_lab);
+  void SimulateAndScore(const float* target_lab_device,
+                        const float* target_mean_device,
+                        const float* target_stddevsq_device,
+                        ScoreState& score_state);
   void Mutate(TlsPrngList::reference engine);
   // Given a number within [0, total_dynamic_opcodes_) returns the index of the
   // vector within opcodes_ that contains this value.
@@ -154,8 +192,9 @@ class Kernel {
   std::vector<size_t> opcode_counts_;
 
   uint64 fingerprint_;
+  std::unique_ptr<float[]> mssim_sum_;
   bool score_valid_;
-  double score_;
+  float score_;
   uint32 victories_;
 };
 

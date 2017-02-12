@@ -5,8 +5,6 @@
 #include <cstring>
 #include <random>
 
-#include "cuda.h"
-#include "cuda_runtime.h"
 #include "farmhash.h"
 extern "C" {
 #include "libz26/libz26.h"
@@ -22,6 +20,7 @@ extern "C" {
 
 namespace vcsmc {
 
+const int kLabBufferSize = kFrameSizeBytes * sizeof(float) * 3;
 const size_t kSimSkipLines = 23;
 
 Kernel::Kernel()
@@ -102,17 +101,15 @@ bool Kernel::SaveImage(const std::string& file_name) const {
   return vcsmc::SaveImage(&image, file_name);
 }
 
-void Kernel::ClobberSpec(const SpecList new_specs) {
-  size_t target_spec_index = 0;
-  for (size_t i = 0; i < new_specs->size(); ++i) {
-    while (target_spec_index < specs_->size() &&
-           specs_->at(target_spec_index).range().start_time() <
-              new_specs->at(i).range().start_time()) {
-      ++target_spec_index;
-    }
-    specs_->at(target_spec_index) = new_specs->at(i);
+void Kernel::FinalizeScore() {
+  assert(mssim_sum_.get());
+  float sum = 0.0f;
+  for (size_t i = 0; i < 120; ++i) {
+    sum += mssim_sum_[i];
   }
-  RegenerateBytecode(bytecode_size_);
+  score_ = 1.0 - (sum /
+      static_cast<float>(kTargetFrameWidthPixels * kFrameHeightPixels));
+  score_valid_ = true;
 }
 
 void Kernel::GenerateRandom(
@@ -200,6 +197,19 @@ void Kernel::GenerateRandom(
   RegenerateBytecode(total_byte_size);
 }
 
+void Kernel::ClobberSpec(const SpecList new_specs) {
+  size_t target_spec_index = 0;
+  for (size_t i = 0; i < new_specs->size(); ++i) {
+    while (target_spec_index < specs_->size() &&
+           specs_->at(target_spec_index).range().start_time() <
+              new_specs->at(i).range().start_time()) {
+      ++target_spec_index;
+    }
+    specs_->at(target_spec_index) = new_specs->at(i);
+  }
+  RegenerateBytecode(bytecode_size_);
+}
+
 void Kernel::GenerateRandomKernelJob::operator()(
     const tbb::blocked_range<size_t>& r) const {
   TlsPrngList::reference tls_prng = tls_prng_list_.local();
@@ -209,10 +219,45 @@ void Kernel::GenerateRandomKernelJob::operator()(
   }
 }
 
+Kernel::ScoreState::ScoreState() {
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
+
+  cudaMalloc(&sim_lab_device, kLabBufferSize);
+  cudaMalloc(&sim_mean_device, kLabBufferSize);
+  cudaMalloc(&sim_stddevsq_device, kLabBufferSize);
+  cudaMalloc(&sim_cov_device, kLabBufferSize);
+  cudaMalloc(&ssim_device, kFrameSizeBytes * sizeof(float));
+  cudaMalloc(&block_sum_device, 120 * sizeof(float));
+}
+
+Kernel::ScoreState::~ScoreState() {
+  // Clear any pending work on this thread.
+  cudaStreamSynchronize(stream);
+
+  cudaFree(sim_lab_device);
+  cudaFree(sim_mean_device);
+  cudaFree(sim_stddevsq_device);
+  cudaFree(sim_cov_device);
+  cudaFree(ssim_device);
+  cudaFree(block_sum_device);
+
+  cudaStreamDestroy(stream);
+}
+
 void Kernel::ScoreKernelJob::operator()(
     const tbb::blocked_range<size_t>& r) const {
+  ScoreStateList::reference score_state = score_state_list_.local();
   for (size_t i = r.begin(); i < r.end(); ++i) {
-    generation_->at(i)->SimulateAndScore(target_lab_);
+    generation_->at(i)->SimulateAndScore(target_lab_device_,
+        target_mean_device_, target_stddevsq_device_, score_state);
+  }
+}
+
+void Kernel::FinalizeScoreJob::operator()(
+    const tbb::blocked_range<size_t>& r) const {
+  for (size_t i = r.begin(); i < r.end(); ++i) {
+    generation_->at(i)->FinalizeScore();
   }
 }
 
@@ -420,8 +465,12 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
                               bytecode_size_);
 }
 
-void Kernel::SimulateAndScore(const double* target_lab) {
+void Kernel::SimulateAndScore(const float* target_lab_device,
+                              const float* target_mean_device,
+                              const float* target_stddevsq_device,
+                              ScoreState& score_state) {
   sim_frame_.reset(new uint8[kLibZ26ImageSizeBytes]);
+
   std::memset(sim_frame_.get(), 0, kLibZ26ImageSizeBytes);
   simulate_single_frame(bytecode_.get(), bytecode_size_, sim_frame_.get());
   // Convert sim output to Lab for scoring with MSSIM.
@@ -441,19 +490,34 @@ void Kernel::SimulateAndScore(const double* target_lab) {
     ++frame_pointer;
     lab += 3;
   }
-  const int kLabBufferSize = kFrameSizeBytes * sizeof(float) * 3;
-  float* sim_lab_device;
-  cudaMalloc(&sim_lab_device, kLabBufferSize);
-  float* sim_mean_device;
-  cudaMalloc(&sim_mean_device, kLabBufferSize);
-  float* sim_stddevsq_device;
-  cudaMalloc(&sim_stddevsq_device, kLabBuffserSize);
-  float* sim_cov_out;
-  cudaMalloc(&sim_cov_out, kLabBuffserSize);
 
-  score_ = 1.0 - Mssim(sim_lab.get(), target_lab, kTargetFrameWidthPixels,
-      kFrameHeightPixels);
-  score_valid_ = true;
+  dim3 image_dim_block(16, 16);
+  dim3 image_dim_grid(kTargetFrameWidthPixels / 16,
+                      kFrameHeightPixels / 16);
+  dim3 sum_dim_block(256);
+  dim3 sum_dim_grid(120);
+  mssim_sum_.reset(new float[120]);
+
+  cudaMemcpyAsync(sim_lab.get(), score_state.sim_lab_device, kLabBufferSize,
+      cudaMemcpyHostToDevice, score_state.stream);
+  ComputeLocalMean<<<image_dim_block, image_dim_grid, 0, score_state.stream>>>(
+      score_state.sim_lab_device, score_state.sim_mean_device);
+  ComputeLocalStdDevSquared<<<image_dim_block, image_dim_grid, 0,
+      score_state.stream>>>(score_state.sim_lab_device,
+      score_state.sim_mean_device, score_state.sim_stddevsq_device);
+  ComputeLocalCovariance<<<image_dim_block, image_dim_grid, 0,
+      score_state.stream>>>(score_state.sim_lab_device,
+      score_state.sim_mean_device, score_state.target_lab_device,
+      score_state.target_mean_device, score_state.sim_cov_device);
+  ComputeSSIM<<<image_dim_block, image_dim_grid, 0, score_state.stream>>>(
+      score_state.sim_mean_device, score_state.sim_stddevsq_device,
+      score_state.target_mean_device, score_state.target_stddevsq_device,
+      score_state.sim_cov_device, score_state.ssim_device);
+  ComputeBlockSum<<<sum_dim_block, sum_dim_grid, 120 * sizeof(float),
+      score_state.stream>>>(score_state.ssim_device,
+      score_state.block_sum_device);
+  cudaMemcpyAsync(score_state.block_sum_device, mssim_sum_.get(),
+      120 * sizeof(float), cudaMemcpyDeviceToHost, score_state.stream);
 }
 
 size_t Kernel::OpcodeFieldIndex(size_t opcode_index) {
