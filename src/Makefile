@@ -1,5 +1,5 @@
 # VCSMC src/ Makefile.
-# Dependencies: libpng, clang, OpenCL
+# Dependencies: libpng, clang,CUDA, Intel TBB
 # tools dependencies: python colormath, Wand, ImageMagick
 INCLUDES=-I. -I$(FARMHASH_INCLUDE) -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)     \
     -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE) -I$(TBB_INCLUDE)
@@ -15,7 +15,8 @@ LDPATH=/Developer/NVIDIA/CUDA-8.0/lib
 endif
 
 ifeq ($(UNAME), Linux)
-LDFLAGS+=-lpthread -lunwind
+CFLAGS+=-I/opt/cuda/include
+LDFLAGS+=-lpthread -lunwind -L/opt/cuda/lib64
 endif
 
 DEPS=constants.h image_file.h types.h

@@ -18,6 +18,7 @@ endif
 
 ifeq ($(UNAME), Linux)
 export DYLIB=so
+export NVCC=/opt/cuda/bin/nvcc -Wno-deprecated-gpu-targets
 endif
 
 export FARMHASH_LIB=$(OUT)/farmhash/lib/libfarmhash.a
