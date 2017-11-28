@@ -43,12 +43,12 @@ int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
   // Build distances table.
-  std::unique_ptr<double[]> distances(new double[128*128]);
-  double* d = distances.get();
+  std::unique_ptr<float[]> distances(new float[128*128]);
+  float* d = distances.get();
   for (size_t i = 0; i < 128; ++i) {
-    const double* i_lab = vcsmc::kAtariNTSCLabColorTable + (i * 4);
+    const float* i_lab = vcsmc::kAtariNTSCLabColorTable + (i * 3);
     for (size_t j = 0; j < 128; ++j) {
-      *d = vcsmc::Ciede2k(i_lab, vcsmc::kAtariNTSCLabColorTable + (j * 4));
+      *d = vcsmc::Ciede2k(i_lab, vcsmc::kAtariNTSCLabColorTable + (j * 3));
       ++d;
     }
   }
@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
 
       "namespace vcsmc {\n\n"
 
-      "const double kColorDistanceNTSC[128*128] = {\n";
+      "const float kColorDistanceNTSC[128*128] = {\n";
 
   size_t bytes_written = write(fd, code_top_string.c_str(),
       code_top_string.size());
@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
 
   char buf[1024];
   for (size_t i = 0; i < 128*128; ++i) {
-    size_t len = snprintf(buf, 1024, "  %.19g,\n",
+    size_t len = snprintf(buf, 1024, "  %.12g,\n",
         FLAGS_normalize ?
             distances[i] / vcsmc::kMaxCiede2kDistance : distances[i]);
     write(fd, buf, len);

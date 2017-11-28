@@ -30,29 +30,29 @@ DEFINE_bool(adjust_contrast, true,
 DEFINE_string(image_file, "", "Required image input file path.");
 DEFINE_string(output_dir, "", "Required output output index directory.");
 
-typedef std::vector<std::vector<double>> ColorDistances;
+typedef std::vector<std::vector<float>> ColorDistances;
 
 class ComputeColorErrorTableJob {
  public:
   ComputeColorErrorTableJob(
-      const double* target_lab,
+      const float* target_lab,
       ColorDistances& distances)
       : target_lab_(target_lab),
         distances_(distances) {}
   void operator()(const tbb::blocked_range<size_t>& r) const {
     for (size_t i = r.begin(); i < r.end(); ++i) {
-      const double* atari_lab = vcsmc::kAtariNTSCLabColorTable + (i * 4);
-      std::vector<double>& error_table = distances_[i];
-      const double* target_lab = target_lab_;
+      const float* atari_lab = vcsmc::kAtariNTSCLabColorTable + (i * 3);
+      std::vector<float>& error_table = distances_[i];
+      const float* target_lab = target_lab_;
       for (size_t j = 0; j < vcsmc::kFrameSizeBytes; ++j) {
-        double error = vcsmc::Ciede2k(target_lab, atari_lab);
-        target_lab += 4;
+        float error = vcsmc::Ciede2k(target_lab, atari_lab);
+        target_lab += 3;
         error_table.push_back(error);
       }
     }
   }
  private:
-  const double* target_lab_;
+  const float* target_lab_;
   ColorDistances& distances_;
 };
 
@@ -80,29 +80,29 @@ int main(int argc, char* argv[]) {
   }
 
   // Convert target image to Lab colors for scoring.
-  std::shared_ptr<double> target_lab(new double[vcsmc::kFrameSizeBytes * 4]);
+  std::shared_ptr<float> target_lab(new float[vcsmc::kFrameSizeBytes * 3]);
   for (size_t i = 0; i < vcsmc::kFrameSizeBytes; ++i) {
-    vcsmc::RGBAToLabA(reinterpret_cast<uint8*>(target_image->pixels() + i),
-        target_lab.get() + (i * 4));
+    vcsmc::RGBAToLab(reinterpret_cast<uint8*>(target_image->pixels() + i),
+        target_lab.get() + (i * 3));
   }
 
   if (FLAGS_adjust_contrast) {
-    double min_lab = vcsmc::kMaxLab;
-    double max_lab = 0.0;
-    double* lab_ptr = target_lab.get();
+    float min_lab = vcsmc::kMaxLab;
+    float max_lab = 0.0;
+    float* lab_ptr = target_lab.get();
     for (size_t i = 0; i < vcsmc::kFrameSizeBytes; ++i) {
       min_lab = std::min(*lab_ptr, min_lab);
       max_lab = std::max(*lab_ptr, max_lab);
-      lab_ptr += 4;
+      lab_ptr += 3;
     }
 
-    double scale = vcsmc::kMaxLab / (max_lab - min_lab);
+    float scale = vcsmc::kMaxLab / (max_lab - min_lab);
     lab_ptr = target_lab.get();
     for (size_t i = 0; i < vcsmc::kFrameSizeBytes; ++i) {
-      double L = *lab_ptr;
+      float L = *lab_ptr;
       L = (L - min_lab) * scale;
       *lab_ptr = L;
-      lab_ptr += 4;
+      lab_ptr += 3;
     }
   }
 
@@ -115,10 +115,10 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<uint8[]> ideal_colors(new uint8[vcsmc::kFrameSizeBytes]);
   uint8* color = ideal_colors.get();
   for (size_t i = 0; i < vcsmc::kFrameSizeBytes; ++i) {
-    double min_pixel_error = color_distances[0][i];
+    float min_pixel_error = color_distances[0][i];
     size_t min_pixel_color = 0;
     for (size_t j = 1; j < vcsmc::kNTSCColors; ++j) {
-      double error = color_distances[j][i];
+      float error = color_distances[j][i];
       if (error < min_pixel_error) {
         min_pixel_error = error;
         min_pixel_color = j;

@@ -3,7 +3,7 @@
 
 namespace vcsmc {
 
-extern const double kColorDistanceNTSC[];
+extern const float kColorDistanceNTSC[];
 
 }  // namespace vcsmc
 

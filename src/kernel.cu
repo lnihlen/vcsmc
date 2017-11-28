@@ -223,12 +223,19 @@ Kernel::ScoreState::ScoreState() {
   cudaStream_t stream;
   cudaStreamCreate(&stream);
 
-  cudaMalloc(&sim_lab_device, kLabBufferSize);
-  cudaMalloc(&sim_mean_device, kLabBufferSize);
-  cudaMalloc(&sim_stddevsq_device, kLabBufferSize);
-  cudaMalloc(&sim_cov_device, kLabBufferSize);
-  cudaMalloc(&ssim_device, kFrameSizeBytes * sizeof(float));
-  cudaMalloc(&block_sum_device, 120 * sizeof(float));
+  cudaError_t result;
+  result = cudaMalloc(&sim_lab_device, kLabBufferSize);
+  assert(result == cudaSuccess);
+  result = cudaMalloc(&sim_mean_device, kLabBufferSize);
+  assert(result == cudaSuccess);
+  result = cudaMalloc(&sim_stddevsq_device, kLabBufferSize);
+  assert(result == cudaSuccess);
+  result = cudaMalloc(&sim_cov_device, kLabBufferSize);
+  assert(result == cudaSuccess);
+  result = cudaMalloc(&ssim_device, kFrameSizeBytes * sizeof(float));
+  assert(result == cudaSuccess);
+  result = cudaMalloc(&block_sum_device, 120 * sizeof(float));
+  assert(result == cudaSuccess);
 }
 
 Kernel::ScoreState::~ScoreState() {
@@ -465,9 +472,9 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
                               bytecode_size_);
 }
 
-void Kernel::SimulateAndScore(const float* target_lab_device,
-                              const float* target_mean_device,
-                              const float* target_stddevsq_device,
+void Kernel::SimulateAndScore(const float3* target_lab_device,
+                              const float3* target_mean_device,
+                              const float3* target_stddevsq_device,
                               ScoreState& score_state) {
   sim_frame_.reset(new uint8[kLibZ26ImageSizeBytes]);
 
@@ -507,11 +514,11 @@ void Kernel::SimulateAndScore(const float* target_lab_device,
       score_state.sim_mean_device, score_state.sim_stddevsq_device);
   ComputeLocalCovariance<<<image_dim_block, image_dim_grid, 0,
       score_state.stream>>>(score_state.sim_lab_device,
-      score_state.sim_mean_device, score_state.target_lab_device,
-      score_state.target_mean_device, score_state.sim_cov_device);
+      score_state.sim_mean_device, target_lab_device, target_mean_device,
+      score_state.sim_cov_device);
   ComputeSSIM<<<image_dim_block, image_dim_grid, 0, score_state.stream>>>(
       score_state.sim_mean_device, score_state.sim_stddevsq_device,
-      score_state.target_mean_device, score_state.target_stddevsq_device,
+      target_mean_device, target_stddevsq_device,
       score_state.sim_cov_device, score_state.ssim_device);
   ComputeBlockSum<<<sum_dim_block, sum_dim_grid, 120 * sizeof(float),
       score_state.stream>>>(score_state.ssim_device,

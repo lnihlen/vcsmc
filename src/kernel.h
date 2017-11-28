@@ -76,10 +76,10 @@ class Kernel {
     ScoreState(const ScoreState&) = delete;
 
     cudaStream_t stream;
-    float* sim_lab_device;
-    float* sim_mean_device;
-    float* sim_stddevsq_device;
-    float* sim_cov_device;
+    float3* sim_lab_device;
+    float3* sim_mean_device;
+    float3* sim_stddevsq_device;
+    float3* sim_cov_device;
     float* ssim_device;
     float* block_sum_device;
   };
@@ -91,9 +91,9 @@ class Kernel {
   class ScoreKernelJob {
    public:
     ScoreKernelJob(Generation generation,
-                   const float* target_lab_device,
-                   const float* target_mean_device,
-                   const float* target_stddevsq_device,
+                   const float3* target_lab_device,
+                   const float3* target_mean_device,
+                   const float3* target_stddevsq_device,
                    ScoreStateList& score_state_list)
         : generation_(generation),
           target_lab_device_(target_lab_device),
@@ -104,9 +104,9 @@ class Kernel {
 
    private:
     Generation generation_;
-    const float* target_lab_device_;
-    const float* target_mean_device_;
-    const float* target_stddevsq_device_;
+    const float3* target_lab_device_;
+    const float3* target_mean_device_;
+    const float3* target_stddevsq_device_;
     ScoreStateList& score_state_list_;
   };
 
@@ -170,9 +170,9 @@ class Kernel {
   // Given valid data in opcodes_ refills bytecode_ with the concatenated data
   // in opcodes_ and specs_, appends jumps and updates fingerprint_.
   void RegenerateBytecode(size_t bytecode_size);
-  void SimulateAndScore(const float* target_lab_device,
-                        const float* target_mean_device,
-                        const float* target_stddevsq_device,
+  void SimulateAndScore(const float3* target_lab_device,
+                        const float3* target_mean_device,
+                        const float3* target_stddevsq_device,
                         ScoreState& score_state);
   void Mutate(TlsPrngList::reference engine);
   // Given a number within [0, total_dynamic_opcodes_) returns the index of the

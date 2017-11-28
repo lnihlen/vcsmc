@@ -6,11 +6,11 @@
 namespace vcsmc {
 
 // Maximum Lab value in our Lab definition.
-const double kMaxLab = 100.0;
+const float kMaxLab = 100.0;
 
 // Given four bytes of rgba color pointed to by |rgba| stores three floats of
 // L*a*b* converted color values at |lab|.
-void RGBAToLabA(const uint8* rgba, float* lab);
+void RGBAToLab(const uint8* rgba, float* lab);
 
 // Given input colors in L*a*b* color space returns the CIEDE2000 delta E value,
 // a nonlinear color distance based on the human vision response.
@@ -25,7 +25,7 @@ void RGBAToLabA(const uint8* rgba, float* lab);
 //
 // Note that CIEDE2000 is discontinuous so is not useful for gradient
 // descent algorithms.
-double Ciede2k(const double* laba_1, const double* laba_2);
+float Ciede2k(const float* laba_1, const float* laba_2);
 
 }  // namespace vcsmc
 

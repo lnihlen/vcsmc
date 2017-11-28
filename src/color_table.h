@@ -5,7 +5,7 @@
 
 namespace vcsmc {
   extern const uint32 kAtariNTSCABGRColorTable[];
-  extern const double kAtariNTSCLabColorTable[];
+  extern const float kAtariNTSCLabColorTable[];
 }  // namespace vcsmc
 
 #endif  // SRC_COLOR_TABLE_H_

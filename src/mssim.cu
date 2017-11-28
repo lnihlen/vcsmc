@@ -1,10 +1,5 @@
 #include "mssim.h"
 
-#include <algorithm>
-#include <memory>
-
-#include "constants.h"
-
 namespace vcsmc {
 
 #define WINDOW_SIZE 8
@@ -25,13 +20,20 @@ __global__ void ComputeLocalMean(const float3* lab_in,
   float3 mean = make_float3(0.0, 0.0, 0.0);
   int n = 0;
   for (int i = 0; i < min(WINDOW_SIZE, IMAGE_HEIGHT - y); ++i) {
+    int row_offset = i * IMAGE_HEIGHT;
     for (int j = 0; j < min(WINDOW_SIZE, IMAGE_WIDTH - x); ++j) {
-      mean += lab_in[j][i];
+      float3 lab = lab_in[row_offset + j];
+      mean = make_float3(mean.x + lab.x,
+                         mean.y + lab.y,
+                         mean.z + lab.z);
       ++n;
     }
   }
-  mean = mean / __int2float_rn(n);
-  mean_out[x][y] = mean;
+  float n_float = __int2float_rn(n);
+  mean = make_float3(mean.x / n_float,
+                     mean.y / n_float,
+                     mean.z / n_float);
+  mean_out[(y * IMAGE_WIDTH) + x] = mean;
 }
 
 __global__ void ComputeLocalStdDevSquared(const float3* lab_in,
@@ -44,15 +46,25 @@ __global__ void ComputeLocalStdDevSquared(const float3* lab_in,
   float3 std_dev = make_float3(0.0, 0.0, 0.0);
   int n = 0;
   for (int i = 0; i < min(WINDOW_SIZE, IMAGE_HEIGHT - y); ++i) {
+    int row_offset = i * IMAGE_HEIGHT;
     for (int j = 0; j < min(WINDOW_SIZE, IMAGE_WIDTH - x); ++j) {
-      float3 del = lab_in[j][i] - mean_in[j][i];
-      std_dev += del * del;
+      float3 lab = lab_in[row_offset + j];
+      float3 mean = mean_in[row_offset + j];
+      float3 del = make_float3(lab.x - mean.x,
+                               lab.y - mean.y,
+                               lab.z - mean.z);
+      std_dev = make_float3(std_dev.x + (del.x * del.x),
+                            std_dev.y + (del.y * del.y),
+                            std_dev.z + (del.z * del.z));
       ++n;
     }
   }
   n = max(1, n - 1);
-  std_dev = std_dev / __int2float_rn(n);
-  stddevsq_out = std_dev;
+  float n_float = __int2float_rn(n);
+  std_dev = make_float3(std_dev.x / n_float,
+                        std_dev.y / n_float,
+                        std_dev.z / n_float);
+  stddevsq_out[(y * IMAGE_WIDTH) + x] = std_dev;
 }
 
 __global__ void ComputeLocalCovariance(const float3* lab_a_in,
@@ -67,15 +79,30 @@ __global__ void ComputeLocalCovariance(const float3* lab_a_in,
   float3 cov = make_float3(0.0, 0.0, 0.0);
   int n = 0;
   for (int i = 0; i < min(WINDOW_SIZE, IMAGE_HEIGHT - y); ++i) {
+    int row_offset = i * IMAGE_HEIGHT;
     for (int j = 0; j < min(WINDOW_SIZE, IMAGE_WIDTH - x); ++j) {
-      float3 del_a = lab_a_in[j][i] - mean_a_in[j][i];
-      float3 del_b = lab_b_in[j][i] - mean_b_in[j][i];
-      cov += del_a * del_b;
+      float3 lab_a = lab_a_in[row_offset + j];
+      float3 mean_a = mean_a_in[row_offset + j];
+      float3 del_a = make_float3(lab_a.x - mean_a.x,
+                                 lab_a.y - mean_a.y,
+                                 lab_a.z - mean_a.z);
+
+      float3 lab_b = lab_b_in[row_offset + j];
+      float3 mean_b = mean_b_in[row_offset + j];
+      float3 del_b = make_float3(lab_b.x - mean_b.x,
+                                 lab_b.y - mean_b.y,
+                                 lab_b.z - mean_b.z);
+      cov = make_float3(cov.x + (del_a.x * del_b.x),
+                        cov.y + (del_a.y * del_b.y),
+                        cov.z + (del_a.z * del_b.z));
     }
   }
   n = max(1, n - 1);
-  cov = cov / __int2float_rn(n);
-  cov_ab_out[x][y] = cov;
+  float n_float = __int2float_rn(n);
+  cov = make_float3(cov.x / n_float,
+                    cov.y / n_float,
+                    cov.z / n_float);
+  cov_ab_out[(y * IMAGE_WIDTH) + x] = cov;
 }
 
 __global__ void ComputeSSIM(const float3* mean_a_in,
@@ -88,12 +115,22 @@ __global__ void ComputeSSIM(const float3* mean_a_in,
   int y = (blockIdx.y * blockDim.y) + threadIdx.y;
   if (x >= IMAGE_WIDTH || y >= IMAGE_HEIGHT)
     return;
-  float3 mean_a = mean_a_in[x][y];
-  float3 mean_b = mean_b_in[x][y];
-  float3 ssim =
-      (((2.0 * mean_a * mean_b) + C1) * ((2 * cov_ab_in[x][y]) + C2)) /
-          (((mean_a * mean_a) + (mean_b * mean_b) + C1) *
-           (stddevsq_a[x][y] + stddevsq_b[x][y] + C2));
+  float3 mean_a = mean_a_in[(y * IMAGE_WIDTH) + x];
+  float3 stddevsq_a = stddevsq_a_in[(y * IMAGE_WIDTH) + x];
+  float3 mean_b = mean_b_in[(y * IMAGE_WIDTH) + x];
+  float3 stddevsq_b = stddevsq_b_in[(y * IMAGE_WIDTH) + x];
+  float3 cov_ab = cov_ab_in[(y * IMAGE_WIDTH) + x];
+  float3 ssim = make_float3(
+      (((2.0 * mean_a.x * mean_b.x) + C1) * ((2.0 * cov_ab.x) + C2)) /
+          (((mean_a.x * mean_a.x) + (mean_b.x * mean_b.x) + C1) *
+           (stddevsq_a.x + stddevsq_b.x + C2)),
+      (((2.0 * mean_a.y * mean_b.y) + C1) * ((2.0 * cov_ab.y) + C2)) /
+          (((mean_a.y * mean_a.y) + (mean_b.y * mean_b.y) + C1) *
+           (stddevsq_a.y + stddevsq_b.y + C2)),
+      (((2.0 * mean_a.z * mean_b.z) + C1) * ((2.0 * cov_ab.z) + C2)) /
+          (((mean_a.z * mean_a.z) + (mean_b.z * mean_b.z) + C1) *
+           (stddevsq_a.z + stddevsq_b.z + C2)));
+
   ssim_out[(y * IMAGE_WIDTH) + x] =
       (WEIGHT_L * ssim.x) + (WEIGHT_A * ssim.y) + (WEIGHT_B * ssim.z);
 }
@@ -107,11 +144,11 @@ __global__ void ComputeSSIM(const float3* mean_a_in,
 // http://developer.download.nvidia.com/compute/cuda/1.1-Beta/x86_website/
 //    projects/reduction/doc/reduction.pdf
 __global__ void ComputeBlockSum(const float* ssim_in, float* block_sum_out) {
-  extern __shared__ float block_shared[SUM_BLOCK_SIZE];
+  __shared__ float block_shared[SUM_BLOCK_SIZE];
   int thread_id = threadIdx.x;
   int global_id = (blockIdx.x * SUM_BLOCK_SIZE * 2) + thread_id;
   block_shared[thread_id] =
-      ssim_in[global_id] + ssim_in[gloabl_id + SUM_BLOCK_SIZE];
+      ssim_in[global_id] + ssim_in[global_id + SUM_BLOCK_SIZE];
   __syncthreads();
 
   if (thread_id < 128) {

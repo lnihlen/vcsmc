@@ -29,6 +29,7 @@
 #include "image.h"
 #include "image_file.h"
 #include "kernel.h"
+#include "mssim.h"
 #include "serialization.h"
 #include "spec.h"
 #include "tls_prng.h"
@@ -135,6 +136,19 @@ int main(int argc, char* argv[]) {
   auto program_start_time = std::chrono::high_resolution_clock::now();
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
+  // Initialize CUDA, use first device.
+  int cuda_device_count = 0;
+  cudaGetDeviceCount(&cuda_device_count);
+  if (!cuda_device_count) {
+    fprintf(stderr, "unable to find CUDA device.\n");
+    return -1;
+  }
+  cudaSetDevice(0);
+  cudaDeviceProp device_props;
+  cudaGetDeviceProperties(&device_props, 0);
+  printf("CUDA Device 0: \"%s\" with compute capability %d.%d.\n",
+      device_props.name, device_props.major, device_props.minor);
+
   // Read input image, vet, and convert to Lab color.
   std::unique_ptr<vcsmc::Image> input_image = vcsmc::LoadImage(
       FLAGS_input_image_file);
@@ -155,11 +169,11 @@ int main(int argc, char* argv[]) {
   }
   // Copy input Lab colors to device, compute mean and stddev asynchronously.
   const int kLabBufferSize = vcsmc::kFrameSizeBytes * sizeof(float) * 3;
-  float* input_lab_device;
+  float3* input_lab_device;
   cudaMalloc(&input_lab_device, kLabBufferSize);
-  float* input_mean_device;
+  float3* input_mean_device;
   cudaMalloc(&input_mean_device, kLabBufferSize);
-  float* input_stddevsq_device;
+  float3* input_stddevsq_device;
   cudaMalloc(&input_stddevsq_device, kLabBufferSize);
   cudaMemcpyAsync(input_lab_device, input_lab.get(), kLabBufferSize,
       cudaMemcpyHostToDevice, 0);
@@ -183,6 +197,7 @@ int main(int argc, char* argv[]) {
 
   tbb::task_scheduler_init tbb_init;
   vcsmc::TlsPrngList prng_list;
+  vcsmc::Kernel::ScoreStateList state_list;
   int generation_size = FLAGS_generation_size;
 
   vcsmc::Generation generation;
@@ -295,15 +310,15 @@ int main(int argc, char* argv[]) {
     }
     // Score all unscored kernels in the current generation.
     auto start_of_scoring = std::chrono::high_resolution_clock::now();
-    if (full_range_sim_needed) {
-      tbb::parallel_for(full_range,
-          vcsmc::Kernel::ScoreKernelJob(generation, input_lab.get()));
-      scoring_count += generation_size;
-    } else {
-      tbb::parallel_for(back_half,
-          vcsmc::Kernel::ScoreKernelJob(generation, input_lab.get()));
-      scoring_count += generation_size / 2;
-    }
+    tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
+        vcsmc::Kernel::ScoreKernelJob(generation, input_lab_device,
+        input_mean_device, input_stddevsq_device, state_list));
+    // Wait for all streams to finish and then finalize.
+    cudaDeviceSynchronize();
+    tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
+        vcsmc::Kernel::FinalizeScoreJob(generation));
+    scoring_count += full_range_sim_needed ?
+        generation_size : generation_size / 2;
     auto end_of_scoring = std::chrono::high_resolution_clock::now();
     scoring_time_us += std::chrono::duration_cast<std::chrono::microseconds>(
         end_of_scoring - start_of_scoring).count();

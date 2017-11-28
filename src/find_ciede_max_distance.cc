@@ -20,7 +20,7 @@ struct MaxDistance {
 
   uint32 color_a;
   uint32 color_b;
-  double distance;
+  float distance;
 };
 
 typedef tbb::combinable<MaxDistance> MaxDistances;
@@ -33,11 +33,11 @@ class SearchABGRJob {
   void operator()(const tbb::blocked_range<uint32>& r) const {
     MaxDistance& local_max_distance = max_distances_.local();
     for (uint32 i = r.begin(); i < r.end(); ++i) {
-      double lab_a[4];
-      vcsmc::RGBAToLabA(reinterpret_cast<const uint8*>(&i), lab_a);
+      float lab_a[3];
+      vcsmc::RGBAToLab(reinterpret_cast<const uint8*>(&i), lab_a);
       for (uint32 j = 0; j < vcsmc::kNTSCColors; ++j) {
-        double distance = vcsmc::Ciede2k(lab_a,
-            vcsmc::kAtariNTSCLabColorTable + (4 * j));
+        float distance = vcsmc::Ciede2k(lab_a,
+            vcsmc::kAtariNTSCLabColorTable + (j * 3));
         if (distance > local_max_distance.distance) {
           local_max_distance.color_a = i;
           local_max_distance.color_b = j;
