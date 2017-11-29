@@ -1,6 +1,7 @@
 #ifndef SRC_KERNEL_H_
 #define SRC_KERNEL_H_
 
+#include <cassert>
 #include <memory>
 
 #include "cuda.h"
@@ -46,7 +47,7 @@ class Kernel {
   size_t bytecode_size() const { return bytecode_size_; }
   uint64 fingerprint() const { return fingerprint_; }
   bool score_valid() const { return score_valid_; }
-  double score() const { return score_; }
+  float score() const { assert(score_valid()); return score_; }
   uint32 victories() const { return victories_; }
   const SpecList specs() const { return specs_; }
   const std::vector<std::vector<uint32>>& opcodes() const { return opcodes_; }
@@ -115,11 +116,15 @@ class Kernel {
   // finish computation.
   class FinalizeScoreJob {
    public:
-    FinalizeScoreJob(Generation generation) : generation_(generation) {}
+    FinalizeScoreJob(Generation generation,
+                     ScoreStateList& score_state_list)
+        : generation_(generation),
+          score_state_list_(score_state_list) {}
     void operator()(const tbb::blocked_range<size_t>& r) const;
 
    private:
     Generation generation_;
+    ScoreStateList& score_state_list_;
   };
 
   // Given a provided reference kernel, generate the target kernel as a copy of
@@ -183,7 +188,7 @@ class Kernel {
   std::vector<Range> opcode_ranges_;
   std::vector<std::vector<uint32>> opcodes_;
 
-  size_t bytecode_size_;
+  size_t bytecode_size_ = 0;
   std::vector<Range> dynamic_areas_;
   std::unique_ptr<uint8[]> bytecode_;
   std::unique_ptr<uint8[]> sim_frame_;
@@ -191,11 +196,11 @@ class Kernel {
   size_t total_dynamic_opcodes_;
   std::vector<size_t> opcode_counts_;
 
-  uint64 fingerprint_;
+  uint64 fingerprint_ = 0;
   std::unique_ptr<float[]> mssim_sum_;
-  bool score_valid_;
-  float score_;
-  uint32 victories_;
+  bool score_valid_ = false;
+  float score_ = 1.0f;
+  uint32 victories_ = 0;
 };
 
 

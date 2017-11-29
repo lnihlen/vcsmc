@@ -1,7 +1,7 @@
 #include "kernel.h"
 
 #include <array>
-#include <cassert>
+#include <cmath>
 #include <cstring>
 #include <random>
 
@@ -25,13 +25,7 @@ const size_t kSimSkipLines = 23;
 
 Kernel::Kernel()
   : specs_(new std::vector<Spec>()),
-    bytecode_size_(0),
-    total_dynamic_opcodes_(0),
-    fingerprint_(0),
-    score_valid_(false),
-    score_(1.0),
-    victories_(0) {
-}
+    total_dynamic_opcodes_(0) {}
 
 Kernel::Kernel(
     SpecList specs,
@@ -107,7 +101,8 @@ void Kernel::FinalizeScore() {
   for (size_t i = 0; i < 120; ++i) {
     sum += mssim_sum_[i];
   }
-  score_ = 1.0 - (sum /
+  assert(!std::isnan(sum));
+  score_ = 1.0f - (sum /
       static_cast<float>(kTargetFrameWidthPixels * kFrameHeightPixels));
   score_valid_ = true;
 }
@@ -263,6 +258,10 @@ void Kernel::ScoreKernelJob::operator()(
 
 void Kernel::FinalizeScoreJob::operator()(
     const tbb::blocked_range<size_t>& r) const {
+  // Contract with calling this job is that we have waited for all Kernel
+  // scoring computation to be completed, so the stream should be idle.
+  ScoreStateList::reference score_state = score_state_list_.local();
+  assert(cudaStreamQuery(score_state.stream) == cudaSuccess);
   for (size_t i = r.begin(); i < r.end(); ++i) {
     generation_->at(i)->FinalizeScore();
   }
@@ -485,14 +484,16 @@ void Kernel::SimulateAndScore(const float3* target_lab_device,
   float* lab = sim_lab.get();
   uint8* frame_pointer = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
   for (size_t i = 0; i < kFrameSizeBytes; ++i) {
-    if (*frame_pointer >= 128) {
+    uint8 col = *frame_pointer;
+    if (col >= 128) {
       lab[0] = 0.0;
       lab[1] = 0.0;
       lab[2] = 0.0;
     } else {
-      lab[0] = kAtariNTSCLabColorTable[*frame_pointer * 3];
-      lab[1] = kAtariNTSCLabColorTable[(*frame_pointer * 3) + 1];
-      lab[2] = kAtariNTSCLabColorTable[(*frame_pointer * 3) + 2];
+      uint32 lab_index = col * 3;
+      lab[0] = kAtariNTSCLabColorTable[lab_index];
+      lab[1] = kAtariNTSCLabColorTable[lab_index];
+      lab[2] = kAtariNTSCLabColorTable[lab_index];
     }
     ++frame_pointer;
     lab += 3;

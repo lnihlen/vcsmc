@@ -41,17 +41,20 @@ OBJ=$(OUT)/assembler.o                                                         \
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
-         $(OUTTESTS)/color_unittests.o                                         \
          $(OUTTESTS)/kernel_unittests.o                                        \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/serialization_unittests.o
 
-all: $(OUT)/find_ciede_max_distance                                            \
-     $(OUT)/fit                                                                \
-     $(OUT)/gen                                                                \
-     $(OUT)/pcm                                                                \
-     $(OUT)/respec                                                             \
-     $(OUT)/sim                                                                \
+vcsmc: $(OUT)/find_ciede_max_distance                                          \
+       $(OUT)/fit                                                              \
+       $(OUT)/gen                                                              \
+       $(OUT)/pcm                                                              \
+       $(OUT)/respec                                                           \
+       $(OUT)/sim
+
+tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
+
+all: vcsmc tests
 
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS) $(INCLUDES)
@@ -65,7 +68,7 @@ $(OUT)/color_distance_table.o: $(OUT)/build_error_distances
 	$(CC) -c -o $@ $(OUT)/color_distance_table.cc $(CFLAGS) $(INCLUDES)
 
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
-	$(CC) -c -o $@ $< $(CFLAGS) -I$(GTEST_INCLUDE)
+	$(CC) -c -o $@ $< $(CFLAGS) $(INCLUDES) -I$(GTEST_INCLUDE)
 
 $(OUT)/build_error_distances: $(IMAGE_OBJ) $(COLOR_OBJ)                        \
                               $(OUT)/build_error_distances.o
@@ -96,15 +99,25 @@ $(OUT)/sim: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/sim.o                      \
             $(OUT)/color_distance_table.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
-tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
-
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
     $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o | $(OUTTESTS)/
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS) $(GTEST_LIB)
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(INCLUDES) $(LDFLAGS) $(LIBS)        \
+    $(GTEST_LIB)
 
 $(OUTTESTS)/:
 	mkdir -p $(OUTTESTS)
 
 .PHONY: clean
 clean:
-	rm -rf $(OUT)
+	rm -rf $(COLOR_OBJ) $(IMAGE_OBJ) $(OBJ) $(TEST_OBJ)                          \
+    $(OUT)/build_error_distances{,.o}                                          \
+    $(OUT)/color_distances.png                                                 \
+    $(OUT)/color_distance_table.{cc,o}                                         \
+    $(OUT)/find_ciede_max_distance{,.o}                                        \
+    $(OUT)/fit{,.o}                                                            \
+    $(OUT)/gen{,.o}                                                            \
+    $(OUT)/pcm{,.o}                                                            \
+    $(OUT)/respec{,.o}                                                         \
+    $(OUT)/sim{,.o}                                                            \
+    $(OUTTESTS)/run_unittests
+

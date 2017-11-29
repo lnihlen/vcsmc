@@ -1,5 +1,5 @@
 extern "C" {
-#include <libz26/libz26.h>
+#include "libz26/libz26.h"
 }
 
 #include "gtest/gtest.h"

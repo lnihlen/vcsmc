@@ -39,7 +39,8 @@ extern "C" {
 }
 
 DEFINE_bool(print_stats, false,
-    "If true gen will print generation statistics to stdio periodically.");
+    "If true gen will print generation statistics to stdio after every "
+    "save_count generations.");
 
 DEFINE_int32(generation_size, 1000,
     "Number of individuals to keep in an evolutionary programming generation.");
@@ -138,11 +139,18 @@ int main(int argc, char* argv[]) {
 
   // Initialize CUDA, use first device.
   int cuda_device_count = 0;
-  cudaGetDeviceCount(&cuda_device_count);
-  if (!cuda_device_count) {
+  cudaError_t cuda_error = cudaGetDeviceCount(&cuda_device_count);
+  if (cuda_error != cudaSuccess) {
+    fprintf(stderr, "CUDA error on device enumeration.\n");
+    fprintf(stderr,"%s: %s\n", cudaGetErrorName(cuda_error),
+                               cudaGetErrorString(cuda_error));
+    return -1;
+  } else if (!cuda_device_count) {
     fprintf(stderr, "unable to find CUDA device.\n");
     return -1;
   }
+  // Ensure synchronization behavior consistent with our needs.
+  cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
   cudaSetDevice(0);
   cudaDeviceProp device_props;
   cudaGetDeviceProperties(&device_props, 0);
@@ -277,7 +285,7 @@ int main(int argc, char* argv[]) {
   // outer sim loop.
   cudaDeviceSynchronize();
 
-  double target_error = strtod(FLAGS_target_error.c_str(), nullptr);
+  float target_error = strtof(FLAGS_target_error.c_str(), nullptr);
   int generation_count = 0;
   int streak = 0;
   double last_generation_score = 0.0;
@@ -304,8 +312,9 @@ int main(int argc, char* argv[]) {
   bool full_range_sim_needed = true;
 
   while (true) {
-    if (global_minimum->score() <= target_error && generation_count > 0) {
-      printf("target error reached, terminating.\n");
+    if (generation_count > 0 && global_minimum->score() <= target_error) {
+      printf("target error reached after %d generations, terminating.\n",
+             generation_count);
       break;
     }
     // Score all unscored kernels in the current generation.
@@ -316,7 +325,7 @@ int main(int argc, char* argv[]) {
     // Wait for all streams to finish and then finalize.
     cudaDeviceSynchronize();
     tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
-        vcsmc::Kernel::FinalizeScoreJob(generation));
+        vcsmc::Kernel::FinalizeScoreJob(generation, state_list));
     scoring_count += full_range_sim_needed ?
         generation_size : generation_size / 2;
     auto end_of_scoring = std::chrono::high_resolution_clock::now();

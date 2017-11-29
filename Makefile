@@ -41,7 +41,7 @@ depends: | $(OUT)/
 	$(MAKE) -C third_party/ all
 
 vcsmc: depends | $(OUT)/
-	$(MAKE) -C src/ all
+	$(MAKE) -C src/ vcsmc
 
 tests: depends vcsmc | $(OUT)/
 	$(MAKE) -C src/ tests
@@ -52,4 +52,8 @@ $(OUT)/:
 .PHONY: clean
 clean:
 	$(MAKE) -C src/ clean
+
+
+.PHONY: cleandeps
+cleandeps: clean
 	$(MAKE) -C third_party/ clean

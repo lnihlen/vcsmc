@@ -20,7 +20,7 @@ __global__ void ComputeLocalMean(const float3* lab_in,
   float3 mean = make_float3(0.0, 0.0, 0.0);
   int n = 0;
   for (int i = 0; i < min(WINDOW_SIZE, IMAGE_HEIGHT - y); ++i) {
-    int row_offset = i * IMAGE_HEIGHT;
+    int row_offset = ((y + i) * IMAGE_HEIGHT) + x;
     for (int j = 0; j < min(WINDOW_SIZE, IMAGE_WIDTH - x); ++j) {
       float3 lab = lab_in[row_offset + j];
       mean = make_float3(mean.x + lab.x,
@@ -46,7 +46,7 @@ __global__ void ComputeLocalStdDevSquared(const float3* lab_in,
   float3 std_dev = make_float3(0.0, 0.0, 0.0);
   int n = 0;
   for (int i = 0; i < min(WINDOW_SIZE, IMAGE_HEIGHT - y); ++i) {
-    int row_offset = i * IMAGE_HEIGHT;
+    int row_offset = ((y + i) * IMAGE_HEIGHT) + x;
     for (int j = 0; j < min(WINDOW_SIZE, IMAGE_WIDTH - x); ++j) {
       float3 lab = lab_in[row_offset + j];
       float3 mean = mean_in[row_offset + j];
@@ -79,7 +79,7 @@ __global__ void ComputeLocalCovariance(const float3* lab_a_in,
   float3 cov = make_float3(0.0, 0.0, 0.0);
   int n = 0;
   for (int i = 0; i < min(WINDOW_SIZE, IMAGE_HEIGHT - y); ++i) {
-    int row_offset = i * IMAGE_HEIGHT;
+    int row_offset = ((y + i) * IMAGE_HEIGHT) + x;
     for (int j = 0; j < min(WINDOW_SIZE, IMAGE_WIDTH - x); ++j) {
       float3 lab_a = lab_a_in[row_offset + j];
       float3 mean_a = mean_a_in[row_offset + j];
