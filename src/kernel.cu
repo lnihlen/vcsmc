@@ -6,22 +6,11 @@
 #include <random>
 
 #include "farmhash.h"
-extern "C" {
-#include "libz26/libz26.h"
-}
 
 #include "assembler.h"
-#include "color.h"
-#include "color_distance_table.h"
-#include "color_table.h"
-#include "image.h"
-#include "image_file.h"
-#include "mssim.h"
 
 namespace vcsmc {
 
-const int kLabBufferSize = kFrameSizeBytes * sizeof(float) * 3;
-const size_t kSimSkipLines = 23;
 
 Kernel::Kernel()
   : specs_(new std::vector<Spec>()),
@@ -71,28 +60,6 @@ Kernel::Kernel(
     }
   }
   RegenerateBytecode(total_byte_size);
-}
-
-bool Kernel::SaveImage(const std::string& file_name) const {
-  if (!score_valid_ || !sim_frame_) return false;
-  Image image(kTargetFrameWidthPixels, kFrameHeightPixels);
-  uint32* pix = image.pixels_writeable();
-  const uint8* sim = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
-  for (size_t i = 0; i < kTargetFrameWidthPixels * kFrameHeightPixels; i += 2) {
-    uint32 color;
-    if (*sim >= 128) {
-      color = 0xff00ff00;  // Bright green for undefined pixel.
-    } else {
-      assert(*sim < 128);
-      color = kAtariNTSCABGRColorTable[*sim];
-    }
-    *pix = color;
-    ++pix;
-    *pix = color;
-    ++pix;
-    sim += 2;
-  }
-  return vcsmc::SaveImage(&image, file_name);
 }
 
 void Kernel::FinalizeScore() {
@@ -217,7 +184,7 @@ void Kernel::GenerateRandomKernelJob::operator()(
 Kernel::ScoreState::ScoreState() {
   cudaStream_t stream;
   cudaStreamCreate(&stream);
-
+/*
   cudaError_t result;
   result = cudaMalloc(&sim_lab_device, kLabBufferSize);
   assert(result == cudaSuccess);
@@ -231,6 +198,7 @@ Kernel::ScoreState::ScoreState() {
   assert(result == cudaSuccess);
   result = cudaMalloc(&block_sum_device, 120 * sizeof(float));
   assert(result == cudaSuccess);
+*/
 }
 
 Kernel::ScoreState::~ScoreState() {
@@ -475,10 +443,11 @@ void Kernel::SimulateAndScore(const float3* target_lab_device,
                               const float3* target_mean_device,
                               const float3* target_stddevsq_device,
                               ScoreState& score_state) {
-  sim_frame_.reset(new uint8[kLibZ26ImageSizeBytes]);
+/*
+//  sim_frame_.reset(new uint8[kLibZ26ImageSizeBytes]);
 
-  std::memset(sim_frame_.get(), 0, kLibZ26ImageSizeBytes);
-  simulate_single_frame(bytecode_.get(), bytecode_size_, sim_frame_.get());
+//  std::memset(sim_frame_.get(), 0, kLibZ26ImageSizeBytes);
+//  simulate_single_frame(bytecode_.get(), bytecode_size_, sim_frame_.get());
   // Convert sim output to Lab for scoring with MSSIM.
   std::unique_ptr<float> sim_lab(new float[kFrameSizeBytes * 3]);
   float* lab = sim_lab.get();
@@ -526,6 +495,7 @@ void Kernel::SimulateAndScore(const float3* target_lab_device,
       score_state.block_sum_device);
   cudaMemcpyAsync(score_state.block_sum_device, mssim_sum_.get(),
       120 * sizeof(float), cudaMemcpyDeviceToHost, score_state.stream);
+*/
 }
 
 size_t Kernel::OpcodeFieldIndex(size_t opcode_index) {

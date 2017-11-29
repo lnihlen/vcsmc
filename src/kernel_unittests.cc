@@ -260,6 +260,7 @@ TEST(GenerateRandomKernelJobTest, GeneratesValidRandomKernel) {
 }
 
 // TODO: separate simulation and scoring. Then test scoring in its own suite.
+// Test simulation here.
 TEST(ScoreKernelJobTest, SimulatesSimpleFrameKernel) {
   tbb::task_scheduler_init tbb_init;
   TlsPrngList prng_list;

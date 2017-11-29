@@ -31,9 +31,6 @@ class Kernel {
       const std::vector<Range>& dynamic_areas,
       const std::vector<std::unique_ptr<uint8[]>>& packed_opcodes);
 
-  // Save the simulated kernel image to provided png filename.
-  bool SaveImage(const std::string& file_name) const;
-
   void FinalizeScore();
   void GenerateRandom(const SpecList specs, TlsPrngList::reference tls_prng);
   void ClobberSpec(const SpecList new_specs);
@@ -44,6 +41,9 @@ class Kernel {
   const uint8* bytecode() const { return bytecode_.get(); }
   const std::vector<Range>& dynamic_areas() const { return dynamic_areas_; }
   const uint8* sim_frame() const { return sim_frame_.get(); }
+  void set_sim_frame(std::unique_ptr<uint8[]> sim_frame) {
+    sim_frame_ = std::move(sim_frame);
+  }
   size_t bytecode_size() const { return bytecode_size_; }
   uint64 fingerprint() const { return fingerprint_; }
   bool score_valid() const { return score_valid_; }
@@ -191,12 +191,14 @@ class Kernel {
   size_t bytecode_size_ = 0;
   std::vector<Range> dynamic_areas_;
   std::unique_ptr<uint8[]> bytecode_;
-  std::unique_ptr<uint8[]> sim_frame_;
 
   size_t total_dynamic_opcodes_;
   std::vector<size_t> opcode_counts_;
 
   uint64 fingerprint_ = 0;
+
+  // Storage for sim and score, useful to keep with a Kernel.
+  std::unique_ptr<uint8[]> sim_frame_;
   std::unique_ptr<float[]> mssim_sum_;
   bool score_valid_ = false;
   float score_ = 1.0f;

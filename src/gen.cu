@@ -35,8 +35,10 @@
 #include "tls_prng.h"
 
 extern "C" {
-#include <libz26/libz26.h>
+#include "libz26/libz26.h"
 }
+
+const size_t kSimSkipLines = 23;
 
 DEFINE_bool(print_stats, false,
     "If true gen will print generation statistics to stdio after every "
@@ -58,7 +60,7 @@ DEFINE_int32(stagnant_mutation_count, 16,
     "Number of mutations to apply to each cohort member when re-randomizing "
     "stagnant cohort.");
 DEFINE_int32(stagnant_count_limit, 0,
-    "If nonzero, terminate after the supplied number of randomizations.");
+    "If nonzero, terminate after the supplied number of re-randomizations.");
 
 DEFINE_string(input_image_file, "",
     "Required - the input png file to fit against.");
@@ -115,6 +117,24 @@ class CompeteKernelJob {
   size_t tourney_size_;
 };
 
+class SimulateKernelJob {
+ public:
+  SimulateKernelJob(vcsmc::Generation generation)
+    : generation_(generation) {}
+  void operator()(const tbb::blocked_range<size_t>& r) const {
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      std::unique_ptr<uint8[]> sim_frame(new uint8[kLibZ26ImageSizeBytes]);
+      std::memset(sim_frame.get(), 0xff, kLibZ26ImageSizeBytes);
+      std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
+      simulate_single_frame(kernel->bytecode(), kernel->bytecode_size(),
+          sim_frame.get());
+      kernel->set_sim_frame(std::move(sim_frame));
+    }
+  }
+ private:
+  vcsmc::Generation generation_;
+};
+
 void SaveState(vcsmc::Generation generation,
     std::shared_ptr<vcsmc::Kernel> global_minimum) {
   if (FLAGS_generation_output_file != "") {
@@ -124,7 +144,8 @@ void SaveState(vcsmc::Generation generation,
     }
   }
   if (FLAGS_image_output_file != "") {
-    global_minimum->SaveImage(FLAGS_image_output_file);
+    vcsmc::Image min_sim_image(global_minimum->sim_frame());
+    vcsmc::SaveImage(&min_sim_image, FLAGS_image_output_file);
   }
   if (!vcsmc::SaveKernelToFile(global_minimum,
         FLAGS_global_minimum_output_file)) {
@@ -292,6 +313,9 @@ int main(int argc, char* argv[]) {
   bool reroll = false;
   int reroll_count = 0;
 
+  uint64 simulation_time_us = 0;
+  uint64 simulation_count = 0;
+
   uint64 scoring_time_us = 0;
   uint64 scoring_count = 0;
 
@@ -317,11 +341,23 @@ int main(int argc, char* argv[]) {
              generation_count);
       break;
     }
+
+    // Simulate any newly generated kernels to get output color values.
+    auto start_of_simulation = std::chrono::high_resolution_clock::now();
+    tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
+        SimulateKernelJob(generation));
+    simulation_count += full_range_sim_needed ?
+        generation_size : generation_size / 2;
+    auto end_of_simulation = std::chrono::high_resolution_clock::now();
+    simulation_time_us += std::chrono::duration_cast<std::chrono::microseconds>(
+        end_of_simulation - start_of_simulation).count();
+
     // Score all unscored kernels in the current generation.
     auto start_of_scoring = std::chrono::high_resolution_clock::now();
     tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
         vcsmc::Kernel::ScoreKernelJob(generation, input_lab_device,
         input_mean_device, input_stddevsq_device, state_list));
+
     // Wait for all streams to finish and then finalize.
     cudaDeviceSynchronize();
     tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
@@ -364,13 +400,15 @@ int main(int argc, char* argv[]) {
       auto now = std::chrono::high_resolution_clock::now();
       if (FLAGS_print_stats) {
         printf("gen: %7d leader: %016" PRIx64 " score: %.8f div: %5.3f "
-               "sim: %7" PRIu64 " tourney: %7" PRIu64 " mutate: %7" PRIu64 " "
-               "epoch: %7" PRIu64 " elapsed: %7" PRIu64
+               "sim: %7" PRIu64 " score: %7" PRIu64 " tourney: %7" PRIu64 " "
+               "mutate: %7" PRIu64 " epoch: %7" PRIu64 " elapsed: %7" PRIu64
                "%s\n",
             generation_count,
             generation->at(0)->fingerprint(),
             global_minimum->score(),
             diversity,
+            simulation_count ? simulation_count * 1000000 / simulation_time_us
+                : 0,
             scoring_count ? scoring_count * 1000000 / scoring_time_us : 0,
             tourney_count ? tourney_count * 1000000 / tourney_time_us : 0,
             mutate_count ? mutate_count * 1000000 / mutate_time_us : 0,

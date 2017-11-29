@@ -13,9 +13,10 @@ namespace vcsmc {
 // the uint32.
 class Image {
  public:
-  Image() = delete;
   // Constructs an Image that owns a pixel array.
   Image(uint32 width, uint32 height);
+  // Constructs an Image from raw Atari color bytes.
+  Image(const uint8* atari_colors);
   ~Image();
 
   uint32 width() const { return width_; }
@@ -30,6 +31,8 @@ class Image {
   const uint32 width_;
   const uint32 height_;
   std::unique_ptr<uint32[]> pixels_;
+
+  Image() = delete;
 };
 
 }  // namespace vcsmc
