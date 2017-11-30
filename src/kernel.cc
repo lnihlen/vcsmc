@@ -59,22 +59,30 @@ Kernel::Kernel(
       ++opcode_list_index;
     }
   }
-  RegenerateBytecode(total_byte_size);
+  bytecode_size_ = total_byte_size;
+  RegenerateBytecode();
 }
 
-/*
-void Kernel::FinalizeScore() {
-  assert(mssim_sum_.get());
-  float sum = 0.0f;
-  for (size_t i = 0; i < 120; ++i) {
-    sum += mssim_sum_[i];
+std::shared_ptr<Kernel> Kernel::Clone() {
+  std::shared_ptr<Kernel> clone(new Kernel());
+  std::copy(specs_->begin(), specs_->end(),
+      std::back_inserter(*clone->specs_.get()));
+  for (size_t j = 0; j < opcodes_.size(); ++j) {
+    clone->opcodes_.emplace_back();
+    std::copy(opcodes_[j].begin(), opcodes_[j].end(),
+        std::back_inserter(clone->opcodes_.back()));
   }
-  assert(!std::isnan(sum));
-  score_ = 1.0f - (sum /
-      static_cast<float>(kTargetFrameWidthPixels * kFrameHeightPixels));
-  score_valid_ = true;
+  std::copy(opcode_ranges_.begin(),
+            opcode_ranges_.end(),
+            std::back_inserter(clone->opcode_ranges_));
+  target->bytecode_size_ = bytecode_size_;
+
+  target->total_dynamic_opcodes_ = total_dynamic_opcodes_;
+  std::copy(opcode_counts_.begin(),
+            opcode_counts_.end(),
+            std::back_inserter(clone->opcode_counts_));
+  return clone;
 }
-*/
 
 void Kernel::GenerateRandom(
     const SpecList specs, TlsPrngList::reference tls_prng) {
@@ -158,7 +166,8 @@ void Kernel::GenerateRandom(
     opcode_counts_.push_back(total_dynamic_opcodes_);
   }
 
-  RegenerateBytecode(total_byte_size);
+  bytescode_size_ = total_byte_size;
+  RegenerateBytecode();
 }
 
 void Kernel::ClobberSpec(const SpecList new_specs) {
@@ -171,7 +180,7 @@ void Kernel::ClobberSpec(const SpecList new_specs) {
     }
     specs_->at(target_spec_index) = new_specs->at(i);
   }
-  RegenerateBytecode(bytecode_size_);
+  RegenerateBytecode();
 }
 
 void Kernel::GenerateRandomKernelJob::operator()(
@@ -180,98 +189,6 @@ void Kernel::GenerateRandomKernelJob::operator()(
   for (size_t i = r.begin(); i < r.end(); ++i) {
     std::shared_ptr<Kernel> kernel = generation_->at(i);
     kernel->GenerateRandom(specs_, tls_prng);
-  }
-}
-
-/*
-Kernel::ScoreState::ScoreState() {
-  cudaStream_t stream;
-  cudaStreamCreate(&stream);
-
-  cudaError_t result;
-  result = cudaMalloc(&sim_lab_device, kLabBufferSize);
-  assert(result == cudaSuccess);
-  result = cudaMalloc(&sim_mean_device, kLabBufferSize);
-  assert(result == cudaSuccess);
-  result = cudaMalloc(&sim_stddevsq_device, kLabBufferSize);
-  assert(result == cudaSuccess);
-  result = cudaMalloc(&sim_cov_device, kLabBufferSize);
-  assert(result == cudaSuccess);
-  result = cudaMalloc(&ssim_device, kFrameSizeBytes * sizeof(float));
-  assert(result == cudaSuccess);
-  result = cudaMalloc(&block_sum_device, 120 * sizeof(float));
-  assert(result == cudaSuccess);
-}
-
-Kernel::ScoreState::~ScoreState() {
-  // Clear any pending work on this thread.
-  cudaStreamSynchronize(stream);
-
-  cudaFree(sim_lab_device);
-  cudaFree(sim_mean_device);
-  cudaFree(sim_stddevsq_device);
-  cudaFree(sim_cov_device);
-  cudaFree(ssim_device);
-  cudaFree(block_sum_device);
-
-  cudaStreamDestroy(stream);
-}
-
-void Kernel::ScoreKernelJob::operator()(
-    const tbb::blocked_range<size_t>& r) const {
-  ScoreStateList::reference score_state = score_state_list_.local();
-  for (size_t i = r.begin(); i < r.end(); ++i) {
-    generation_->at(i)->SimulateAndScore(target_lab_device_,
-        target_mean_device_, target_stddevsq_device_, score_state);
-  }
-}
-
-void Kernel::FinalizeScoreJob::operator()(
-    const tbb::blocked_range<size_t>& r) const {
-  // Contract with calling this job is that we have waited for all Kernel
-  // scoring computation to be completed, so the stream should be idle.
-  ScoreStateList::reference score_state = score_state_list_.local();
-  assert(cudaStreamQuery(score_state.stream) == cudaSuccess);
-  for (size_t i = r.begin(); i < r.end(); ++i) {
-    generation_->at(i)->FinalizeScore();
-  }
-}
-*/
-
-void Kernel::MutateKernelJob::operator()(
-    const tbb::blocked_range<size_t>& r) const {
-  TlsPrngList::reference tls_prng = tls_prng_list_.local();
-  for (size_t i = r.begin(); i < r.end(); ++i) {
-    std::shared_ptr<Kernel> original = source_generation_->at(i);
-    std::shared_ptr<Kernel> target =
-        target_generation_->at(i + target_index_offset_);
-    // Copy the internal program state of the original kernel to the target.
-    target->specs_.reset(new std::vector<Spec>());
-    std::copy(original->specs_->begin(), original->specs_->end(),
-        std::back_inserter(*target->specs_.get()));
-    target->opcodes_.clear();
-    for (size_t j = 0; j < original->opcodes_.size(); ++j) {
-      target->opcodes_.emplace_back();
-      std::copy(original->opcodes_[j].begin(), original->opcodes_[j].end(),
-          std::back_inserter(target->opcodes_.back()));
-    }
-    target->opcode_ranges_.clear();
-    std::copy(original->opcode_ranges_.begin(),
-        original->opcode_ranges_.end(),
-        std::back_inserter(target->opcode_ranges_));
-    target->bytecode_size_ = original->bytecode_size_;
-
-    target->total_dynamic_opcodes_ = original->total_dynamic_opcodes_;
-    target->opcode_counts_.clear();
-    std::copy(original->opcode_counts_.begin(),
-        original->opcode_counts_.end(),
-        std::back_inserter(target->opcode_counts_));
-
-    // Now do the mutations to the target.
-    for (size_t j = 0; j < number_of_mutations_; ++j)
-      target->Mutate(tls_prng);
-
-    target->RegenerateBytecode(target->bytecode_size_);
   }
 }
 
@@ -399,8 +316,10 @@ void Kernel::AppendJmpSpec(uint32 current_cycle, size_t current_bank_size) {
       std::move(bytecode));
 }
 
-void Kernel::RegenerateBytecode(size_t bytecode_size) {
-  bytecode_size_ = bytecode_size;
+// Given valid data in opcodes_ refills bytecode_ with the concatenated data in
+// opcodes_ and specs_, appends jumps and updates fingerprint_. Assumes
+// |bytecode_size_| is already valid.
+void Kernel::RegenerateBytecode() {
   score_valid_ = false;
   score_ = 1.0;
   bytecode_.reset(new uint8[bytecode_size]);
@@ -441,66 +360,6 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
   fingerprint_ = util::Hash64(reinterpret_cast<const char*>(bytecode_.get()),
                               bytecode_size_);
 }
-
-/*
-
-void Kernel::SimulateAndScore(const float3* target_lab_device,
-                              const float3* target_mean_device,
-                              const float3* target_stddevsq_device,
-                              ScoreState& score_state) {
-//  sim_frame_.reset(new uint8[kLibZ26ImageSizeBytes]);
-
-//  std::memset(sim_frame_.get(), 0, kLibZ26ImageSizeBytes);
-//  simulate_single_frame(bytecode_.get(), bytecode_size_, sim_frame_.get());
-  // Convert sim output to Lab for scoring with MSSIM.
-  std::unique_ptr<float> sim_lab(new float[kFrameSizeBytes * 3]);
-  float* lab = sim_lab.get();
-  uint8* frame_pointer = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
-  for (size_t i = 0; i < kFrameSizeBytes; ++i) {
-    uint8 col = *frame_pointer;
-    if (col >= 128) {
-      lab[0] = 0.0;
-      lab[1] = 0.0;
-      lab[2] = 0.0;
-    } else {
-      uint32 lab_index = col * 3;
-      lab[0] = kAtariNTSCLabColorTable[lab_index];
-      lab[1] = kAtariNTSCLabColorTable[lab_index];
-      lab[2] = kAtariNTSCLabColorTable[lab_index];
-    }
-    ++frame_pointer;
-    lab += 3;
-  }
-
-  dim3 image_dim_block(16, 16);
-  dim3 image_dim_grid(kTargetFrameWidthPixels / 16,
-                      kFrameHeightPixels / 16);
-  dim3 sum_dim_block(256);
-  dim3 sum_dim_grid(120);
-  mssim_sum_.reset(new float[120]);
-
-  cudaMemcpyAsync(sim_lab.get(), score_state.sim_lab_device, kLabBufferSize,
-      cudaMemcpyHostToDevice, score_state.stream);
-  ComputeLocalMean<<<image_dim_block, image_dim_grid, 0, score_state.stream>>>(
-      score_state.sim_lab_device, score_state.sim_mean_device);
-  ComputeLocalStdDevSquared<<<image_dim_block, image_dim_grid, 0,
-      score_state.stream>>>(score_state.sim_lab_device,
-      score_state.sim_mean_device, score_state.sim_stddevsq_device);
-  ComputeLocalCovariance<<<image_dim_block, image_dim_grid, 0,
-      score_state.stream>>>(score_state.sim_lab_device,
-      score_state.sim_mean_device, target_lab_device, target_mean_device,
-      score_state.sim_cov_device);
-  ComputeSSIM<<<image_dim_block, image_dim_grid, 0, score_state.stream>>>(
-      score_state.sim_mean_device, score_state.sim_stddevsq_device,
-      target_mean_device, target_stddevsq_device,
-      score_state.sim_cov_device, score_state.ssim_device);
-  ComputeBlockSum<<<sum_dim_block, sum_dim_grid, 120 * sizeof(float),
-      score_state.stream>>>(score_state.ssim_device,
-      score_state.block_sum_device);
-  cudaMemcpyAsync(score_state.block_sum_device, mssim_sum_.get(),
-      120 * sizeof(float), cudaMemcpyDeviceToHost, score_state.stream);
-}
-*/
 
 size_t Kernel::OpcodeFieldIndex(size_t opcode_index) {
   size_t opcode_field = 0;

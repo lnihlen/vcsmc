@@ -14,7 +14,6 @@
 namespace vcsmc {
 
 class Kernel;
-typedef std::shared_ptr<std::vector<std::shared_ptr<Kernel>>> Generation;
 
 // A Kernel represents a program in 6502 bytecode for the VCS that generates one
 // frame of output imagery when run on the Atari.
@@ -29,12 +28,17 @@ class Kernel {
       const std::vector<Range>& dynamic_areas,
       const std::vector<std::unique_ptr<uint8[]>>& packed_opcodes);
 
-//  void FinalizeScore();
+  // Make a value copy of this Kernel and return a pointer to it. Need to call
+  // RegenerateBytecode() before use.
+  std::shared_ptr<Kernel> Clone();
+
   void GenerateRandom(const SpecList specs, TlsPrngList::reference tls_prng);
   void ClobberSpec(const SpecList new_specs);
 
-  void ResetVictories() { victories_ = 0; }
-  void AddVictory() { ++victories_; }
+  // Randomly regenerate one opcode per call. After one or more calls to Mutate,
+  // please call RegenerateBytecode() in order to finalize the new binary.
+  void Mutate(TlsPrngList::reference engine);
+  void RegenerateBytecode();
 
   const uint8* bytecode() const { return bytecode_.get(); }
   const std::vector<Range>& dynamic_areas() const { return dynamic_areas_; }
@@ -50,137 +54,12 @@ class Kernel {
   const SpecList specs() const { return specs_; }
   const std::vector<std::vector<uint32>>& opcodes() const { return opcodes_; }
 
-  // Given a pointer to a completely empty Kernel this Job will populate it with
-  // totally random bytecode.
-  class GenerateRandomKernelJob {
-   public:
-    GenerateRandomKernelJob(Generation generation,
-                            SpecList specs,
-                            TlsPrngList& tls_prng_list)
-        : generation_(generation),
-          specs_(specs),
-          tls_prng_list_(tls_prng_list) {}
-    void operator()(const tbb::blocked_range<size_t>& r) const;
-
-   private:
-    Generation generation_;
-    const SpecList specs_;
-    TlsPrngList& tls_prng_list_;
-  };
-
-  /*
-  struct ScoreState {
-   public:
-    ScoreState();
-    ~ScoreState();
-    ScoreState(const ScoreState&) = delete;
-
-    cudaStream_t stream;
-    float3* sim_lab_device;
-    float3* sim_mean_device;
-    float3* sim_stddevsq_device;
-    float3* sim_cov_device;
-    float* ssim_device;
-    float* block_sum_device;
-  };
-
-  typedef tbb::enumerable_thread_specific<ScoreState> ScoreStateList;
-
-
-  // Score an unscored kernel by simulating it and then comparing it to the
-  // target lab image.
-  class ScoreKernelJob {
-   public:
-    ScoreKernelJob(Generation generation,
-                   const float3* target_lab_device,
-                   const float3* target_mean_device,
-                   const float3* target_stddevsq_device,
-                   ScoreStateList& score_state_list)
-        : generation_(generation),
-          target_lab_device_(target_lab_device),
-          target_mean_device_(target_mean_device),
-          target_stddevsq_device_(target_stddevsq_device),
-          score_state_list_(score_state_list) {}
-    void operator()(const tbb::blocked_range<size_t>& r) const;
-
-   private:
-    Generation generation_;
-    const float3* target_lab_device_;
-    const float3* target_mean_device_;
-    const float3* target_stddevsq_device_;
-    ScoreStateList& score_state_list_;
-  };
-
-  // As we now use CUDA to compute almost all of the score asynchronously we
-  // wait for all GPU work to complete and then call this on each kernel to
-  // finish computation.
-  class FinalizeScoreJob {
-   public:
-    FinalizeScoreJob(Generation generation,
-                     ScoreStateList& score_state_list)
-        : generation_(generation),
-          score_state_list_(score_state_list) {}
-    void operator()(const tbb::blocked_range<size_t>& r) const;
-
-   private:
-    Generation generation_;
-    ScoreStateList& score_state_list_;
-  };
-  */
-
-  // Given a provided reference kernel, generate the target kernel as a copy of
-  // the reference with the provided number of random mutations. Should iterate
-  // over the first half of |generation|, which will use that as source material
-  // and target the latter half of the array for copy and mutation.
-  class MutateKernelJob {
-   public:
-    MutateKernelJob(Generation source_generation,
-                    Generation target_generation,
-                    size_t target_index_offset,
-                    size_t number_of_mutations,
-                    TlsPrngList& tls_prng_list)
-        : source_generation_(source_generation),
-          target_generation_(target_generation),
-          target_index_offset_(target_index_offset),
-          number_of_mutations_(number_of_mutations),
-          tls_prng_list_(tls_prng_list) {}
-    void operator()(const tbb::blocked_range<size_t>& r) const;
-   private:
-    Generation source_generation_;
-    Generation target_generation_;
-    size_t target_index_offset_;
-    const size_t number_of_mutations_;
-    TlsPrngList& tls_prng_list_;
-  };
-
-  // Given an existing Kernel and a new list of specs (typically audio) this
-  // will clobber the existing specs and regenerate the bytecode.
-  class ClobberSpecJob {
-   public:
-    ClobberSpecJob(Generation generation,
-                   SpecList specs)
-        : generation_(generation),
-          specs_(specs) {}
-    void operator()(const tbb::blocked_range<size_t>& r) const;
-   private:
-    Generation generation_;
-    const SpecList specs_;
-  };
-
  private:
   uint32 GenerateRandomOpcode(uint32 cycles_remaining,
-      TlsPrngList::reference engine);
+                              TlsPrngList::reference engine);
   uint32 GenerateRandomLoad(TlsPrngList::reference engine);
   uint32 GenerateRandomStore(TlsPrngList::reference engine);
   void AppendJmpSpec(uint32 current_cycle, size_t current_bank_size);
-  // Given valid data in opcodes_ refills bytecode_ with the concatenated data
-  // in opcodes_ and specs_, appends jumps and updates fingerprint_.
-  void RegenerateBytecode(size_t bytecode_size);
-//  void SimulateAndScore(const float3* target_lab_device,
-//                        const float3* target_mean_device,
-//                        const float3* target_stddevsq_device,
-//                        ScoreState& score_state);
-  void Mutate(TlsPrngList::reference engine);
   // Given a number within [0, total_dynamic_opcodes_) returns the index of the
   // vector within opcodes_ that contains this value.
   size_t OpcodeFieldIndex(size_t opcode_index);
@@ -197,13 +76,6 @@ class Kernel {
   std::vector<size_t> opcode_counts_;
 
   uint64 fingerprint_ = 0;
-
-  // Storage for sim and score, useful to keep with a Kernel.
-  std::unique_ptr<uint8[]> sim_frame_;
-  std::unique_ptr<float[]> mssim_sum_;
-  bool score_valid_ = false;
-  float score_ = 1.0f;
-  uint32 victories_ = 0;
 };
 
 
