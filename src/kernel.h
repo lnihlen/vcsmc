@@ -4,8 +4,6 @@
 #include <cassert>
 #include <memory>
 
-#include "cuda.h"
-#include "cuda_runtime.h"
 #include "tbb/tbb.h"
 
 #include "range.h"
@@ -31,7 +29,7 @@ class Kernel {
       const std::vector<Range>& dynamic_areas,
       const std::vector<std::unique_ptr<uint8[]>>& packed_opcodes);
 
-  void FinalizeScore();
+//  void FinalizeScore();
   void GenerateRandom(const SpecList specs, TlsPrngList::reference tls_prng);
   void ClobberSpec(const SpecList new_specs);
 
@@ -70,6 +68,7 @@ class Kernel {
     TlsPrngList& tls_prng_list_;
   };
 
+  /*
   struct ScoreState {
    public:
     ScoreState();
@@ -86,6 +85,7 @@ class Kernel {
   };
 
   typedef tbb::enumerable_thread_specific<ScoreState> ScoreStateList;
+
 
   // Score an unscored kernel by simulating it and then comparing it to the
   // target lab image.
@@ -126,6 +126,7 @@ class Kernel {
     Generation generation_;
     ScoreStateList& score_state_list_;
   };
+  */
 
   // Given a provided reference kernel, generate the target kernel as a copy of
   // the reference with the provided number of random mutations. Should iterate
@@ -175,10 +176,10 @@ class Kernel {
   // Given valid data in opcodes_ refills bytecode_ with the concatenated data
   // in opcodes_ and specs_, appends jumps and updates fingerprint_.
   void RegenerateBytecode(size_t bytecode_size);
-  void SimulateAndScore(const float3* target_lab_device,
-                        const float3* target_mean_device,
-                        const float3* target_stddevsq_device,
-                        ScoreState& score_state);
+//  void SimulateAndScore(const float3* target_lab_device,
+//                        const float3* target_mean_device,
+//                        const float3* target_stddevsq_device,
+//                        ScoreState& score_state);
   void Mutate(TlsPrngList::reference engine);
   // Given a number within [0, total_dynamic_opcodes_) returns the index of the
   // vector within opcodes_ that contains this value.

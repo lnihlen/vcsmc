@@ -62,6 +62,7 @@ Kernel::Kernel(
   RegenerateBytecode(total_byte_size);
 }
 
+/*
 void Kernel::FinalizeScore() {
   assert(mssim_sum_.get());
   float sum = 0.0f;
@@ -73,6 +74,7 @@ void Kernel::FinalizeScore() {
       static_cast<float>(kTargetFrameWidthPixels * kFrameHeightPixels));
   score_valid_ = true;
 }
+*/
 
 void Kernel::GenerateRandom(
     const SpecList specs, TlsPrngList::reference tls_prng) {
@@ -181,10 +183,11 @@ void Kernel::GenerateRandomKernelJob::operator()(
   }
 }
 
+/*
 Kernel::ScoreState::ScoreState() {
   cudaStream_t stream;
   cudaStreamCreate(&stream);
-/*
+
   cudaError_t result;
   result = cudaMalloc(&sim_lab_device, kLabBufferSize);
   assert(result == cudaSuccess);
@@ -198,7 +201,6 @@ Kernel::ScoreState::ScoreState() {
   assert(result == cudaSuccess);
   result = cudaMalloc(&block_sum_device, 120 * sizeof(float));
   assert(result == cudaSuccess);
-*/
 }
 
 Kernel::ScoreState::~ScoreState() {
@@ -234,6 +236,7 @@ void Kernel::FinalizeScoreJob::operator()(
     generation_->at(i)->FinalizeScore();
   }
 }
+*/
 
 void Kernel::MutateKernelJob::operator()(
     const tbb::blocked_range<size_t>& r) const {
@@ -439,11 +442,12 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
                               bytecode_size_);
 }
 
+/*
+
 void Kernel::SimulateAndScore(const float3* target_lab_device,
                               const float3* target_mean_device,
                               const float3* target_stddevsq_device,
                               ScoreState& score_state) {
-/*
 //  sim_frame_.reset(new uint8[kLibZ26ImageSizeBytes]);
 
 //  std::memset(sim_frame_.get(), 0, kLibZ26ImageSizeBytes);
@@ -495,8 +499,8 @@ void Kernel::SimulateAndScore(const float3* target_lab_device,
       score_state.block_sum_device);
   cudaMemcpyAsync(score_state.block_sum_device, mssim_sum_.get(),
       120 * sizeof(float), cudaMemcpyDeviceToHost, score_state.stream);
-*/
 }
+*/
 
 size_t Kernel::OpcodeFieldIndex(size_t opcode_index) {
   size_t opcode_field = 0;

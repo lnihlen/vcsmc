@@ -39,6 +39,9 @@ extern "C" {
 }
 
 const size_t kSimSkipLines = 23;
+const size_t kLabBufferSizeBytes = sizeof(float) *
+    3 * vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels;
+const size_t kBlockSumBufferSize = 120;
 
 DEFINE_bool(print_stats, false,
     "If true gen will print generation statistics to stdio after every "
@@ -86,6 +89,180 @@ DEFINE_string(target_error, "0.0",
     "Error at which to stop optimizing.");
 DEFINE_string(append_kernel_binary, "", "Path to append kernel binary.");
 
+struct MssimScoreState {
+ public:
+  MssimScoreState() {
+    cudaStream_t stream;
+    cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
+
+    cudaError_t result;
+    result = cudaMalloc(&sim_lab_device, kLabBufferSizeBytes);
+    assert(result == cudaSuccess);
+    result = cudaMalloc(&sim_mean_device, kLabBufferSizeBytes);
+    assert(result == cudaSuccess);
+    result = cudaMalloc(&sim_stddevsq_device, kLabBufferSizeBytes);
+    assert(result == cudaSuccess);
+    result = cudaMalloc(&sim_cov_device, kLabBufferSizeBytes);
+    assert(result == cudaSuccess);
+    result = cudaMalloc(&ssim_device, sizeof(float) *
+        vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels);
+    assert(result == cudaSuccess);
+    result = cudaMalloc(&block_sum_device, sizeof(float) * kBlockSumBufferSize);
+    assert(result == cudaSuccess);
+  }
+
+  ~MssimScoreState() {
+    // Clear any pending work on this thread.
+    cudaStreamSynchronize(stream);
+
+    cudaFree(sim_lab_device);
+    cudaFree(sim_mean_device);
+    cudaFree(sim_stddevsq_device);
+    cudaFree(sim_cov_device);
+    cudaFree(ssim_device);
+    cudaFree(block_sum_device);
+
+    cudaStreamDestroy(stream);
+  }
+  MssimScoreState(const MssimScoreState&) = delete;
+
+  cudaStream_t stream;
+  float3* sim_lab_device;
+  float3* sim_mean_device;
+  float3* sim_stddevsq_device;
+  float3* sim_cov_device;
+  float* ssim_device;
+  float* block_sum_device;
+};
+
+typedef tbb::enumerable_thread_specific<MssimScoreState> MssimScoreStateList;
+
+class SimulateKernelJob {
+ public:
+  SimulateKernelJob(vcsmc::Generation generation)
+    : generation_(generation) {}
+  void operator()(const tbb::blocked_range<size_t>& r) const {
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      std::unique_ptr<uint8[]> sim_frame(new uint8[kLibZ26ImageSizeBytes]);
+      std::memset(sim_frame.get(), 0xff, kLibZ26ImageSizeBytes);
+      std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
+      simulate_single_frame(kernel->bytecode(), kernel->bytecode_size(),
+          sim_frame.get());
+
+      // Convert simulated colors to LAB for MSSIM computation.
+      std::unique_ptr<float> sim_lab(new float[vcsmc::kFrameSizeBytes * 3]);
+      float* lab = sim_lab.get();
+      uint8* frame_pointer =
+          sim_frame.get() + (kLibZ26ImageWidth * kSimSkipLines);
+      for (size_t i = 0; i < kFrameWidthPixels * kFrameHeightPixels; ++i) {
+        uint8 col = *frame_pointer;
+        if (col >= 128) {
+          lab[0] = 0.0;
+          lab[1] = 0.0;
+          lab[2] = 0.0;
+          lab[3] = 0.0;
+          lab[4] = 0.0;
+          lab[5] = 0.0
+        } else {
+          uint32 lab_index = col * 3;
+          lab[0] = kAtariNTSCLabColorTable[lab_index];
+          lab[1] = kAtariNTSCLabColorTable[lab_index + 1];
+          lab[2] = kAtariNTSCLabColorTable[lab_index + 2];
+          lab[3] = kAtariNTSCLabColorTable[lab_index];
+          lab[4] = kAtariNTSCLabColorTable[lab_index + 1];
+          lab[5] = kAtariNTSCLabColorTable[lab_index + 2];
+        }
+        frame_pointer += 2;
+        lab += 6;
+      }
+      // Can move the frame to the kernel for storage, we have the LAB colors
+      // now so are done with it.
+      kernel->set_sim_frame(std::move(sim_frame));
+
+      dim3 image_dim_block(16, 16);
+      dim3 image_dim_grid(kTargetFrameWidthPixels / 16,
+                          kFrameHeightPixels / 16);
+      dim3 sum_dim_block(256);
+      dim3 sum_dim_grid(kBlockSumBufferSize);
+      mssim_sum_.reset(new float[kBlockSumBufferSize]);
+
+      dim3 final_sum_block(120);
+      dim3 final_sum_grid(1);
+
+      cudaMemcpyAsync(sim_lab.get(), score_state.sim_lab_device,
+          kLabBufferSizeBytes, cudaMemcpyHostToDevice, score_state.stream);
+      ComputeLocalMean<<<image_dim_block, image_dim_grid, 0, score_state.stream>>>(
+          score_state.sim_lab_device, score_state.sim_mean_device);
+      ComputeLocalStdDevSquared<<<image_dim_block, image_dim_grid, 0,
+          score_state.stream>>>(score_state.sim_lab_device,
+          score_state.sim_mean_device, score_state.sim_stddevsq_device);
+      ComputeLocalCovariance<<<image_dim_block, image_dim_grid, 0,
+          score_state.stream>>>(score_state.sim_lab_device,
+          score_state.sim_mean_device, target_lab_device, target_mean_device,
+          score_state.sim_cov_device);
+      ComputeSSIM<<<image_dim_block, image_dim_grid, 0, score_state.stream>>>(
+          score_state.sim_mean_device, score_state.sim_stddevsq_device,
+          target_mean_device, target_stddevsq_device,
+          score_state.sim_cov_device, score_state.ssim_device);
+      ComputeBlockSum<<<sum_dim_block, sum_dim_grid, 120 * sizeof(float),
+          score_state.stream>>>(score_state.ssim_device,
+          score_state.block_sum_device);
+      cudaMemcpyAsync(score_state.block_sum_device, mssim_sum_.get(),
+          sizeof(float), cudaMemcpyDeviceToHost, score_state.stream);
+    }
+  }
+ private:
+  vcsmc::Generation generation_;
+};
+
+// As we now use CUDA to compute almost all of the score asynchronously we
+// wait for all GPU work to complete and then call this on each kernel to
+// finish computation.
+class FinalizeScoreJob {
+ public:
+  FinalizeScoreJob(vcsmc::Generation generation,
+                   MssimScoreStateList& mssim_score_state_list)
+      : generation_(generation),
+        mssim_score_state_list_(mssim_score_state_list) {}
+  void operator()(const tbb::blocked_range<size_t>& r) const {
+    // Contract with calling this job is that we have waited for all Kernel
+    // scoring computation to be completed, so the stream should be idle.
+    MssimScoreStateList::reference score_state =
+        mssim_score_state_list_.local();
+    assert(cudaStreamQuery(score_state.stream) == cudaSuccess);
+    for (size_t i = r.begin(); i < r.end(); ++i) {
+      generation_->at(i)->FinalizeScore();
+    }
+  }
+
+ private:
+  vcsmc::Generation generation_;
+  MssimScoreStateList& mssim_score_state_list_;
+};
+
+class ScoreKernelJob {
+ public:
+  ScoreKernelJob(vcsmc::Generation generation,
+                 const float3* target_lab_device,
+                 const float3* target_mean_device,
+                 const float3* target_stddevsq_device,
+                 MssimScoreStateList& mssim_score_state_list)
+      : generation_(generation),
+        target_lab_device_(target_lab_device),
+        target_mean_device_(target_mean_device),
+        target_stddevsq_device_(target_stddevsq_device),
+        mssim_score_state_list_(mssim_score_state_list) {}
+  void operator()(const tbb::blocked_range<size_t>& r) const {
+  }
+
+ private:
+  vcsmc::Generation generation_;
+  const float3* target_lab_device_;
+  const float3* target_mean_device_;
+  const float3* target_stddevsq_device_;
+  MssimScoreStateList& mssim_score_state_list_;
+};
+
 class CompeteKernelJob {
  public:
   CompeteKernelJob(
@@ -115,24 +292,6 @@ class CompeteKernelJob {
   const vcsmc::Generation generation_;
   vcsmc::TlsPrngList& prng_list_;
   size_t tourney_size_;
-};
-
-class SimulateKernelJob {
- public:
-  SimulateKernelJob(vcsmc::Generation generation)
-    : generation_(generation) {}
-  void operator()(const tbb::blocked_range<size_t>& r) const {
-    for (size_t i = r.begin(); i < r.end(); ++i) {
-      std::unique_ptr<uint8[]> sim_frame(new uint8[kLibZ26ImageSizeBytes]);
-      std::memset(sim_frame.get(), 0xff, kLibZ26ImageSizeBytes);
-      std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
-      simulate_single_frame(kernel->bytecode(), kernel->bytecode_size(),
-          sim_frame.get());
-      kernel->set_sim_frame(std::move(sim_frame));
-    }
-  }
- private:
-  vcsmc::Generation generation_;
 };
 
 void SaveState(vcsmc::Generation generation,
@@ -226,7 +385,7 @@ int main(int argc, char* argv[]) {
 
   tbb::task_scheduler_init tbb_init;
   vcsmc::TlsPrngList prng_list;
-  vcsmc::Kernel::ScoreStateList state_list;
+  MssimScoreStateList mssim_state_list;
   int generation_size = FLAGS_generation_size;
 
   vcsmc::Generation generation;
@@ -355,8 +514,8 @@ int main(int argc, char* argv[]) {
     // Score all unscored kernels in the current generation.
     auto start_of_scoring = std::chrono::high_resolution_clock::now();
     tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
-        vcsmc::Kernel::ScoreKernelJob(generation, input_lab_device,
-        input_mean_device, input_stddevsq_device, state_list));
+        ScoreKernelJob(generation, input_lab_device, input_mean_device,
+        input_stddevsq_device, mssim_state_list));
 
     // Wait for all streams to finish and then finalize.
     cudaDeviceSynchronize();
