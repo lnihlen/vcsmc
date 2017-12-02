@@ -89,11 +89,6 @@ DEFINE_string(target_error, "0.0",
     "Error at which to stop optimizing.");
 DEFINE_string(append_kernel_binary, "", "Path to append kernel binary.");
 
-typedef tbb::enumerable_thread_specific<MssimScoreState> MssimScoreStateList;
-typedef std::shared_ptr<tbb::concurrent_unordered_map<
-    std::shared_ptr<vcsmc::Kernel>, KernelScore>> ScoreMap;
-typedef std::shared_ptr<std::vector<std::shared_ptr<vcsmc::Kernel>>> Generation;
-
 struct MssimScoreState {
  public:
   MssimScoreState() {
@@ -145,54 +140,72 @@ struct MssimScoreState {
 
 struct KernelScore {
  public:
-  std::unique_ptr<uint8[]> sim_frame;
-  std::unique_ptr<float[]> block_sums;
-  std::shared_ptr<vcsmc::Kernel> kernel;
+  std::shared_ptr<uint8> sim_frame;
+  std::shared_ptr<float> block_sums;
   float score = 1.0;
   uint32 victories = 0;
 };
+
+struct KernelHash {
+  size_t operator()(const std::shared_ptr<vcsmc::Kernel>& kernel) const {
+    return static_cast<size_t>(kernel->fingerprint());
+  }
+};
+
+struct KernelEqual {
+  bool operator()(const std::shared_ptr<vcsmc::Kernel>& kernel_a,
+                  const std::shared_ptr<vcsmc::Kernel>& kernel_b) const {
+          return kernel_a->fingerprint() == kernel_b->fingerprint();
+  }
+};
+
+typedef tbb::enumerable_thread_specific<MssimScoreState> MssimScoreStateList;
+// Sweeping an interesting thing under the rug for now - this map uses 32-bit
+// keys (size_t) but the fingerprints on the Kernel are 64-bit.
+typedef tbb::concurrent_unordered_map<std::shared_ptr<vcsmc::Kernel>,
+        KernelScore, KernelHash, KernelEqual> ScoreMap;
 
 // Given a pointer to a completely empty Kernel this Job will populate it with
 // totally random bytecode.
 class GenerateRandomKernelJob {
  public:
-  GenerateRandomKernelJob(Generation generation,
-                          SpecList specs,
-                          TlsPrngList& tls_prng_list)
+  GenerateRandomKernelJob(vcsmc::Generation generation,
+                          vcsmc::SpecList specs,
+                          vcsmc::TlsPrngList& tls_prng_list)
       : generation_(generation),
         specs_(specs),
         tls_prng_list_(tls_prng_list) {}
   void operator()(const tbb::blocked_range<size_t>& r) const {
-    TlsPrngList::reference tls_prng = tls_prng_list_.local();
+    vcsmc::TlsPrngList::reference tls_prng = tls_prng_list_.local();
     for (size_t i = r.begin(); i < r.end(); ++i) {
-      std::shared_ptr<Kernel> kernel = generation_->at(i);
+      std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
       kernel->GenerateRandom(specs_, tls_prng);
     }
   }
 
  private:
-  Generation generation_;
-  const SpecList specs_;
-  TlsPrngList& tls_prng_list_;
+  vcsmc::Generation generation_;
+  const vcsmc::SpecList specs_;
+  vcsmc::TlsPrngList& tls_prng_list_;
 };
 
 // Given an existing Kernel and a new list of specs (typically audio) this
 // will clobber the existing specs and regenerate the bytecode.
 class ClobberSpecJob {
  public:
-  ClobberSpecJob(Generation generation,
-                 SpecList specs)
+  ClobberSpecJob(vcsmc::Generation generation,
+                 vcsmc::SpecList specs)
       : generation_(generation),
         specs_(specs) {}
   void operator()(const tbb::blocked_range<size_t>& r) const {
     for (size_t i = r.begin(); i < r.end(); ++i) {
-      std::shared_ptr<Kernel> kernel = generation_->at(i);
+      std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
       kernel->ClobberSpec(specs_);
     }
   }
  private:
-  Generation generation_;
-  const SpecList specs_;
+  vcsmc::Generation generation_;
+  const vcsmc::SpecList specs_;
 };
 
 // Given a provided reference kernel, generate the target kernel as a copy of
@@ -201,49 +214,61 @@ class ClobberSpecJob {
 // and target the latter half of the array for copy and mutation.
 class MutateKernelJob {
  public:
-  MutateKernelJob(Generation source_generation,
-                  Generation target_generation,
+  MutateKernelJob(vcsmc::Generation source_generation,
+                  vcsmc::Generation target_generation,
                   size_t target_index_offset,
                   size_t number_of_mutations,
-                  TlsPrngList& tls_prng_list)
+                  vcsmc::TlsPrngList& tls_prng_list)
       : source_generation_(source_generation),
         target_generation_(target_generation),
         target_index_offset_(target_index_offset),
         number_of_mutations_(number_of_mutations),
         tls_prng_list_(tls_prng_list) {}
   void operator()(const tbb::blocked_range<size_t>& r) const {
-    TlsPrngList::reference tls_prng = tls_prng_list_.local();
+    vcsmc::TlsPrngList::reference tls_prng = tls_prng_list_.local();
     for (size_t i = r.begin(); i < r.end(); ++i) {
-      std::shared_ptr<Kernel> original = source_generation_->at(i);
-      std::shared_ptr<Kernel> target = original->Clone();
-      target_generation_->insert(i + target_index_offset_, target);
+      std::shared_ptr<vcsmc::Kernel> original = source_generation_->at(i);
+      std::shared_ptr<vcsmc::Kernel> target = original->Clone();
+      target_generation_->at(i + target_index_offset_) = target;
 
-    // Now do the mutations to the target.
-    for (size_t j = 0; j < number_of_mutations_; ++j)
-      target->Mutate(tls_prng);
+      // Now do the mutations to the target.
+      for (size_t j = 0; j < number_of_mutations_; ++j)
+        target->Mutate(tls_prng);
+      target->RegenerateBytecode();
+    }
+ }
 
-    target->RegenerateBytecode();
-  }
  private:
-  Generation source_generation_;
-  Generation target_generation_;
+  vcsmc::Generation source_generation_;
+  vcsmc::Generation target_generation_;
   size_t target_index_offset_;
   const size_t number_of_mutations_;
-  TlsPrngList& tls_prng_list_;
+  vcsmc::TlsPrngList& tls_prng_list_;
 };
 
 class SimulateKernelJob {
  public:
-  SimulateKernelJob(Generation generation, ScoreMap score_map)
-    : generation_(generation), score_map_(score_map) {}
+  SimulateKernelJob(vcsmc::Generation generation,
+                    const float3* target_lab_device,
+                    const float3* target_mean_device,
+                    const float3* target_stddevsq_device,
+                    ScoreMap& score_map,
+                    MssimScoreStateList& mssim_score_state_list)
+    : generation_(generation),
+      target_lab_device_(target_lab_device),
+      target_mean_device_(target_mean_device),
+      target_stddevsq_device_(target_stddevsq_device),
+      score_map_(score_map),
+      mssim_score_state_list_(mssim_score_state_list_) {}
   void operator()(const tbb::blocked_range<size_t>& r) const {
+    MssimScoreStateList::reference score_state =
+          mssim_score_state_list_.local();
     for (size_t i = r.begin(); i < r.end(); ++i) {
       std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
 
       KernelScore kernel_score;
       kernel_score.sim_frame.reset(new uint8[kLibZ26ImageSizeBytes]);
       kernel_score.block_sums.reset(new float[kBlockSumBufferSize]);
-      kernel_score.kernel = kernel;
 
       simulate_single_frame(kernel->bytecode(), kernel->bytecode_size(),
           kernel_score.sim_frame.get());
@@ -251,9 +276,10 @@ class SimulateKernelJob {
       // Convert simulated colors to LAB for MSSIM computation.
       std::unique_ptr<float> sim_lab(new float[vcsmc::kFrameSizeBytes * 3]);
       float* lab = sim_lab.get();
-      uint8* frame_pointer =
-          kernel_score.sim_frame.get() + (kLibZ26ImageWidth * kSimSkipLines);
-      for (size_t i = 0; i < kFrameWidthPixels * kFrameHeightPixels; ++i) {
+      uint8* frame_pointer = kernel_score.sim_frame.get() +
+          (kLibZ26ImageWidth * kSimSkipLines);
+      for (size_t i = 0;
+           i < vcsmc::kFrameWidthPixels * vcsmc::kFrameHeightPixels; ++i) {
         uint8 col = *frame_pointer;
         if (col >= 128) {
           lab[0] = 0.0;
@@ -261,47 +287,49 @@ class SimulateKernelJob {
           lab[2] = 0.0;
           lab[3] = 0.0;
           lab[4] = 0.0;
-          lab[5] = 0.0
+          lab[5] = 0.0;
         } else {
           uint32 lab_index = col * 3;
-          lab[0] = kAtariNTSCLabColorTable[lab_index];
-          lab[1] = kAtariNTSCLabColorTable[lab_index + 1];
-          lab[2] = kAtariNTSCLabColorTable[lab_index + 2];
-          lab[3] = kAtariNTSCLabColorTable[lab_index];
-          lab[4] = kAtariNTSCLabColorTable[lab_index + 1];
-          lab[5] = kAtariNTSCLabColorTable[lab_index + 2];
+          lab[0] = vcsmc::kAtariNTSCLabColorTable[lab_index];
+          lab[1] = vcsmc::kAtariNTSCLabColorTable[lab_index + 1];
+          lab[2] = vcsmc::kAtariNTSCLabColorTable[lab_index + 2];
+          lab[3] = vcsmc::kAtariNTSCLabColorTable[lab_index];
+          lab[4] = vcsmc::kAtariNTSCLabColorTable[lab_index + 1];
+          lab[5] = vcsmc::kAtariNTSCLabColorTable[lab_index + 2];
         }
         frame_pointer += 2;
         lab += 6;
       }
 
       dim3 image_dim_block(16, 16);
-      dim3 image_dim_grid(kTargetFrameWidthPixels / 16,
-                          kFrameHeightPixels / 16);
+      dim3 image_dim_grid(vcsmc::kTargetFrameWidthPixels / 16,
+                          vcsmc::kFrameHeightPixels / 16);
       dim3 sum_dim_block(256);
       dim3 sum_dim_grid(kBlockSumBufferSize);
-      mssim_sum_.reset(new float[kBlockSumBufferSize]);
 
       cudaMemcpyAsync(sim_lab.get(), score_state.sim_lab_device,
           kLabBufferSizeBytes, cudaMemcpyHostToDevice, score_state.stream);
-      ComputeLocalMean<<<image_dim_block, image_dim_grid, 0,
+      vcsmc::ComputeLocalMean<<<image_dim_block, image_dim_grid, 0,
           score_state.stream>>>(score_state.sim_lab_device,
                                 score_state.sim_mean_device);
-      ComputeLocalStdDevSquared<<<image_dim_block, image_dim_grid, 0,
+      vcsmc::ComputeLocalStdDevSquared<<<image_dim_block, image_dim_grid, 0,
           score_state.stream>>>(score_state.sim_lab_device,
                                 score_state.sim_mean_device,
                                 score_state.sim_stddevsq_device);
-      ComputeLocalCovariance<<<image_dim_block, image_dim_grid, 0,
+      vcsmc::ComputeLocalCovariance<<<image_dim_block, image_dim_grid, 0,
           score_state.stream>>>(score_state.sim_lab_device,
                                 score_state.sim_mean_device,
-                                target_lab_device,
-                                target_mean_device,
+                                target_lab_device_,
+                                target_mean_device_,
                                 score_state.sim_cov_device);
-      ComputeSSIM<<<image_dim_block, image_dim_grid, 0, score_state.stream>>>(
-          score_state.sim_mean_device, score_state.sim_stddevsq_device,
-          target_mean_device, target_stddevsq_device,
-          score_state.sim_cov_device, score_state.ssim_device);
-      ComputeBlockSum<<<sum_dim_block, sum_dim_grid,
+      vcsmc::ComputeSSIM<<<image_dim_block, image_dim_grid, 0,
+          score_state.stream>>>(score_state.sim_mean_device,
+                                score_state.sim_stddevsq_device,
+                                target_mean_device_,
+                                target_stddevsq_device_,
+                                score_state.sim_cov_device,
+                                score_state.ssim_device);
+      vcsmc::ComputeBlockSum<<<sum_dim_block, sum_dim_grid,
           kBlockSumBufferSize * sizeof(float), score_state.stream>>>(
           score_state.ssim_device, score_state.block_sum_device);
       cudaMemcpyAsync(score_state.block_sum_device,
@@ -310,13 +338,17 @@ class SimulateKernelJob {
                       cudaMemcpyDeviceToHost,
                       score_state.stream);
 
-      score_map_->insert(kernel_score);
+      score_map_.insert(std::make_pair(kernel, kernel_score));
     }
   }
 
  private:
-  Generation generation_;
-  ScoreMap score_map_;
+  vcsmc::Generation generation_;
+  const float3* target_lab_device_;
+  const float3* target_mean_device_;
+  const float3* target_stddevsq_device_;
+  ScoreMap& score_map_;
+  MssimScoreStateList& mssim_score_state_list_;
 };
 
 // As we now use CUDA to compute almost all of the score asynchronously we
@@ -324,9 +356,12 @@ class SimulateKernelJob {
 // finish computation.
 class FinalizeScoreJob {
  public:
-  FinalizeScoreJob(Generation generation, ScoreMap score_map)
+  FinalizeScoreJob(vcsmc::Generation generation,
+                   ScoreMap& score_map,
+                   MssimScoreStateList& mssim_score_state_list)
       : generation_(generation),
-        score_map_(score_map) {}
+        score_map_(score_map),
+        mssim_score_state_list_(mssim_score_state_list_) {}
   void operator()(const tbb::blocked_range<size_t>& r) const {
     // Contract with calling this job is that we have waited for all Kernel
     // scoring computation to be completed, so the stream should be idle.
@@ -335,8 +370,8 @@ class FinalizeScoreJob {
     assert(cudaStreamQuery(score_state.stream) == cudaSuccess);
     for (size_t i = r.begin(); i < r.end(); ++i) {
       std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
-      ScoreMap::iterator kernel_score = score_map_->find(kernel);
-      assert(kernel_score != score_map_->end());
+      ScoreMap::iterator kernel_score = score_map_.find(kernel);
+      assert(kernel_score != score_map_.end());
 
       float sum = 0.0f;
       float* block_sums = kernel_score->second.block_sums.get();
@@ -354,15 +389,16 @@ class FinalizeScoreJob {
   }
 
  private:
-  Generation generation_;
-  ScoreMap score_map_;
+  vcsmc::Generation generation_;
+  ScoreMap& score_map_;
+  MssimScoreStateList& mssim_score_state_list_;
 };
 
 class CompeteKernelJob {
  public:
   CompeteKernelJob(
-      const Generation generation,
-      ScoreMap score_map,
+      const vcsmc::Generation generation,
+      ScoreMap& score_map,
       vcsmc::TlsPrngList& prng_list,
       size_t tourney_size)
       : generation_(generation),
@@ -374,8 +410,8 @@ class CompeteKernelJob {
     for (size_t i = r.begin(); i < r.end(); ++i) {
       std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
 
-      ScoreMap::iterator kernel_score = score_map_->find(kernel);
-      assert(kernel_score_it != score_map_->end());
+      ScoreMap::iterator kernel_score_it = score_map_.find(kernel);
+      assert(kernel_score_it != score_map_.end());
       uint32 victories = 0;
       float kernel_score = kernel_score_it->second.score;
       std::uniform_int_distribution<size_t> tourney_distro(
@@ -383,7 +419,7 @@ class CompeteKernelJob {
       for (size_t j = 0; j < tourney_size_; ++j) {
         size_t contestant_index = tourney_distro(engine);
         // Lower scores mean better performance.
-        ScoreMap::iterator competing_kernel = score_map_->find(
+        ScoreMap::const_iterator competing_kernel = score_map_.find(
             generation_->at(contestant_index));
         if (kernel_score < competing_kernel->second.score)
           ++victories;
@@ -394,14 +430,14 @@ class CompeteKernelJob {
   }
  private:
   const vcsmc::Generation generation_;
-  ScoreMap score_map_;
+  ScoreMap& score_map_;
   vcsmc::TlsPrngList& prng_list_;
   size_t tourney_size_;
 };
 
-void SaveState(Generation generation,
-               ScoreMap score_map,
-               std::shared_ptr<vcsmc::Kernel> global_minimum) {
+void SaveState(vcsmc::Generation generation,
+               const std::shared_ptr<vcsmc::Kernel>& global_minimum,
+               const ScoreMap::const_iterator& global_minimum_score) {
   if (FLAGS_generation_output_file != "") {
     if (!vcsmc::SaveGenerationFile(generation, FLAGS_generation_output_file)) {
       fprintf(stderr, "error saving final generation file %s\n",
@@ -410,8 +446,8 @@ void SaveState(Generation generation,
   }
   if (FLAGS_image_output_file != "") {
     vcsmc::Image min_sim_image(
-        sim_frame->find(global_minimum)->second.sim_frame.get() +
-        (kLibZ26ImageWidth * kSimSkipLines);
+        global_minimum_score->second.sim_frame.get() +
+        (kLibZ26ImageWidth * kSimSkipLines));
     vcsmc::SaveImage(&min_sim_image, FLAGS_image_output_file);
   }
   if (!vcsmc::SaveKernelToFile(global_minimum,
@@ -465,21 +501,21 @@ int main(int argc, char* argv[]) {
   }
   // Copy input Lab colors to device, compute mean and stddev asynchronously.
   const int kLabBufferSize = vcsmc::kFrameSizeBytes * sizeof(float) * 3;
-  float3* input_lab_device;
-  cudaMalloc(&input_lab_device, kLabBufferSize);
-  float3* input_mean_device;
-  cudaMalloc(&input_mean_device, kLabBufferSize);
-  float3* input_stddevsq_device;
-  cudaMalloc(&input_stddevsq_device, kLabBufferSize);
-  cudaMemcpyAsync(input_lab_device, input_lab.get(), kLabBufferSize,
+  float3* target_lab_device;
+  cudaMalloc(&target_lab_device, kLabBufferSize);
+  float3* target_mean_device;
+  cudaMalloc(&target_mean_device, kLabBufferSize);
+  float3* target_stddevsq_device;
+  cudaMalloc(&target_stddevsq_device, kLabBufferSize);
+  cudaMemcpyAsync(target_lab_device, input_lab.get(), kLabBufferSize,
       cudaMemcpyHostToDevice, 0);
   dim3 dim_block(16, 16);
   dim3 dim_grid(vcsmc::kTargetFrameWidthPixels / 16,
                 vcsmc::kFrameHeightPixels / 16);
-  vcsmc::ComputeLocalMean<<<dim_block, dim_grid, 0>>>(input_lab_device,
-      input_mean_device);
+  vcsmc::ComputeLocalMean<<<dim_block, dim_grid, 0>>>(target_lab_device,
+      target_mean_device);
   vcsmc::ComputeLocalStdDevSquared<<<dim_block, dim_grid, 0>>>(
-      input_lab_device, input_mean_device, input_stddevsq_device);
+      target_lab_device, target_mean_device, target_stddevsq_device);
 
   vcsmc::SpecList audio_spec_list;
   if (FLAGS_audio_spec_list_file != "") {
@@ -493,9 +529,9 @@ int main(int argc, char* argv[]) {
 
   tbb::task_scheduler_init tbb_init;
   vcsmc::TlsPrngList prng_list;
-  MssimScoreStateList mssim_state_list;
-  Generation generation;
-  ScoreMap score_map(new ScoreMap);
+  MssimScoreStateList mssim_score_state_list;
+  vcsmc::Generation generation;
+  ScoreMap score_map;
 
   int generation_size = FLAGS_generation_size;
 
@@ -556,7 +592,7 @@ int main(int argc, char* argv[]) {
     generation_size = generation->size();
     if (audio_spec_list) {
       tbb::parallel_for(tbb::blocked_range<size_t>(0, generation_size),
-          vcsmc::Kernel::ClobberSpecJob(generation, audio_spec_list));
+          ClobberSpecJob(generation, audio_spec_list));
     }
   }
 
@@ -576,7 +612,7 @@ int main(int argc, char* argv[]) {
   float target_error = strtof(FLAGS_target_error.c_str(), nullptr);
   int generation_count = 0;
   int streak = 0;
-  double last_generation_score = 0.0;
+  float last_generation_score = 0.0f;
   bool reroll = false;
   int reroll_count = 0;
 
@@ -592,7 +628,8 @@ int main(int argc, char* argv[]) {
   uint64 mutate_time_us = 0;
   uint64 mutate_count = 0;
 
-  std::shared_ptr<vcsmc::Kernel> global_minimum = generation->at(0);
+  std::shared_ptr<vcsmc::Kernel> global_minimum;
+  ScoreMap::const_iterator global_minimum_score = score_map.end();
 
   auto epoch_time = std::chrono::high_resolution_clock::now();
 
@@ -603,32 +640,37 @@ int main(int argc, char* argv[]) {
   bool full_range_sim_needed = true;
 
   while (true) {
-    if (generation_count > 0 && global_minimum->score() <= target_error) {
+    if (global_minimum_score != score_map.end() &&
+        global_minimum_score->second.score <= target_error) {
       printf("target error reached after %d generations, terminating.\n",
              generation_count);
       break;
     }
 
-    // Simulate any newly generated kernels to get output color values.
+    // Simulate any newly generated kernels to get output color values. The
+    // simulation job also launches the CUDA scoring jobs, so they can work in
+    // parallel on GPU with the simulation of other Kernels on CPU.
     auto start_of_simulation = std::chrono::high_resolution_clock::now();
     tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
-        SimulateKernelJob(generation));
+        SimulateKernelJob(generation,
+                          target_lab_device,
+                          target_mean_device,
+                          target_stddevsq_device,
+                          score_map,
+                          mssim_score_state_list));
     simulation_count += full_range_sim_needed ?
         generation_size : generation_size / 2;
     auto end_of_simulation = std::chrono::high_resolution_clock::now();
     simulation_time_us += std::chrono::duration_cast<std::chrono::microseconds>(
         end_of_simulation - start_of_simulation).count();
 
-    // Score all unscored kernels in the current generation.
+    // TODO: time this
+    cudaDeviceSynchronize();
+
+    // Compute final score for all unscored kernels in the current generation.
     auto start_of_scoring = std::chrono::high_resolution_clock::now();
     tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
-        ScoreKernelJob(generation, input_lab_device, input_mean_device,
-        input_stddevsq_device, mssim_state_list));
-
-    // Wait for all streams to finish and then finalize.
-    cudaDeviceSynchronize();
-    tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
-        vcsmc::Kernel::FinalizeScoreJob(generation, state_list));
+        FinalizeScoreJob(generation, score_map, mssim_score_state_list));
     scoring_count += full_range_sim_needed ?
         generation_size : generation_size / 2;
     auto end_of_scoring = std::chrono::high_resolution_clock::now();
@@ -638,7 +680,8 @@ int main(int argc, char* argv[]) {
     // Conduct tournament based on scores.
     auto start_of_tourney = std::chrono::high_resolution_clock::now();
     tbb::parallel_for(full_range,
-        CompeteKernelJob(generation, prng_list, FLAGS_tournament_size));
+        CompeteKernelJob(generation, score_map, prng_list,
+        FLAGS_tournament_size));
     auto end_of_tourney = std::chrono::high_resolution_clock::now();
     tourney_count += generation_size;
     tourney_time_us += std::chrono::duration_cast<std::chrono::microseconds>(
@@ -646,15 +689,21 @@ int main(int argc, char* argv[]) {
 
     // Sort generation by victories.
     std::sort(generation->begin(), generation->end(),
-        [](std::shared_ptr<vcsmc::Kernel> a, std::shared_ptr<vcsmc::Kernel> b) {
-          if (a->victories() == b->victories())
-            return a->score() < b->score();
+        [score_map](std::shared_ptr<vcsmc::Kernel> a,
+                    std::shared_ptr<vcsmc::Kernel> b) {
+          ScoreMap::const_iterator a_score = score_map.find(a);
+          ScoreMap::const_iterator b_score = score_map.find(b);
+          if (a_score->second.victories == b_score->second.victories)
+            return a_score->second.score < b_score->second.score;
 
-          return b->victories() < a->victories();
+          return a_score->second.victories > b_score->second.victories;
         });
 
-    if (generation->at(0)->score() < global_minimum->score()) {
+    if (global_minimum_score == score_map.end() ||
+        score_map.find(generation->at(0))->second.score <
+        global_minimum_score->second.score) {
       global_minimum = generation->at(0);
+      global_minimum_score = score_map.find(generation->at(0));
     }
 
     if ((generation_count % FLAGS_save_count) == 0) {
@@ -672,7 +721,7 @@ int main(int argc, char* argv[]) {
                "%s\n",
             generation_count,
             generation->at(0)->fingerprint(),
-            global_minimum->score(),
+            global_minimum_score->second.score,
             diversity,
             simulation_count ? simulation_count * 1000000 / simulation_time_us
                 : 0,
@@ -692,14 +741,14 @@ int main(int argc, char* argv[]) {
       tourney_time_us = 0;
       mutate_count = 0;
       mutate_time_us = 0;
-      SaveState(generation, global_minimum);
+      SaveState(generation, global_minimum, global_minimum_score);
       epoch_time = now;
     }
 
-    if (last_generation_score == global_minimum->score()) {
+    if (last_generation_score == global_minimum_score->second.score) {
       ++streak;
     } else {
-      last_generation_score = global_minimum->score();
+      last_generation_score = global_minimum_score->second.score;
       streak = 0;
     }
 
@@ -708,9 +757,11 @@ int main(int argc, char* argv[]) {
         streak < FLAGS_stagnant_generation_count) {
       // Replace lowest-scoring half of generation with mutated versions of
       // highest-scoring half of generation.
+      for (size_t i = generation_size / 2; i < generation_size; ++i)
+        score_map.unsafe_erase(generation->at(i));
       tbb::parallel_for(front_half,
-          vcsmc::Kernel::MutateKernelJob(generation, generation,
-              generation_size / 2, 1, prng_list));
+          MutateKernelJob(generation, generation, generation_size / 2, 1,
+          prng_list));
       mutate_count += generation_size / 2;
       full_range_sim_needed = false;
     } else {
@@ -722,16 +773,16 @@ int main(int argc, char* argv[]) {
       reroll = true;
       streak = 0;
       vcsmc::Generation mutated_generation(
-          new std::vector<std::shared_ptr<vcsmc::Kernel>>);
-      for (int i = 0; i < generation_size; ++i) {
-        mutated_generation->emplace_back(new vcsmc::Kernel());
-      }
+          new std::vector<std::shared_ptr<vcsmc::Kernel>>(generation_size));
       tbb::parallel_for(full_range,
-          vcsmc::Kernel::MutateKernelJob(generation, mutated_generation, 0,
+          MutateKernelJob(generation, mutated_generation, 0,
             FLAGS_stagnant_mutation_count, prng_list));
       generation = mutated_generation;
       mutate_count += generation_size;
       full_range_sim_needed = true;
+      score_map.clear();
+      global_minimum.reset();
+      global_minimum_score = score_map.end();
     }
     auto end_of_mutate = std::chrono::high_resolution_clock::now();
     mutate_time_us += std::chrono::duration_cast<std::chrono::microseconds>(
@@ -749,7 +800,7 @@ int main(int argc, char* argv[]) {
     ProfilerStop();
   }
 
-  SaveState(generation, global_minimum);
+  SaveState(generation, global_minimum, global_minimum_score);
 
   if (FLAGS_append_kernel_binary != "") {
     vcsmc::AppendKernelBinary(global_minimum, FLAGS_append_kernel_binary);

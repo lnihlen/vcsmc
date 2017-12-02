@@ -75,9 +75,9 @@ std::shared_ptr<Kernel> Kernel::Clone() {
   std::copy(opcode_ranges_.begin(),
             opcode_ranges_.end(),
             std::back_inserter(clone->opcode_ranges_));
-  target->bytecode_size_ = bytecode_size_;
+  clone->bytecode_size_ = bytecode_size_;
 
-  target->total_dynamic_opcodes_ = total_dynamic_opcodes_;
+  clone->total_dynamic_opcodes_ = total_dynamic_opcodes_;
   std::copy(opcode_counts_.begin(),
             opcode_counts_.end(),
             std::back_inserter(clone->opcode_counts_));
@@ -166,7 +166,7 @@ void Kernel::GenerateRandom(
     opcode_counts_.push_back(total_dynamic_opcodes_);
   }
 
-  bytescode_size_ = total_byte_size;
+  bytecode_size_ = total_byte_size;
   RegenerateBytecode();
 }
 
@@ -181,23 +181,6 @@ void Kernel::ClobberSpec(const SpecList new_specs) {
     specs_->at(target_spec_index) = new_specs->at(i);
   }
   RegenerateBytecode();
-}
-
-void Kernel::GenerateRandomKernelJob::operator()(
-    const tbb::blocked_range<size_t>& r) const {
-  TlsPrngList::reference tls_prng = tls_prng_list_.local();
-  for (size_t i = r.begin(); i < r.end(); ++i) {
-    std::shared_ptr<Kernel> kernel = generation_->at(i);
-    kernel->GenerateRandom(specs_, tls_prng);
-  }
-}
-
-void Kernel::ClobberSpecJob::operator()(
-    const tbb::blocked_range<size_t>& r) const {
-  for (size_t i = r.begin(); i < r.end(); ++i) {
-    std::shared_ptr<Kernel> target = generation_->at(i);
-    target->ClobberSpec(specs_);
-  }
 }
 
 uint32 Kernel::GenerateRandomOpcode(
@@ -320,9 +303,7 @@ void Kernel::AppendJmpSpec(uint32 current_cycle, size_t current_bank_size) {
 // opcodes_ and specs_, appends jumps and updates fingerprint_. Assumes
 // |bytecode_size_| is already valid.
 void Kernel::RegenerateBytecode() {
-  score_valid_ = false;
-  score_ = 1.0;
-  bytecode_.reset(new uint8[bytecode_size]);
+  bytecode_.reset(new uint8[bytecode_size_]);
   dynamic_areas_.clear();
   uint32 current_cycle = 0;
   size_t current_range_index = 0;

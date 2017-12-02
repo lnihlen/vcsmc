@@ -14,6 +14,7 @@
 namespace vcsmc {
 
 class Kernel;
+typedef std::shared_ptr<std::vector<std::shared_ptr<Kernel>>> Generation;
 
 // A Kernel represents a program in 6502 bytecode for the VCS that generates one
 // frame of output imagery when run on the Atari.
@@ -42,15 +43,8 @@ class Kernel {
 
   const uint8* bytecode() const { return bytecode_.get(); }
   const std::vector<Range>& dynamic_areas() const { return dynamic_areas_; }
-  const uint8* sim_frame() const { return sim_frame_.get(); }
-  void set_sim_frame(std::unique_ptr<uint8[]> sim_frame) {
-    sim_frame_ = std::move(sim_frame);
-  }
   size_t bytecode_size() const { return bytecode_size_; }
   uint64 fingerprint() const { return fingerprint_; }
-  bool score_valid() const { return score_valid_; }
-  float score() const { assert(score_valid()); return score_; }
-  uint32 victories() const { return victories_; }
   const SpecList specs() const { return specs_; }
   const std::vector<std::vector<uint32>>& opcodes() const { return opcodes_; }
 
