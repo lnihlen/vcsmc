@@ -26,6 +26,7 @@
 #include "bit_map.h"
 #include "color.h"
 #include "color_table.h"
+#include "cuda_utils.h"
 #include "image.h"
 #include "image_file.h"
 #include "kernel.h"
@@ -39,11 +40,9 @@ extern "C" {
 }
 
 const size_t kSimSkipLines = 23;
-const size_t kLabBufferSizeBytes = sizeof(float) *
-    3 * vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels;
 const size_t kBlockSumBufferSize = 120;
 
-DEFINE_bool(print_stats, false,
+DEFINE_bool(print_stats, true,
     "If true gen will print generation statistics to stdio after every "
     "save_count generations.");
 
@@ -97,13 +96,13 @@ struct MssimScoreState {
     result = cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
     assert(result == cudaSuccess);
 
-    result = cudaMalloc(&sim_lab_device, kLabBufferSizeBytes);
+    result = cudaMalloc(&sim_lab_device, vcsmc::kLabBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&sim_mean_device, kLabBufferSizeBytes);
+    result = cudaMalloc(&sim_mean_device, vcsmc::kLabBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&sim_stddevsq_device, kLabBufferSizeBytes);
+    result = cudaMalloc(&sim_stddevsq_device, vcsmc::kLabBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&sim_cov_device, kLabBufferSizeBytes);
+    result = cudaMalloc(&sim_cov_device, vcsmc::kLabBufferSizeBytes);
     assert(result == cudaSuccess);
     result = cudaMalloc(&ssim_device, sizeof(float) *
         vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels);
@@ -144,13 +143,14 @@ struct KernelScore {
   KernelScore()
     : sim_frame(new uint8[kLibZ26ImageSizeBytes]),
       block_sums(new float[kBlockSumBufferSize]),
-      sim_lab(new float[kLabBufferSizeBytes]) {}
+      sim_lab(new float[vcsmc::kLabBufferSizeBytes]) {}
 
   std::shared_ptr<uint8> sim_frame;
   std::shared_ptr<float> block_sums;
   std::shared_ptr<float> sim_lab;
   float score = 1.0;
   uint32 victories = 0;
+  bool score_final = false;
 };
 
 struct KernelHash {
@@ -225,11 +225,13 @@ class MutateKernelJob {
                   vcsmc::Generation target_generation,
                   size_t target_index_offset,
                   size_t number_of_mutations,
+                  ScoreMap& score_map,
                   vcsmc::TlsPrngList& tls_prng_list)
       : source_generation_(source_generation),
         target_generation_(target_generation),
         target_index_offset_(target_index_offset),
         number_of_mutations_(number_of_mutations),
+        score_map_(score_map),
         tls_prng_list_(tls_prng_list) {}
   void operator()(const tbb::blocked_range<size_t>& r) const {
     vcsmc::TlsPrngList::reference tls_prng = tls_prng_list_.local();
@@ -243,14 +245,30 @@ class MutateKernelJob {
         target->Mutate(tls_prng);
 
       target->RegenerateBytecode();
+
+      // Sometimes the mutation currently results in a situation where the
+      // fingerprint doesn't change between target and original, or the
+      // fingerprint does but the hash table still collides because we are
+      // disregarding the 32 most significant bits of the fingerprint in the
+      // hash. This results in hash table collisions and other sadness. TODO:
+      // figure out why this happens with better Kernel unit testing on
+      // Kernel::Muate().
+      while (target->fingerprint() == original->fingerprint() ||
+             score_map_.find(target) != score_map_.end()) {
+        for (size_t j = 0; j < number_of_mutations_; ++j)
+          target->Mutate(tls_prng);
+
+        target->RegenerateBytecode();
+      }
     }
  }
 
  private:
   vcsmc::Generation source_generation_;
   vcsmc::Generation target_generation_;
-  size_t target_index_offset_;
+  const size_t target_index_offset_;
   const size_t number_of_mutations_;
+  ScoreMap& score_map_;
   vcsmc::TlsPrngList& tls_prng_list_;
 };
 
@@ -282,9 +300,9 @@ class SimulateKernelJob {
       float* lab = kernel_score.sim_lab.get();
       uint8* frame_pointer = kernel_score.sim_frame.get() +
           (kLibZ26ImageWidth * kSimSkipLines);
-      for (size_t i = 0;
-           i < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels;
-           i += 2) {
+      for (size_t j = 0;
+           j < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels;
+           j += 2) {
         uint8 col = *frame_pointer;
         if (col < 128) {
           uint32 lab_index = col * 3;
@@ -312,8 +330,11 @@ class SimulateKernelJob {
       dim3 sum_dim_block(256);
       dim3 sum_dim_grid(kBlockSumBufferSize);
 
-      cudaMemcpyAsync(kernel_score.sim_lab.get(), score_state.sim_lab_device,
-          kLabBufferSizeBytes, cudaMemcpyHostToDevice, score_state.stream);
+      cudaMemcpyAsync(score_state.sim_lab_device,
+                      kernel_score.sim_lab.get(),
+                      vcsmc::kLabBufferSizeBytes,
+                      cudaMemcpyHostToDevice,
+                      score_state.stream);
       vcsmc::ComputeLocalMean<<<image_dim_block, image_dim_grid, 0,
           score_state.stream>>>(score_state.sim_lab_device,
                                 score_state.sim_mean_device);
@@ -337,8 +358,8 @@ class SimulateKernelJob {
       vcsmc::ComputeBlockSum<<<sum_dim_block, sum_dim_grid,
           kBlockSumBufferSize * sizeof(float), score_state.stream>>>(
           score_state.ssim_device, score_state.block_sum_device);
-      cudaMemcpyAsync(score_state.block_sum_device,
-                      kernel_score.block_sums.get(),
+      cudaMemcpyAsync(kernel_score.block_sums.get(),
+                      score_state.block_sum_device,
                       sizeof(float) * kBlockSumBufferSize,
                       cudaMemcpyDeviceToHost,
                       score_state.stream);
@@ -376,20 +397,22 @@ class FinalizeScoreJob {
       std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
       ScoreMap::iterator kernel_score = score_map_.find(kernel);
       assert(kernel_score != score_map_.end());
+      assert(!kernel_score->second.score_final);
+      assert(kernel_score->second.block_sums.get() != nullptr);
 
       float sum = 0.0f;
       float* block_sums = kernel_score->second.block_sums.get();
-      for (int j = 0; j < kBlockSumBufferSize; ++j) {
-        sum += *block_sums;
-        ++block_sums;
+      for (size_t j = 0; j < kBlockSumBufferSize; ++j) {
+        sum += block_sums[j];
       }
-      kernel_score->second.score = sum /
+      kernel_score->second.score = 1.0f - (sum /
           static_cast<float>(vcsmc::kTargetFrameWidthPixels *
-                             vcsmc::kFrameHeightPixels);
+                             vcsmc::kFrameHeightPixels));
 
       // Release temp float storage for savings.
       kernel_score->second.block_sums.reset();
       kernel_score->second.sim_lab.reset();
+      kernel_score->second.score_final = true;
     }
   }
 
@@ -467,25 +490,7 @@ int main(int argc, char* argv[]) {
   auto program_start_time = std::chrono::high_resolution_clock::now();
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
-  // Initialize CUDA, use first device.
-  int cuda_device_count = 0;
-  cudaError_t cuda_error = cudaGetDeviceCount(&cuda_device_count);
-  if (cuda_error != cudaSuccess) {
-    fprintf(stderr, "CUDA error on device enumeration.\n");
-    fprintf(stderr,"%s: %s\n", cudaGetErrorName(cuda_error),
-                               cudaGetErrorString(cuda_error));
-    return -1;
-  } else if (!cuda_device_count) {
-    fprintf(stderr, "unable to find CUDA device.\n");
-    return -1;
-  }
-  // Ensure synchronization behavior consistent with our needs.
-  cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
-  cudaSetDevice(0);
-  cudaDeviceProp device_props;
-  cudaGetDeviceProperties(&device_props, 0);
-  printf("CUDA Device 0: \"%s\" with compute capability %d.%d.\n",
-      device_props.name, device_props.major, device_props.minor);
+  if (!vcsmc::InitializeCuda()) return -1;
 
   // Read input image, vet, and convert to Lab color.
   std::unique_ptr<vcsmc::Image> input_image = vcsmc::LoadImage(
@@ -506,15 +511,16 @@ int main(int argc, char* argv[]) {
         input_lab.get() + (i * 3));
   }
   // Copy input Lab colors to device, compute mean and stddev asynchronously.
-  const int kLabBufferSize = vcsmc::kFrameSizeBytes * sizeof(float) * 3;
   float3* target_lab_device;
-  cudaMalloc(&target_lab_device, kLabBufferSize);
+  cudaMalloc(&target_lab_device, vcsmc::kLabBufferSizeBytes);
   float3* target_mean_device;
-  cudaMalloc(&target_mean_device, kLabBufferSize);
+  cudaMalloc(&target_mean_device, vcsmc::kLabBufferSizeBytes);
   float3* target_stddevsq_device;
-  cudaMalloc(&target_stddevsq_device, kLabBufferSize);
-  cudaMemcpyAsync(target_lab_device, input_lab.get(), kLabBufferSize,
-      cudaMemcpyHostToDevice, 0);
+  cudaMalloc(&target_stddevsq_device, vcsmc::kLabBufferSizeBytes);
+  cudaMemcpy(input_lab.get(),
+             target_lab_device,
+             vcsmc::kLabBufferSizeBytes,
+             cudaMemcpyHostToDevice);
   dim3 dim_block(16, 16);
   dim3 dim_grid(vcsmc::kTargetFrameWidthPixels / 16,
                 vcsmc::kFrameHeightPixels / 16);
@@ -539,7 +545,7 @@ int main(int argc, char* argv[]) {
   vcsmc::Generation generation;
   ScoreMap score_map;
 
-  int generation_size = FLAGS_generation_size;
+  size_t generation_size = static_cast<size_t>(FLAGS_generation_size);
 
   if (FLAGS_seed_generation_file == "") {
     vcsmc::SpecList spec_list = vcsmc::ParseSpecListFile(FLAGS_spec_list_file);
@@ -582,7 +588,7 @@ int main(int argc, char* argv[]) {
     }
 
     generation.reset(new std::vector<std::shared_ptr<vcsmc::Kernel>>);
-    for (int i = 0; i < generation_size; ++i) {
+    for (size_t i = 0; i < generation_size; ++i) {
       generation->emplace_back(new vcsmc::Kernel());
     }
 
@@ -616,11 +622,11 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
 
   float target_error = strtof(FLAGS_target_error.c_str(), nullptr);
-  int generation_count = 0;
-  int streak = 0;
+  size_t generation_count = 0;
+  size_t streak = 0;
   float last_generation_score = 0.0f;
   bool reroll = false;
-  int reroll_count = 0;
+  size_t reroll_count = 0;
 
   uint64 simulation_time_us = 0;
   uint64 simulation_count = 0;
@@ -648,7 +654,7 @@ int main(int argc, char* argv[]) {
   while (true) {
     if (global_minimum_score != score_map.end() &&
         global_minimum_score->second.score <= target_error) {
-      printf("target error reached after %d generations, terminating.\n",
+      printf("target error reached after %lu generations, terminating.\n",
              generation_count);
       break;
     }
@@ -709,6 +715,8 @@ int main(int argc, char* argv[]) {
       global_minimum_score = score_map.find(generation->at(0));
     }
 
+    assert(global_minimum_score != score_map.end());
+
     if ((generation_count % FLAGS_save_count) == 0) {
       std::set<uint64> fingerprint_set;
       for (size_t i = 0; i < generation->size(); ++i) {
@@ -718,7 +726,7 @@ int main(int argc, char* argv[]) {
           static_cast<double>(generation_size);
       auto now = std::chrono::high_resolution_clock::now();
       if (FLAGS_print_stats) {
-        printf("gen: %7d leader: %016" PRIx64 " score: %.8f div: %5.3f "
+        printf("gen: %7lu leader: %016" PRIx64 " score: %.8f div: %5.3f "
                "sim: %7" PRIu64 " score: %7" PRIu64 " tourney: %7" PRIu64 " "
                "mutate: %7" PRIu64 " epoch: %7" PRIu64 " elapsed: %7" PRIu64
                "%s\n",
@@ -757,19 +765,19 @@ int main(int argc, char* argv[]) {
 
     auto start_of_mutate = std::chrono::high_resolution_clock::now();
     if (FLAGS_stagnant_generation_count == 0 ||
-        streak < FLAGS_stagnant_generation_count) {
+        streak < static_cast<size_t>(FLAGS_stagnant_generation_count)) {
       // Replace lowest-scoring half of generation with mutated versions of
       // highest-scoring half of generation.
       for (size_t i = generation_size / 2; i < generation_size; ++i)
         score_map.unsafe_erase(generation->at(i));
       tbb::parallel_for(front_half,
           MutateKernelJob(generation, generation, generation_size / 2, 1,
-          prng_list));
+          score_map, prng_list));
       mutate_count += generation_size / 2;
       full_range_sim_needed = false;
     } else {
       ++reroll_count;
-      if (reroll_count > FLAGS_stagnant_count_limit) {
+      if (reroll_count > static_cast<size_t>(FLAGS_stagnant_count_limit)) {
         printf("max reroll count reached, terminating.\n");
         break;
       }
@@ -779,7 +787,7 @@ int main(int argc, char* argv[]) {
           new std::vector<std::shared_ptr<vcsmc::Kernel>>(generation_size));
       tbb::parallel_for(full_range,
           MutateKernelJob(generation, mutated_generation, 0,
-            FLAGS_stagnant_mutation_count, prng_list));
+            FLAGS_stagnant_mutation_count, score_map, prng_list));
       generation = mutated_generation;
       mutate_count += generation_size;
       full_range_sim_needed = true;
@@ -793,7 +801,7 @@ int main(int argc, char* argv[]) {
 
     ++generation_count;
     if (FLAGS_max_generation_number > 0 &&
-        generation_count > FLAGS_max_generation_number) {
+        generation_count > static_cast<size_t>(FLAGS_max_generation_number)) {
       printf("max generation count reached, terminating.\n");
       break;
     }

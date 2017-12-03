@@ -59,7 +59,6 @@ __global__ void ComputeLocalStdDevSquared(const float3* lab_in,
       ++n;
     }
   }
-  n = max(1, n - 1);
   float n_float = __int2float_rn(n);
   std_dev = make_float3(std_dev.x / n_float,
                         std_dev.y / n_float,
@@ -95,9 +94,9 @@ __global__ void ComputeLocalCovariance(const float3* lab_a_in,
       cov = make_float3(cov.x + (del_a.x * del_b.x),
                         cov.y + (del_a.y * del_b.y),
                         cov.z + (del_a.z * del_b.z));
+      ++n;
     }
   }
-  n = max(1, n - 1);
   float n_float = __int2float_rn(n);
   cov = make_float3(cov.x / n_float,
                     cov.y / n_float,

@@ -31,6 +31,7 @@ IMAGE_OBJ=$(OUT)/bit_map.o                                                     \
           $(OUT)/value_map.o
 
 OBJ=$(OUT)/assembler.o                                                         \
+    $(OUT)/cuda_utils.o                                                        \
     $(OUT)/kernel.o                                                            \
     $(OUT)/mssim.o                                                             \
     $(OUT)/range.o                                                             \
@@ -42,6 +43,7 @@ OBJ=$(OUT)/assembler.o                                                         \
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
          $(OUTTESTS)/kernel_unittests.o                                        \
+         $(OUTTESTS)/mssim_unittests.o                                         \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/serialization_unittests.o
 
@@ -60,7 +62,7 @@ $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES)
 
 $(OUT)/%.o: %.cu $(DEPS)
-	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -Xcompiler "$(OPT)"
+	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -Xcompiler "$(OPT) $(CFLAGS)"
 
 $(OUT)/color_distance_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
 $(OUT)/color_distance_table.o: $(OUT)/build_error_distances
@@ -69,6 +71,10 @@ $(OUT)/color_distance_table.o: $(OUT)/build_error_distances
 
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CC) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES) -I$(GTEST_INCLUDE)
+
+$(OUTTESTS)/%.o: %.cu $(DEPS)
+	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -I$(GTEST_INCLUDE)               \
+    -Xcompiler "$(OPT)"
 
 $(OUT)/build_error_distances: $(IMAGE_OBJ) $(COLOR_OBJ)                        \
                               $(OUT)/build_error_distances.o
@@ -101,8 +107,8 @@ $(OUT)/sim: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/sim.o                      \
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
     $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o | $(OUTTESTS)/
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(INCLUDES) $(LDFLAGS) $(LIBS) \
-    $(GTEST_LIB)
+	$(NVCC) -o $@ $^ $(LIBZ26_LIB) $(INCLUDES) $(LDFLAGS) $(LIBS)                \
+    $(GTEST_LIB) -Xcompiler "$(OPT) $(CFLAGS)"
 
 $(OUTTESTS)/:
 	mkdir -p $(OUTTESTS)

@@ -1,9 +1,13 @@
 #ifndef SRC_MSSIM_H_
 #define SRC_MSSIM_H_
 
+#include "constants.h"
 #include "types.h"
 
 namespace vcsmc {
+
+const size_t kLabBufferSizeBytes = sizeof(float) *
+    3 * kTargetFrameWidthPixels * kFrameHeightPixels;
 
 // Given two images in packed doubles with L*a*b* + alpha color format, and
 // their dimensions, this algorithm will compute and return the Mean Structural
