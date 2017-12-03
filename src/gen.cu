@@ -92,10 +92,11 @@ DEFINE_string(append_kernel_binary, "", "Path to append kernel binary.");
 struct MssimScoreState {
  public:
   MssimScoreState() {
-    cudaStream_t stream;
-    cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
-
     cudaError_t result;
+    cudaStream_t stream;
+    result = cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
+    assert(result == cudaSuccess);
+
     result = cudaMalloc(&sim_lab_device, kLabBufferSizeBytes);
     assert(result == cudaSuccess);
     result = cudaMalloc(&sim_mean_device, kLabBufferSizeBytes);
@@ -140,8 +141,14 @@ struct MssimScoreState {
 
 struct KernelScore {
  public:
+  KernelScore()
+    : sim_frame(new uint8[kLibZ26ImageSizeBytes]),
+      block_sums(new float[kBlockSumBufferSize]),
+      sim_lab(new float[kLabBufferSizeBytes]) {}
+
   std::shared_ptr<uint8> sim_frame;
   std::shared_ptr<float> block_sums;
+  std::shared_ptr<float> sim_lab;
   float score = 1.0;
   uint32 victories = 0;
 };
@@ -234,6 +241,7 @@ class MutateKernelJob {
       // Now do the mutations to the target.
       for (size_t j = 0; j < number_of_mutations_; ++j)
         target->Mutate(tls_prng);
+
       target->RegenerateBytecode();
     }
  }
@@ -259,36 +267,26 @@ class SimulateKernelJob {
       target_mean_device_(target_mean_device),
       target_stddevsq_device_(target_stddevsq_device),
       score_map_(score_map),
-      mssim_score_state_list_(mssim_score_state_list_) {}
+      mssim_score_state_list_(mssim_score_state_list) {}
   void operator()(const tbb::blocked_range<size_t>& r) const {
     MssimScoreStateList::reference score_state =
           mssim_score_state_list_.local();
     for (size_t i = r.begin(); i < r.end(); ++i) {
       std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
-
       KernelScore kernel_score;
-      kernel_score.sim_frame.reset(new uint8[kLibZ26ImageSizeBytes]);
-      kernel_score.block_sums.reset(new float[kBlockSumBufferSize]);
 
       simulate_single_frame(kernel->bytecode(), kernel->bytecode_size(),
           kernel_score.sim_frame.get());
 
       // Convert simulated colors to LAB for MSSIM computation.
-      std::unique_ptr<float> sim_lab(new float[vcsmc::kFrameSizeBytes * 3]);
-      float* lab = sim_lab.get();
+      float* lab = kernel_score.sim_lab.get();
       uint8* frame_pointer = kernel_score.sim_frame.get() +
           (kLibZ26ImageWidth * kSimSkipLines);
       for (size_t i = 0;
-           i < vcsmc::kFrameWidthPixels * vcsmc::kFrameHeightPixels; ++i) {
+           i < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels;
+           i += 2) {
         uint8 col = *frame_pointer;
-        if (col >= 128) {
-          lab[0] = 0.0;
-          lab[1] = 0.0;
-          lab[2] = 0.0;
-          lab[3] = 0.0;
-          lab[4] = 0.0;
-          lab[5] = 0.0;
-        } else {
+        if (col < 128) {
           uint32 lab_index = col * 3;
           lab[0] = vcsmc::kAtariNTSCLabColorTable[lab_index];
           lab[1] = vcsmc::kAtariNTSCLabColorTable[lab_index + 1];
@@ -296,6 +294,13 @@ class SimulateKernelJob {
           lab[3] = vcsmc::kAtariNTSCLabColorTable[lab_index];
           lab[4] = vcsmc::kAtariNTSCLabColorTable[lab_index + 1];
           lab[5] = vcsmc::kAtariNTSCLabColorTable[lab_index + 2];
+        } else {
+          lab[0] = 0.0;
+          lab[1] = 0.0;
+          lab[2] = 0.0;
+          lab[3] = 0.0;
+          lab[4] = 0.0;
+          lab[5] = 0.0;
         }
         frame_pointer += 2;
         lab += 6;
@@ -307,7 +312,7 @@ class SimulateKernelJob {
       dim3 sum_dim_block(256);
       dim3 sum_dim_grid(kBlockSumBufferSize);
 
-      cudaMemcpyAsync(sim_lab.get(), score_state.sim_lab_device,
+      cudaMemcpyAsync(kernel_score.sim_lab.get(), score_state.sim_lab_device,
           kLabBufferSizeBytes, cudaMemcpyHostToDevice, score_state.stream);
       vcsmc::ComputeLocalMean<<<image_dim_block, image_dim_grid, 0,
           score_state.stream>>>(score_state.sim_lab_device,
@@ -361,13 +366,12 @@ class FinalizeScoreJob {
                    MssimScoreStateList& mssim_score_state_list)
       : generation_(generation),
         score_map_(score_map),
-        mssim_score_state_list_(mssim_score_state_list_) {}
+        mssim_score_state_list_(mssim_score_state_list) {}
   void operator()(const tbb::blocked_range<size_t>& r) const {
-    // Contract with calling this job is that we have waited for all Kernel
-    // scoring computation to be completed, so the stream should be idle.
     MssimScoreStateList::reference score_state =
         mssim_score_state_list_.local();
-    assert(cudaStreamQuery(score_state.stream) == cudaSuccess);
+    cudaError_t result = cudaStreamSynchronize(score_state.stream);
+    assert(result == cudaSuccess);
     for (size_t i = r.begin(); i < r.end(); ++i) {
       std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
       ScoreMap::iterator kernel_score = score_map_.find(kernel);
@@ -385,6 +389,7 @@ class FinalizeScoreJob {
 
       // Release temp float storage for savings.
       kernel_score->second.block_sums.reset();
+      kernel_score->second.sim_lab.reset();
     }
   }
 
@@ -414,6 +419,7 @@ class CompeteKernelJob {
       assert(kernel_score_it != score_map_.end());
       uint32 victories = 0;
       float kernel_score = kernel_score_it->second.score;
+
       std::uniform_int_distribution<size_t> tourney_distro(
           0, generation_->size() - 1);
       for (size_t j = 0; j < tourney_size_; ++j) {
@@ -663,9 +669,6 @@ int main(int argc, char* argv[]) {
     auto end_of_simulation = std::chrono::high_resolution_clock::now();
     simulation_time_us += std::chrono::duration_cast<std::chrono::microseconds>(
         end_of_simulation - start_of_simulation).count();
-
-    // TODO: time this
-    cudaDeviceSynchronize();
 
     // Compute final score for all unscored kernels in the current generation.
     auto start_of_scoring = std::chrono::high_resolution_clock::now();

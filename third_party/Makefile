@@ -12,7 +12,7 @@ all: farmhash gperftools gtest gflags libyaml libz26 tbb
 
 farmhash: $(FARMHASH_OUT)/lib/libfarmhash.a | $(FARMHASH_OUT)
 
-$(FARMHASH_OUT)/lib/libfarmhash.a: export CFLAGS=-Wall -O2 -g
+$(FARMHASH_OUT)/lib/libfarmhash.a: export CFLAGS=-Wall $(OPT)
 $(FARMHASH_OUT)/lib/libfarmhash.a: | $(FARMHASH_OUT)
 	cd $(FARMHASH_OUT); $(FARMHASH_DIR)/configure --prefix=$(FARMHASH_OUT)
 	$(MAKE) -C $(FARMHASH_OUT) install
@@ -22,14 +22,14 @@ gperftools: $(GPERF_DIR)/configure $(GPERF_OUT)/lib/libprofiler.a | $(GPERF_OUT)
 $(GPERF_DIR)/configure:
 	cd $(GPERF_DIR); ./autogen.sh
 
-$(GPERF_OUT)/lib/libprofiler.a: export CFLAGS=-Wall -O2 -g
+$(GPERF_OUT)/lib/libprofiler.a: export CFLAGS=-Wall $(OPT)
 $(GPERF_OUT)/lib/libprofiler.a: $(GPERF_DIR)/configure | $(GPERF_OUT)
 	cd $(GPERF_OUT); $(GPERF_DIR)/configure --prefix=$(GPERF_OUT)
 	$(MAKE) -C $(GPERF_OUT) install
 
 gtest: $(GTEST_OUT)/libgtest.a | $(GTEST_OUT)
 
-$(GTEST_OUT)/libgtest.a: export CFLAGS=-Wall -O2 -g
+$(GTEST_OUT)/libgtest.a: export CFLAGS=-Wall $(OPT)
 $(GTEST_OUT)/libgtest.a: export CXX=$(CC)
 $(GTEST_OUT)/libgtest.a:
 	cmake -B$(GTEST_OUT) -Hgoogletest/googletest -G"Unix Makefiles"
@@ -37,7 +37,7 @@ $(GTEST_OUT)/libgtest.a:
 
 gflags: $(GFLAGS_OUT)/lib/libgflags.a | $(GFLAGS_OUT)
 
-$(GFLAGS_OUT)/lib/libgflags.a: export CFLAGS=-Wall -O2 -g
+$(GFLAGS_OUT)/lib/libgflags.a: export CFLAGS=-Wall $(OPT)
 $(GFLAGS_OUT)/lib/libgflags.a: export CXX=$(CC)
 $(GFLAGS_OUT)/lib/libgflags.a:
 	cmake -B$(GFLAGS_OUT) -Hgflags -G"Unix Makefiles"
@@ -45,7 +45,7 @@ $(GFLAGS_OUT)/lib/libgflags.a:
 
 libyaml: $(LIBYAML_OUT)/libyaml.a | $(LIBYAML_OUT)
 
-$(LIBYAML_OUT)/libyaml.a: export CFLAGS=-Wall -O2 -g
+$(LIBYAML_OUT)/libyaml.a: export CFLAGS=-Wall $(OPT)
 $(LIBYAML_OUT)/libyaml.a: export CXX=$(CC)
 $(LIBYAML_OUT)/libyaml.a:
 	cmake -B$(LIBYAML_OUT) -Hlibyaml -G"Unix Makefiles"
@@ -91,12 +91,13 @@ $(TBB_OUT):
 
 .PHONY: clean
 clean:
-	rm -f $(DCMT_OUT)
-	rm -f $(FARMHASH_OUT)
+	rm -rf $(DCMT_OUT)
+	rm -rf $(FARMHASH_OUT)
 	cd $(GPERF_DIR); git clean -dxf
-	rm -f $(GPERF_OUT)
-	rm -f $(GTEST_OUT)
-	rm -f $(GFLAGS_OUT)
-	rm -f $(LIBYAML_OUT)
-	rm -f $(LIBZ26_OUT)
-	rm -f $(TBB_OUT)
+	rm -rf $(GPERF_OUT)
+	rm -rf $(GTEST_OUT)
+	rm -rf $(GFLAGS_OUT)
+	rm -rf $(LIBYAML_OUT)
+	rm -rf $(LIBZ26_OUT)
+	rm -rf $(TBB_OUT)
+	rm -f $(OUT)/libtbb*

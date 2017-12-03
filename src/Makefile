@@ -57,51 +57,51 @@ tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 all: vcsmc tests
 
 $(OUT)/%.o: %.cc $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS) $(INCLUDES)
+	$(CC) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES)
 
 $(OUT)/%.o: %.cu $(DEPS)
-	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -Xcompiler "-O2"
+	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -Xcompiler "$(OPT)"
 
 $(OUT)/color_distance_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
 $(OUT)/color_distance_table.o: $(OUT)/build_error_distances
 	$(OUT)/build_error_distances --output_directory=../out
-	$(CC) -c -o $@ $(OUT)/color_distance_table.cc $(CFLAGS) $(INCLUDES)
+	$(CC) -c -o $@ $(OUT)/color_distance_table.cc $(CFLAGS) $(OPT) $(INCLUDES)
 
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
-	$(CC) -c -o $@ $< $(CFLAGS) $(INCLUDES) -I$(GTEST_INCLUDE)
+	$(CC) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES) -I$(GTEST_INCLUDE)
 
 $(OUT)/build_error_distances: $(IMAGE_OBJ) $(COLOR_OBJ)                        \
                               $(OUT)/build_error_distances.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/find_ciede_max_distance: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ)               \
                                 $(OUT)/color_distance_table.o                  \
                                 $(OUT)/find_ciede_max_distance.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/fit: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/fit.o                      \
             $(OUT)/color_distance_table.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/gen: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/gen.o                      \
             $(OUT)/color_distance_table.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/pcm: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o     \
             $(OUT)/pcm.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/respec: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o  \
                $(OUT)/respec.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/sim: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/sim.o                      \
             $(OUT)/color_distance_table.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
     $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/color_distance_table.o | $(OUTTESTS)/
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(INCLUDES) $(LDFLAGS) $(LIBS)        \
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(INCLUDES) $(LDFLAGS) $(LIBS) \
     $(GTEST_LIB)
 
 $(OUTTESTS)/:
@@ -119,5 +119,5 @@ clean:
     $(OUT)/pcm{,.o}                                                            \
     $(OUT)/respec{,.o}                                                         \
     $(OUT)/sim{,.o}                                                            \
-    $(OUTTESTS)/run_unittests
+    $(OUTTESTS)/run_unittests{,.o}
 

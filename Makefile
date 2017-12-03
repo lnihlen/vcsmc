@@ -5,7 +5,8 @@ export CC=clang
 # (also versioned) so that YCM will pick up the correct flags.
 # Also note that right now all the third_party/ builds have hard-coded CFLAGS
 # of their own and don't follow this variable.
-export CFLAGS=-std=c++11 -Wall -Wextra -Werror -O2
+export CFLAGS=-std=c++11 -Wall -Wextra -Werror
+export OPT=-O2
 export LDFLAGS=
 export LIBS=-lstdc++
 export OUT=$(CURDIR)/out
@@ -52,7 +53,6 @@ $(OUT)/:
 .PHONY: clean
 clean:
 	$(MAKE) -C src/ clean
-
 
 .PHONY: cleandeps
 cleandeps: clean

@@ -20,7 +20,7 @@ __global__ void ComputeLocalMean(const float3* lab_in,
   float3 mean = make_float3(0.0, 0.0, 0.0);
   int n = 0;
   for (int i = 0; i < min(WINDOW_SIZE, IMAGE_HEIGHT - y); ++i) {
-    int row_offset = ((y + i) * IMAGE_HEIGHT) + x;
+    int row_offset = ((y + i) * IMAGE_WIDTH) + x;
     for (int j = 0; j < min(WINDOW_SIZE, IMAGE_WIDTH - x); ++j) {
       float3 lab = lab_in[row_offset + j];
       mean = make_float3(mean.x + lab.x,
@@ -46,7 +46,7 @@ __global__ void ComputeLocalStdDevSquared(const float3* lab_in,
   float3 std_dev = make_float3(0.0, 0.0, 0.0);
   int n = 0;
   for (int i = 0; i < min(WINDOW_SIZE, IMAGE_HEIGHT - y); ++i) {
-    int row_offset = ((y + i) * IMAGE_HEIGHT) + x;
+    int row_offset = ((y + i) * IMAGE_WIDTH) + x;
     for (int j = 0; j < min(WINDOW_SIZE, IMAGE_WIDTH - x); ++j) {
       float3 lab = lab_in[row_offset + j];
       float3 mean = mean_in[row_offset + j];
@@ -79,7 +79,7 @@ __global__ void ComputeLocalCovariance(const float3* lab_a_in,
   float3 cov = make_float3(0.0, 0.0, 0.0);
   int n = 0;
   for (int i = 0; i < min(WINDOW_SIZE, IMAGE_HEIGHT - y); ++i) {
-    int row_offset = ((y + i) * IMAGE_HEIGHT) + x;
+    int row_offset = ((y + i) * IMAGE_WIDTH) + x;
     for (int j = 0; j < min(WINDOW_SIZE, IMAGE_WIDTH - x); ++j) {
       float3 lab_a = lab_a_in[row_offset + j];
       float3 mean_a = mean_a_in[row_offset + j];
@@ -115,11 +115,12 @@ __global__ void ComputeSSIM(const float3* mean_a_in,
   int y = (blockIdx.y * blockDim.y) + threadIdx.y;
   if (x >= IMAGE_WIDTH || y >= IMAGE_HEIGHT)
     return;
-  float3 mean_a = mean_a_in[(y * IMAGE_WIDTH) + x];
-  float3 stddevsq_a = stddevsq_a_in[(y * IMAGE_WIDTH) + x];
-  float3 mean_b = mean_b_in[(y * IMAGE_WIDTH) + x];
-  float3 stddevsq_b = stddevsq_b_in[(y * IMAGE_WIDTH) + x];
-  float3 cov_ab = cov_ab_in[(y * IMAGE_WIDTH) + x];
+  int pixel_offset = (y * IMAGE_WIDTH) + x;
+  float3 mean_a = mean_a_in[pixel_offset];
+  float3 stddevsq_a = stddevsq_a_in[pixel_offset];
+  float3 mean_b = mean_b_in[pixel_offset];
+  float3 stddevsq_b = stddevsq_b_in[pixel_offset];
+  float3 cov_ab = cov_ab_in[pixel_offset];
   float3 ssim = make_float3(
       (((2.0 * mean_a.x * mean_b.x) + C1) * ((2.0 * cov_ab.x) + C2)) /
           (((mean_a.x * mean_a.x) + (mean_b.x * mean_b.x) + C1) *
@@ -131,7 +132,7 @@ __global__ void ComputeSSIM(const float3* mean_a_in,
           (((mean_a.z * mean_a.z) + (mean_b.z * mean_b.z) + C1) *
            (stddevsq_a.z + stddevsq_b.z + C2)));
 
-  ssim_out[(y * IMAGE_WIDTH) + x] =
+  ssim_out[pixel_offset] =
       (WEIGHT_L * ssim.x) + (WEIGHT_A * ssim.y) + (WEIGHT_B * ssim.z);
 }
 
