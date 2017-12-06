@@ -162,7 +162,9 @@ __global__ void ComputeSSIM(const float4* mean_a_in,
   // Note we must calculate an unpadded offset for the ssim_out result, as
   // the output buffer needs no padding as there are no loops to unroll here.
   ssim_out[(y * IMAGE_WIDTH) + x] =
-      (WEIGHT_L * ssim.x) + (WEIGHT_A * ssim.y) + (WEIGHT_B * ssim.z);
+      (WEIGHT_L * fabsf(ssim.x)) +
+      (WEIGHT_A * fabsf(ssim.y)) +
+      (WEIGHT_B * fabsf(ssim.z));
 }
 
 // 320 * 192 = 61440 = 256 * 240
