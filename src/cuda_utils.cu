@@ -7,7 +7,7 @@
 
 namespace vcsmc {
 
-bool InitializeCuda() {
+bool InitializeCuda(bool print_stats) {
   // Initialize CUDA, use first device.
   int cuda_device_count = 0;
   cudaError_t cuda_error = cudaGetDeviceCount(&cuda_device_count);
@@ -23,10 +23,21 @@ bool InitializeCuda() {
   // Ensure synchronization behavior consistent with our needs.
   cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
   cudaSetDevice(0);
-  cudaDeviceProp device_props;
-  cudaGetDeviceProperties(&device_props, 0);
-  printf("CUDA Device 0: \"%s\" with compute capability %d.%d.\n",
-      device_props.name, device_props.major, device_props.minor);
+  if (print_stats) {
+    cudaDeviceProp device_props;
+    cudaGetDeviceProperties(&device_props, 0);
+    printf("CUDA Device 0: \"%s\" with compute capability %d.%d.\n",
+        device_props.name, device_props.major, device_props.minor);
+    printf("  total global memory: %lu bytes.\n", device_props.totalGlobalMem);
+    printf("  shared memory per blocK: %lu bytes.\n",
+        device_props.sharedMemPerBlock);
+    printf("  max threads per block: %d threads.\n",
+        device_props.maxThreadsPerBlock);
+    printf("  total constant memory: %lu bytes.\n", device_props.totalConstMem);
+    printf("  can copy and execute simultaneously: %d.\n",
+        device_props.deviceOverlap);
+    printf("  multiprocessor count: %d.\n", device_props.multiProcessorCount);
+  }
   return true;
 }
 

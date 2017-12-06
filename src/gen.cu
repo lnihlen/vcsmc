@@ -129,10 +129,10 @@ struct MssimScoreState {
   MssimScoreState(const MssimScoreState&) = delete;
 
   cudaStream_t stream;
-  float3* sim_lab_device = nullptr;
-  float3* sim_mean_device = nullptr;
-  float3* sim_stddevsq_device = nullptr;
-  float3* sim_cov_device = nullptr;
+  float4* sim_lab_device = nullptr;
+  float4* sim_mean_device = nullptr;
+  float4* sim_stddevsq_device = nullptr;
+  float4* sim_cov_device = nullptr;
   float* ssim_device = nullptr;
   float* block_sum_device = nullptr;
   float* final_sum_device = nullptr;
@@ -143,7 +143,7 @@ struct KernelScore {
   KernelScore()
     : sim_frame(new uint8[kLibZ26ImageSizeBytes]),
       block_sums(new float[kBlockSumBufferSize]),
-      sim_lab(new float[vcsmc::kLabBufferSizeBytes]) {}
+      sim_lab(new float[vcsmc::kLabBufferSize]) {}
 
   std::shared_ptr<uint8> sim_frame;
   std::shared_ptr<float> block_sums;
@@ -275,9 +275,9 @@ class MutateKernelJob {
 class SimulateKernelJob {
  public:
   SimulateKernelJob(vcsmc::Generation generation,
-                    const float3* target_lab_device,
-                    const float3* target_mean_device,
-                    const float3* target_stddevsq_device,
+                    const float4* target_lab_device,
+                    const float4* target_mean_device,
+                    const float4* target_stddevsq_device,
                     ScoreMap& score_map,
                     MssimScoreStateList& mssim_score_state_list)
     : generation_(generation),
@@ -298,35 +298,46 @@ class SimulateKernelJob {
 
       // Convert simulated colors to LAB for MSSIM computation.
       float* lab = kernel_score.sim_lab.get();
+      // Zero out the image, to also zero out the padding.
+      std::memset(lab, 0, vcsmc::kLabBufferSizeBytes);
       uint8* frame_pointer = kernel_score.sim_frame.get() +
           (kLibZ26ImageWidth * kSimSkipLines);
-      for (size_t j = 0;
-           j < vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels;
-           j += 2) {
-        uint8 col = *frame_pointer;
-        if (col < 128) {
-          uint32 lab_index = col * 3;
-          lab[0] = vcsmc::kAtariNTSCLabColorTable[lab_index];
-          lab[1] = vcsmc::kAtariNTSCLabColorTable[lab_index + 1];
-          lab[2] = vcsmc::kAtariNTSCLabColorTable[lab_index + 2];
-          lab[3] = vcsmc::kAtariNTSCLabColorTable[lab_index];
-          lab[4] = vcsmc::kAtariNTSCLabColorTable[lab_index + 1];
-          lab[5] = vcsmc::kAtariNTSCLabColorTable[lab_index + 2];
-        } else {
-          lab[0] = 0.0;
-          lab[1] = 0.0;
-          lab[2] = 0.0;
-          lab[3] = 0.0;
-          lab[4] = 0.0;
-          lab[5] = 0.0;
+      for (size_t j = 0; j < vcsmc::kFrameHeightPixels; ++j) {
+        for (size_t k = 0; k < vcsmc::kFrameWidthPixels; ++k) {
+          uint8 col = *frame_pointer;
+          if (col < 128) {
+            uint32 lab_index = col * 3;
+            lab[0] = vcsmc::kAtariNTSCLabColorTable[lab_index];
+            lab[1] = vcsmc::kAtariNTSCLabColorTable[lab_index + 1];
+            lab[2] = vcsmc::kAtariNTSCLabColorTable[lab_index + 2];
+            lab[3] = 1.0;
+            lab[4] = vcsmc::kAtariNTSCLabColorTable[lab_index];
+            lab[5] = vcsmc::kAtariNTSCLabColorTable[lab_index + 1];
+            lab[6] = vcsmc::kAtariNTSCLabColorTable[lab_index + 2];
+            lab[7] = 1.0;
+          } else {
+            lab[0] = 0.0;
+            lab[1] = 0.0;
+            lab[2] = 0.0;
+            lab[3] = 1.0;
+            lab[4] = 0.0;
+            lab[5] = 0.0;
+            lab[6] = 0.0;
+            lab[7] = 1.0;
+          }
+          frame_pointer += 2;
+          lab += 8;
         }
-        frame_pointer += 2;
-        lab += 6;
+
+        // Skip padding on right.
+        lab += vcsmc::kWindowSize * 4;
       }
 
       dim3 image_dim_block(16, 16);
-      dim3 image_dim_grid(vcsmc::kTargetFrameWidthPixels / 16,
-                          vcsmc::kFrameHeightPixels / 16);
+      dim3 padded_image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
+                                 (vcsmc::kFrameHeightPixels / 16) + 1);
+      dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16),
+                          (vcsmc::kFrameHeightPixels / 16));
       dim3 sum_dim_block(256);
       dim3 sum_dim_grid(kBlockSumBufferSize);
 
@@ -335,14 +346,14 @@ class SimulateKernelJob {
                       vcsmc::kLabBufferSizeBytes,
                       cudaMemcpyHostToDevice,
                       score_state.stream);
-      vcsmc::ComputeLocalMean<<<image_dim_block, image_dim_grid, 0,
+      vcsmc::ComputeLocalMean<<<image_dim_block, padded_image_dim_grid, 0,
           score_state.stream>>>(score_state.sim_lab_device,
                                 score_state.sim_mean_device);
-      vcsmc::ComputeLocalStdDevSquared<<<image_dim_block, image_dim_grid, 0,
-          score_state.stream>>>(score_state.sim_lab_device,
-                                score_state.sim_mean_device,
-                                score_state.sim_stddevsq_device);
-      vcsmc::ComputeLocalCovariance<<<image_dim_block, image_dim_grid, 0,
+      vcsmc::ComputeLocalStdDevSquared<<<image_dim_block, padded_image_dim_grid,
+          0, score_state.stream>>>(score_state.sim_lab_device,
+                                   score_state.sim_mean_device,
+                                   score_state.sim_stddevsq_device);
+      vcsmc::ComputeLocalCovariance<<<image_dim_block, padded_image_dim_grid, 0,
           score_state.stream>>>(score_state.sim_lab_device,
                                 score_state.sim_mean_device,
                                 target_lab_device_,
@@ -370,9 +381,9 @@ class SimulateKernelJob {
 
  private:
   vcsmc::Generation generation_;
-  const float3* target_lab_device_;
-  const float3* target_mean_device_;
-  const float3* target_stddevsq_device_;
+  const float4* target_lab_device_;
+  const float4* target_mean_device_;
+  const float4* target_stddevsq_device_;
   ScoreMap& score_map_;
   MssimScoreStateList& mssim_score_state_list_;
 };
@@ -490,7 +501,7 @@ int main(int argc, char* argv[]) {
   auto program_start_time = std::chrono::high_resolution_clock::now();
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
-  if (!vcsmc::InitializeCuda()) return -1;
+  if (!vcsmc::InitializeCuda(FLAGS_print_stats)) return -1;
 
   // Read input image, vet, and convert to Lab color.
   std::unique_ptr<vcsmc::Image> input_image = vcsmc::LoadImage(
@@ -505,25 +516,34 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "bad image dimensions on input image file %s.\n",
         FLAGS_input_image_file.c_str());
   }
-  std::unique_ptr<float> input_lab(new float[vcsmc::kFrameSizeBytes * 3]);
-  for (uint32 i = 0; i < vcsmc::kFrameSizeBytes; ++i) {
-    vcsmc::RGBAToLab(reinterpret_cast<uint8*>(input_image->pixels() + i),
-        input_lab.get() + (i * 3));
+  std::unique_ptr<float> input_lab(new float[vcsmc::kLabBufferSize]);
+  float* input_lab_ptr = input_lab.get();
+  const uint32* pixel_ptr = input_image->pixels();
+  std::memset(input_lab_ptr, 0, vcsmc::kLabBufferSizeBytes);
+  for (size_t i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
+    for (size_t j = 0; j < vcsmc::kTargetFrameWidthPixels; ++j) {
+      vcsmc::RGBAToLab(reinterpret_cast<const uint8*>(pixel_ptr),
+          input_lab_ptr);
+      input_lab_ptr[3] = 1.0f;
+      ++pixel_ptr;
+      input_lab_ptr += 4;
+    }
+    input_lab_ptr += (4 * vcsmc::kWindowSize);
   }
   // Copy input Lab colors to device, compute mean and stddev asynchronously.
-  float3* target_lab_device;
+  float4* target_lab_device;
   cudaMalloc(&target_lab_device, vcsmc::kLabBufferSizeBytes);
-  float3* target_mean_device;
+  float4* target_mean_device;
   cudaMalloc(&target_mean_device, vcsmc::kLabBufferSizeBytes);
-  float3* target_stddevsq_device;
+  float4* target_stddevsq_device;
   cudaMalloc(&target_stddevsq_device, vcsmc::kLabBufferSizeBytes);
-  cudaMemcpy(input_lab.get(),
-             target_lab_device,
+  cudaMemcpy(target_lab_device,
+             input_lab.get(),
              vcsmc::kLabBufferSizeBytes,
              cudaMemcpyHostToDevice);
   dim3 dim_block(16, 16);
-  dim3 dim_grid(vcsmc::kTargetFrameWidthPixels / 16,
-                vcsmc::kFrameHeightPixels / 16);
+  dim3 dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
+                (vcsmc::kFrameHeightPixels / 16) + 1);
   vcsmc::ComputeLocalMean<<<dim_block, dim_grid, 0>>>(target_lab_device,
       target_mean_device);
   vcsmc::ComputeLocalStdDevSquared<<<dim_block, dim_grid, 0>>>(

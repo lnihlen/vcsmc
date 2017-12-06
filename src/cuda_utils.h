@@ -4,7 +4,7 @@
 namespace vcsmc {
 
 // Returns true on success. Will print to stderr on failure.
-bool InitializeCuda();
+bool InitializeCuda(bool print_stats);
 
 }  // namespace vcsmc
 
