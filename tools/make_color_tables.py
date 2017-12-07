@@ -147,8 +147,13 @@ def build_atari_colors_list():
 def main(argv):
   atari_colors_rgb = build_atari_colors_list()
   atari_colors_lab = []
+  atari_colors_yuv = []
   for color_rgb in atari_colors_rgb:
     atari_colors_lab.append(convert_color(color_rgb, LabColor))
+    atari_colors_yuv.append((\
+        (0.299 * color_rgb.rgb_r + 0.587 * color_rgb.rgb_g + 0.114 * color_rgb.rgb_b),
+        (-0.14713 * color_rgb.rgb_r - 0.28886 * color_rgb.rgb_g + 0.436 * color_rgb.rgb_b),
+        (0.615 * color_rgb.rgb_r - 0.51499 * color_rgb.rgb_g - 0.10001 * color_rgb.rgb_b)))
 
   output_file = file('src/color_table.cc', 'w')
   output_file.write(
@@ -179,6 +184,17 @@ const float kAtariNTSCLabColorTable[128 * 3] = {
         (color_lab.lab_l, color_lab.lab_a, color_lab.lab_b))
 
   output_file.write(',\n'.join(lab_strings))
+  output_file.write("""
+};
+
+const float kAtartiNTSCYUVColorTable[128 * 4] = {
+""")
+  yuv_strings = []
+  for color_yuv in atari_colors_yuv:
+    yuv_strings.append('  %.19g, %.19g, %.19g, 0.0' % \
+        (color_yuv[0], color_yuv[1], color_yuv[2]))
+
+  output_file.write(',\n'.join(yuv_strings))
   output_file.write("""
 };
 

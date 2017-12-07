@@ -48,6 +48,19 @@ void RGBAToLab(const uint8* rgba, float* lab) {
   lab[2] = b_star;
 }
 
+// Conversion detailed in Wikipedia
+// https://en.wikipedia.org/wiki/YUV#Y.E2.80.B2UV444_to_RGB888_conversion
+void YUVToLab(const uint8* rgba, float* yuv) {
+  float r = static_cast<float>(rgba[0]) / 255.0f;
+  float g = static_cast<float>(rgba[1]) / 255.0f;
+  float b = static_cast<float>(rgba[2]) / 255.0f;
+
+  yuv[0] = (0.299 * r) + (0.587 * g) + (0.114 * b);
+  yuv[1] = (-0.14713 * r) - (0.28886 * g) + (0.436 * b);
+  yuv[2] = (0.615 * r) - (0.51499 * g) + (0.10001 * b);
+  yuv[3] = 1.0f;
+}
+
 float Ciede2k(const float* laba_1, const float* laba_2) {
   float L_star_1 = laba_1[0];
   float a_star_1 = laba_1[1];
