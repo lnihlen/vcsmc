@@ -13,8 +13,10 @@ const float kMaxLab = 100.0;
 void RGBAToLab(const uint8* rgba, float* lab);
 
 // Given four bytes of rgba color pointed to by |rgba| stores four floats of
-// (Y, U, V, 1.0)  converted color values at |yuv|.
-void RGBAToYuv(const uint8* rgba, float* yuv);
+// (Y, U, V, 1.0)  converted color values at |yuv|. The normalization maps the
+// maximum range of YUV colors as converted from RGB to the range [0..1] for
+// each value.
+void RGBAToNormalizedYuv(const uint8* rgba, float* nyuv);
 
 // Given input colors in L*a*b* color space returns the CIEDE2000 delta E value,
 // a nonlinear color distance based on the human vision response.

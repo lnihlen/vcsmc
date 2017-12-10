@@ -21,8 +21,8 @@ endif
 
 DEPS=constants.h image_file.h types.h
 
-COLOR_OBJ=$(OUT)/color.o                                                       \
-          $(OUT)/color_table.o
+COLOR_OBJ=$(OUT)/atari_ntsc_abgr_color_table.o                                 \
+          $(OUT)/color.o
 
 IMAGE_OBJ=$(OUT)/bit_map.o                                                     \
           $(OUT)/gray_map.o                                                    \
