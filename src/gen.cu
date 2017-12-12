@@ -23,9 +23,9 @@
 #include "cuda_runtime.h"
 #include "tbb/tbb.h"
 
+#include "atari_ntsc_nyuv_color_table.h"
 #include "bit_map.h"
 #include "color.h"
-#include "color_table.h"
 #include "cuda_utils.h"
 #include "image.h"
 #include "image_file.h"
@@ -96,13 +96,13 @@ struct MssimScoreState {
     result = cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
     assert(result == cudaSuccess);
 
-    result = cudaMalloc(&sim_lab_device, vcsmc::kLabBufferSizeBytes);
+    result = cudaMalloc(&sim_nyuv_device, vcsmc::kNyuvBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&sim_mean_device, vcsmc::kLabBufferSizeBytes);
+    result = cudaMalloc(&sim_mean_device, vcsmc::kNyuvBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&sim_stddevsq_device, vcsmc::kLabBufferSizeBytes);
+    result = cudaMalloc(&sim_stddevsq_device, vcsmc::kNyuvBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&sim_cov_device, vcsmc::kLabBufferSizeBytes);
+    result = cudaMalloc(&sim_cov_device, vcsmc::kNyuvBufferSizeBytes);
     assert(result == cudaSuccess);
     result = cudaMalloc(&ssim_device, sizeof(float) *
         vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels);
@@ -117,7 +117,7 @@ struct MssimScoreState {
     // Clear any pending work on this thread.
     cudaStreamSynchronize(stream);
 
-    cudaFree(sim_lab_device);
+    cudaFree(sim_nyuv_device);
     cudaFree(sim_mean_device);
     cudaFree(sim_stddevsq_device);
     cudaFree(sim_cov_device);
@@ -129,7 +129,7 @@ struct MssimScoreState {
   MssimScoreState(const MssimScoreState&) = delete;
 
   cudaStream_t stream;
-  float4* sim_lab_device = nullptr;
+  float4* sim_nyuv_device = nullptr;
   float4* sim_mean_device = nullptr;
   float4* sim_stddevsq_device = nullptr;
   float4* sim_cov_device = nullptr;
@@ -143,11 +143,11 @@ struct KernelScore {
   KernelScore()
     : sim_frame(new uint8[kLibZ26ImageSizeBytes]),
       block_sums(new float[kBlockSumBufferSize]),
-      sim_lab(new float[vcsmc::kLabBufferSize]) {}
+      sim_nyuv(new float[vcsmc::kNyuvBufferSize]) {}
 
   std::shared_ptr<uint8> sim_frame;
   std::shared_ptr<float> block_sums;
-  std::shared_ptr<float> sim_lab;
+  std::shared_ptr<float> sim_nyuv;
   float score = 1.0;
   uint32 victories = 0;
   bool score_final = false;
@@ -275,13 +275,13 @@ class MutateKernelJob {
 class SimulateKernelJob {
  public:
   SimulateKernelJob(vcsmc::Generation generation,
-                    const float4* target_lab_device,
+                    const float4* target_nyuv_device,
                     const float4* target_mean_device,
                     const float4* target_stddevsq_device,
                     ScoreMap& score_map,
                     MssimScoreStateList& mssim_score_state_list)
     : generation_(generation),
-      target_lab_device_(target_lab_device),
+      target_nyuv_device_(target_nyuv_device),
       target_mean_device_(target_mean_device),
       target_stddevsq_device_(target_stddevsq_device),
       score_map_(score_map),
@@ -296,41 +296,41 @@ class SimulateKernelJob {
       simulate_single_frame(kernel->bytecode(), kernel->bytecode_size(),
           kernel_score.sim_frame.get());
 
-      // Convert simulated colors to LAB for MSSIM computation.
-      float* lab = kernel_score.sim_lab.get();
+      // Convert simulated colors to nYUV for MSSIM computation.
+      float* nyuv = kernel_score.sim_nyuv.get();
       // Zero out the image, to also zero out the padding.
-      std::memset(lab, 0, vcsmc::kLabBufferSizeBytes);
+      std::memset(nyuv, 0, vcsmc::kNyuvBufferSizeBytes);
       uint8* frame_pointer = kernel_score.sim_frame.get() +
           (kLibZ26ImageWidth * kSimSkipLines);
       for (size_t j = 0; j < vcsmc::kFrameHeightPixels; ++j) {
         for (size_t k = 0; k < vcsmc::kFrameWidthPixels; ++k) {
           uint8 col = *frame_pointer;
           if (col < 128) {
-            uint32 lab_index = col * 3;
-            lab[0] = vcsmc::kAtariNTSCLabColorTable[lab_index];
-            lab[1] = vcsmc::kAtariNTSCLabColorTable[lab_index + 1];
-            lab[2] = vcsmc::kAtariNTSCLabColorTable[lab_index + 2];
-            lab[3] = 1.0;
-            lab[4] = vcsmc::kAtariNTSCLabColorTable[lab_index];
-            lab[5] = vcsmc::kAtariNTSCLabColorTable[lab_index + 1];
-            lab[6] = vcsmc::kAtariNTSCLabColorTable[lab_index + 2];
-            lab[7] = 1.0;
+            uint32 nyuv_index = col * 3;
+            nyuv[0] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index];
+            nyuv[1] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 1];
+            nyuv[2] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 2];
+            nyuv[3] = 1.0;
+            nyuv[4] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index];
+            nyuv[5] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 1];
+            nyuv[6] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 2];
+            nyuv[7] = 1.0;
           } else {
-            lab[0] = 0.0;
-            lab[1] = 0.0;
-            lab[2] = 0.0;
-            lab[3] = 1.0;
-            lab[4] = 0.0;
-            lab[5] = 0.0;
-            lab[6] = 0.0;
-            lab[7] = 1.0;
+            nyuv[0] = 0.0;
+            nyuv[1] = 0.0;
+            nyuv[2] = 0.0;
+            nyuv[3] = 1.0;
+            nyuv[4] = 0.0;
+            nyuv[5] = 0.0;
+            nyuv[6] = 0.0;
+            nyuv[7] = 1.0;
           }
           frame_pointer += 2;
-          lab += 8;
+          nyuv += 8;
         }
 
         // Skip padding on right.
-        lab += vcsmc::kWindowSize * 4;
+        nyuv += vcsmc::kWindowSize * 4;
       }
 
       dim3 image_dim_block(16, 16);
@@ -341,22 +341,22 @@ class SimulateKernelJob {
       dim3 sum_dim_block(256);
       dim3 sum_dim_grid(kBlockSumBufferSize);
 
-      cudaMemcpyAsync(score_state.sim_lab_device,
-                      kernel_score.sim_lab.get(),
-                      vcsmc::kLabBufferSizeBytes,
+      cudaMemcpyAsync(score_state.sim_nyuv_device,
+                      kernel_score.sim_nyuv.get(),
+                      vcsmc::kNyuvBufferSizeBytes,
                       cudaMemcpyHostToDevice,
                       score_state.stream);
       vcsmc::ComputeLocalMean<<<image_dim_block, padded_image_dim_grid, 0,
-          score_state.stream>>>(score_state.sim_lab_device,
+          score_state.stream>>>(score_state.sim_nyuv_device,
                                 score_state.sim_mean_device);
       vcsmc::ComputeLocalStdDevSquared<<<image_dim_block, padded_image_dim_grid,
-          0, score_state.stream>>>(score_state.sim_lab_device,
+          0, score_state.stream>>>(score_state.sim_nyuv_device,
                                    score_state.sim_mean_device,
                                    score_state.sim_stddevsq_device);
       vcsmc::ComputeLocalCovariance<<<image_dim_block, padded_image_dim_grid, 0,
-          score_state.stream>>>(score_state.sim_lab_device,
+          score_state.stream>>>(score_state.sim_nyuv_device,
                                 score_state.sim_mean_device,
-                                target_lab_device_,
+                                target_nyuv_device_,
                                 target_mean_device_,
                                 score_state.sim_cov_device);
       vcsmc::ComputeSSIM<<<image_dim_block, image_dim_grid, 0,
@@ -381,7 +381,7 @@ class SimulateKernelJob {
 
  private:
   vcsmc::Generation generation_;
-  const float4* target_lab_device_;
+  const float4* target_nyuv_device_;
   const float4* target_mean_device_;
   const float4* target_stddevsq_device_;
   ScoreMap& score_map_;
@@ -422,7 +422,7 @@ class FinalizeScoreJob {
 
       // Release temp float storage for savings.
       kernel_score->second.block_sums.reset();
-      kernel_score->second.sim_lab.reset();
+      kernel_score->second.sim_nyuv.reset();
       kernel_score->second.score_final = true;
     }
   }
@@ -503,7 +503,7 @@ int main(int argc, char* argv[]) {
 
   if (!vcsmc::InitializeCuda(FLAGS_print_stats)) return -1;
 
-  // Read input image, vet, and convert to Lab color.
+  // Read input image, vet, and convert to Nyuv color.
   std::unique_ptr<vcsmc::Image> input_image = vcsmc::LoadImage(
       FLAGS_input_image_file);
   if (!input_image) {
@@ -516,38 +516,38 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "bad image dimensions on input image file %s.\n",
         FLAGS_input_image_file.c_str());
   }
-  std::unique_ptr<float> input_lab(new float[vcsmc::kLabBufferSize]);
-  float* input_lab_ptr = input_lab.get();
+  std::unique_ptr<float> input_nyuv(new float[vcsmc::kNyuvBufferSize]);
+  float* input_nyuv_ptr = input_nyuv.get();
   const uint32* pixel_ptr = input_image->pixels();
-  std::memset(input_lab_ptr, 0, vcsmc::kLabBufferSizeBytes);
+  std::memset(input_nyuv_ptr, 0, vcsmc::kNyuvBufferSizeBytes);
   for (size_t i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
     for (size_t j = 0; j < vcsmc::kTargetFrameWidthPixels; ++j) {
-      vcsmc::RGBAToLab(reinterpret_cast<const uint8*>(pixel_ptr),
-          input_lab_ptr);
-      input_lab_ptr[3] = 1.0f;
+      vcsmc::RgbaToNormalizedYuv(reinterpret_cast<const uint8*>(pixel_ptr),
+          input_nyuv_ptr);
+      input_nyuv_ptr[3] = 1.0f;
       ++pixel_ptr;
-      input_lab_ptr += 4;
+      input_nyuv_ptr += 4;
     }
-    input_lab_ptr += (4 * vcsmc::kWindowSize);
+    input_nyuv_ptr += (4 * vcsmc::kWindowSize);
   }
-  // Copy input Lab colors to device, compute mean and stddev asynchronously.
-  float4* target_lab_device;
-  cudaMalloc(&target_lab_device, vcsmc::kLabBufferSizeBytes);
+  // Copy input Nyuv colors to device, compute mean and stddev asynchronously.
+  float4* target_nyuv_device;
+  cudaMalloc(&target_nyuv_device, vcsmc::kNyuvBufferSizeBytes);
   float4* target_mean_device;
-  cudaMalloc(&target_mean_device, vcsmc::kLabBufferSizeBytes);
+  cudaMalloc(&target_mean_device, vcsmc::kNyuvBufferSizeBytes);
   float4* target_stddevsq_device;
-  cudaMalloc(&target_stddevsq_device, vcsmc::kLabBufferSizeBytes);
-  cudaMemcpy(target_lab_device,
-             input_lab.get(),
-             vcsmc::kLabBufferSizeBytes,
+  cudaMalloc(&target_stddevsq_device, vcsmc::kNyuvBufferSizeBytes);
+  cudaMemcpy(target_nyuv_device,
+             input_nyuv.get(),
+             vcsmc::kNyuvBufferSizeBytes,
              cudaMemcpyHostToDevice);
   dim3 dim_block(16, 16);
   dim3 dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
                 (vcsmc::kFrameHeightPixels / 16) + 1);
-  vcsmc::ComputeLocalMean<<<dim_block, dim_grid, 0>>>(target_lab_device,
+  vcsmc::ComputeLocalMean<<<dim_block, dim_grid, 0>>>(target_nyuv_device,
       target_mean_device);
   vcsmc::ComputeLocalStdDevSquared<<<dim_block, dim_grid, 0>>>(
-      target_lab_device, target_mean_device, target_stddevsq_device);
+      target_nyuv_device, target_mean_device, target_stddevsq_device);
 
   vcsmc::SpecList audio_spec_list;
   if (FLAGS_audio_spec_list_file != "") {
@@ -685,7 +685,7 @@ int main(int argc, char* argv[]) {
     auto start_of_simulation = std::chrono::high_resolution_clock::now();
     tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
         SimulateKernelJob(generation,
-                          target_lab_device,
+                          target_nyuv_device,
                           target_mean_device,
                           target_stddevsq_device,
                           score_map,

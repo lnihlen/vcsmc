@@ -1,5 +1,5 @@
+#include "atari_ntsc_abgr_color_table.h"
 #include "image.h"
-#include "color_table.h"
 #include "constants.h"
 
 namespace vcsmc {
@@ -15,7 +15,7 @@ Image::Image(const uint8* atari_colors)
   uint32* pixel = pixels_.get();
   const uint8* atari_color = atari_colors;
   for (size_t i = 0; i < kTargetFrameWidthPixels * kFrameHeightPixels; i += 2) {
-    uint32 color = *atari_color < 128 ? kAtariNTSCABGRColorTable[*atari_color] :
+    uint32 color = *atari_color < 128 ? kAtariNtscAbgrColorTable[*atari_color] :
         0xff00ff00;
     *pixel = color;
     ++pixel;

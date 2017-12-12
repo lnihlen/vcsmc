@@ -7,11 +7,11 @@
 namespace vcsmc {
 
 TEST(MssimTest, LocalMeanTest) {
-  std::unique_ptr<float> lab_input(new float[vcsmc::kLabBufferSize]);
-  float* lab_ptr = lab_input.get();
+  std::unique_ptr<float> nyuv_input(new float[vcsmc::kNyuvBufferSize]);
+  float* nyuv_ptr = nyuv_input.get();
 
-  // Zero lab buffer to include padding.
-  std::memset(lab_ptr, 0, kLabBufferSizeBytes);
+  // Zero nyuv buffer to include padding.
+  std::memset(nyuv_ptr, 0, kNyuvBufferSizeBytes);
 
   // Populate each block of pixels starting from upper left hand corner with
   // (i / kWindowSize, i / kWindowSize + 1000, -(i / kWindowSize + 1000))
@@ -20,37 +20,37 @@ TEST(MssimTest, LocalMeanTest) {
       float val = static_cast<float>(
           ((i / kWindowSize) *
            (vcsmc::kTargetFrameWidthPixels / kWindowSize)) + (j / kWindowSize));
-      *lab_ptr = val;
-      ++lab_ptr;
-      *lab_ptr = val + 1000.0f;
-      ++lab_ptr;
-      *lab_ptr = -(val + 1000.0f);
-      ++lab_ptr;
-      *lab_ptr = 1.0f;
-      ++lab_ptr;
+      *nyuv_ptr = val;
+      ++nyuv_ptr;
+      *nyuv_ptr = val + 1000.0f;
+      ++nyuv_ptr;
+      *nyuv_ptr = -(val + 1000.0f);
+      ++nyuv_ptr;
+      *nyuv_ptr = 1.0f;
+      ++nyuv_ptr;
     }
     // Skip padding on right.
-    lab_ptr +=  4 * kWindowSize;
+    nyuv_ptr +=  4 * kWindowSize;
   }
 
-  // Copy lab buffer to device, compute mean, copy it back.
-  float4* lab_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&lab_device, vcsmc::kLabBufferSizeBytes));
+  // Copy nyuv buffer to device, compute mean, copy it back.
+  float4* nyuv_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&nyuv_device, vcsmc::kNyuvBufferSizeBytes));
   float4* mean_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kLabBufferSizeBytes));
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kNyuvBufferSizeBytes));
   dim3 image_dim_block(16, 16);
   dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
                       (vcsmc::kFrameHeightPixels / 16) + 1);
 
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(lab_device, lab_input.get(),
-        vcsmc::kLabBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nyuv_device, nyuv_input.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
   vcsmc::ComputeLocalMean<<<image_dim_block, image_dim_grid>>>(
-      lab_device, mean_device);
-  std::unique_ptr<float> mean_output(new float[vcsmc::kLabBufferSize]);
+      nyuv_device, mean_device);
+  std::unique_ptr<float> mean_output(new float[vcsmc::kNyuvBufferSize]);
   ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_output.get(), mean_device,
-      vcsmc::kLabBufferSizeBytes, cudaMemcpyDeviceToHost));
+      vcsmc::kNyuvBufferSizeBytes, cudaMemcpyDeviceToHost));
 
-  ASSERT_EQ(cudaSuccess, cudaFree(lab_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(nyuv_device));
   ASSERT_EQ(cudaSuccess, cudaFree(mean_device));
 
   // Validate contents of mean buffer.

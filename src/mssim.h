@@ -7,10 +7,10 @@
 namespace vcsmc {
 
 const size_t kWindowSize = 8;
-const size_t kLabBufferSize = 4 *
+const size_t kNyuvBufferSize = 4 *
     (kTargetFrameWidthPixels + kWindowSize) *
     (kFrameHeightPixels + kWindowSize);
-const size_t kLabBufferSizeBytes = sizeof(float) * kLabBufferSize;
+const size_t kNyuvBufferSizeBytes = sizeof(float) * kNyuvBufferSize;
 
 
 // Packed images come in as 1 Atari color byte representing 2 horizontal pixel
@@ -28,10 +28,10 @@ __global__ void FindChangedBlocks(const uint4* parent_packed_image_in,
                                   const uint4* child_packed_image_in,
                                   uchar1* block_mask_out);
 
-__global__ void UnpackToPaddedLab(const uchar1* parent_packed_image_in,
-                                  const float4* lab_table,
+__global__ void UnpackToPaddedNyuv(const uchar1* parent_packed_image_in,
+                                  const float4* nyuv_table,
                                   const uchar1* block_mask_in,  // optional
-                                  float4* lab_out);
+                                  float4* nyuv_out);
 
 // Given two images in packed doubles with L*a*b* + alpha color format, and
 // their dimensions, this algorithm will compute and return the Mean Structural
@@ -41,18 +41,18 @@ __global__ void UnpackToPaddedLab(const uchar1* parent_packed_image_in,
 //   structural distortion measurement,” Signal Process.: Image Commun.,
 //   vol. 19, no. 2, pp. 121–132, Feb. 2004
 //
-__global__ void ComputeLocalMean(const float4* lab_in,
+__global__ void ComputeLocalMean(const float4* nyuv_in,
 //                                 const uchar1* block_mask_in, // optional
                                  float4* mean_out);
 
-__global__ void ComputeLocalStdDevSquared(const float4* lab_in,
+__global__ void ComputeLocalStdDevSquared(const float4* nyuv_in,
                                           const float4* mean_in,
 //                                          const uchar1* block_mask_in, // opt
                                           float4* stddevsq_out);
 
-__global__ void ComputeLocalCovariance(const float4* lab_a_in,
+__global__ void ComputeLocalCovariance(const float4* nyuv_a_in,
                                        const float4* mean_a_in,
-                                       const float4* lab_b_in,
+                                       const float4* nyuv_b_in,
                                        const float4* mean_b_in,
 //                                       const uchar1* block_mask_in, // optional
                                        float4* cov_ab_out);

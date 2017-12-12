@@ -10,8 +10,6 @@
 #include "tbb/tbb.h"
 
 #include "assembler.h"
-#include "color_distance_table.h"
-#include "color_table.h"
 #include "constants.h"
 #include "serialization.h"
 #include "spec.h"
