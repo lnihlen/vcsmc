@@ -4,22 +4,23 @@
 
 #include "gtest/gtest.h"
 
-namespace vcsmc {
+namespace {
 
-TEST(MssimTest, LocalMeanTest) {
+std::unique_ptr<float> MakeInputBlock() {
   std::unique_ptr<float> nyuv_input(new float[vcsmc::kNyuvBufferSize]);
   float* nyuv_ptr = nyuv_input.get();
 
   // Zero nyuv buffer to include padding.
-  std::memset(nyuv_ptr, 0, kNyuvBufferSizeBytes);
+  std::memset(nyuv_ptr, 0, vcsmc::kNyuvBufferSizeBytes);
 
   // Populate each block of pixels starting from upper left hand corner with
   // (i / kWindowSize, i / kWindowSize + 1000, -(i / kWindowSize + 1000))
   for (size_t i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
     for (size_t j = 0; j < vcsmc::kTargetFrameWidthPixels; ++j) {
       float val = static_cast<float>(
-          ((i / kWindowSize) *
-           (vcsmc::kTargetFrameWidthPixels / kWindowSize)) + (j / kWindowSize));
+          ((i / vcsmc::kWindowSize) *
+          (vcsmc::kTargetFrameWidthPixels / vcsmc::kWindowSize)) +
+          (j / vcsmc::kWindowSize));
       *nyuv_ptr = val;
       ++nyuv_ptr;
       *nyuv_ptr = val + 1000.0f;
@@ -30,8 +31,19 @@ TEST(MssimTest, LocalMeanTest) {
       ++nyuv_ptr;
     }
     // Skip padding on right.
-    nyuv_ptr +=  4 * kWindowSize;
+    nyuv_ptr +=  4 * vcsmc::kWindowSize;
   }
+
+  return nyuv_input;
+}
+
+
+}  // namespace
+
+namespace vcsmc {
+
+TEST(MssimTest, LocalMeanTest) {
+  std::unique_ptr<float> nyuv_input = MakeInputBlock();
 
   // Copy nyuv buffer to device, compute mean, copy it back.
   float4* nyuv_device;

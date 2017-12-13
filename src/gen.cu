@@ -766,6 +766,8 @@ int main(int argc, char* argv[]) {
             reroll ? " reroll" : "");
       }
       reroll = false;
+      simulation_count = 0;
+      simulation_time_us = 0;
       scoring_count = 0;
       scoring_time_us = 0;
       tourney_count = 0;
@@ -797,7 +799,8 @@ int main(int argc, char* argv[]) {
       full_range_sim_needed = false;
     } else {
       ++reroll_count;
-      if (reroll_count > static_cast<size_t>(FLAGS_stagnant_count_limit)) {
+      if (FLAGS_stagnant_count_limit > 0 &&
+          reroll_count > static_cast<size_t>(FLAGS_stagnant_count_limit)) {
         printf("max reroll count reached, terminating.\n");
         break;
       }
