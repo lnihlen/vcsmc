@@ -60,11 +60,12 @@ __global__ void ComputeLocalStdDevSquared(const float4* nyuv_in,
     return;
   }
 
+  float4 mean = mean_in[(y * PADDED_IMAGE_WIDTH) + x];
+
   for (int i = 0; i < WINDOW_SIZE; ++i) {
     int row_offset = ((y + i) * PADDED_IMAGE_WIDTH) + x;
     for (int j = 0; j < WINDOW_SIZE; ++j) {
       float4 nyuv = nyuv_in[row_offset + j];
-      float4 mean = mean_in[row_offset + j];
       float4 del = make_float4(nyuv.x - mean.x,
                                nyuv.y - mean.y,
                                nyuv.z - mean.z,
@@ -99,18 +100,19 @@ __global__ void ComputeLocalCovariance(const float4* nyuv_a_in,
     return;
   }
 
+  float4 mean_a = mean_a_in[(y * PADDED_IMAGE_WIDTH) + x];
+  float4 mean_b = mean_b_in[(y * PADDED_IMAGE_WIDTH) + x];
+
   for (int i = 0; i < WINDOW_SIZE; ++i) {
     int row_offset = ((y + i) * PADDED_IMAGE_WIDTH) + x;
     for (int j = 0; j < WINDOW_SIZE; ++j) {
       float4 nyuv_a = nyuv_a_in[row_offset + j];
-      float4 mean_a = mean_a_in[row_offset + j];
       float4 del_a = make_float4(nyuv_a.x - mean_a.x,
                                  nyuv_a.y - mean_a.y,
                                  nyuv_a.z - mean_a.z,
                                  0.0);
 
       float4 nyuv_b = nyuv_b_in[row_offset + j];
-      float4 mean_b = mean_b_in[row_offset + j];
       float4 del_b = make_float4(nyuv_b.x - mean_b.x,
                                  nyuv_b.y - mean_b.y,
                                  nyuv_b.z - mean_b.z,
