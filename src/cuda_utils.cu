@@ -29,7 +29,7 @@ bool InitializeCuda(bool print_stats) {
     printf("CUDA Device 0: \"%s\" with compute capability %d.%d.\n",
         device_props.name, device_props.major, device_props.minor);
     printf("  total global memory: %lu bytes.\n", device_props.totalGlobalMem);
-    printf("  shared memory per blocK: %lu bytes.\n",
+    printf("  shared memory per block: %lu bytes.\n",
         device_props.sharedMemPerBlock);
     printf("  max threads per block: %d threads.\n",
         device_props.maxThreadsPerBlock);
