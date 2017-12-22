@@ -369,6 +369,12 @@ class SimulateKernelJob {
       vcsmc::ComputeBlockSum<<<sum_dim_block, sum_dim_grid,
           kBlockSumBufferSize * sizeof(float), score_state.stream>>>(
           score_state.ssim_device, score_state.block_sum_device);
+      // TODO: it is very likely this copy is blocking. See
+      // http://docs.nvidia.com/cuda/cuda-runtime-api/api-sync-behavior.html#api-sync-behavior
+      // NEED TO USE cudaMallocHost for PINNED memory.
+      // Also can use cuda events to understand how many jobs deep the stream is,
+      // in a queue of events. If the card is too backed up, can go down the
+      // CPU route.
       cudaMemcpyAsync(kernel_score.block_sums.get(),
                       score_state.block_sum_device,
                       sizeof(float) * kBlockSumBufferSize,
