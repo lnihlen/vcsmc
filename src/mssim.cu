@@ -31,7 +31,7 @@ __global__ void ComputeLocalMean(const float4* nyuv_in,
     int row_offset = ((y + i) * PADDED_IMAGE_WIDTH) + x;
     for (int j = 0; j < WINDOW_SIZE; ++j) {
       float4 nyuv = nyuv_in[row_offset + j];
-      // fourth element to be 1.0 in valid elements, 0.0 in padding.
+      // Fourth element to be 1.0 in valid elements, 0.0 in padding.
       mean = make_float4(mean.x + nyuv.x,
                          mean.y + nyuv.y,
                          mean.z + nyuv.z,

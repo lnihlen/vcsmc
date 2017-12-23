@@ -74,6 +74,7 @@ std::unique_ptr<float> MakePaddedTestMean() {
 }
 
 /*
+  Hand-computed block of values for every window for each of Yuv:
     0        7       12       15       16       15       12        7
 11200    11207    11212    11215    11216    11215    11212    11207
 19200    19207    19212    19215    19216    19215    19212    19207
@@ -84,9 +85,34 @@ std::unique_ptr<float> MakePaddedTestMean() {
 11200    11207    11212    11215    11216    11215    11212    11207
 */
 std::unique_ptr<float> MakePaddedTestStandardDeviationSquared() {
-  const float[] collumn_values = { 0.0f, 7.0f, 12.0f, 15.0f, 16.0f, 15.0f, 12.0f, 7.0f };
-  const float[] row_values = { 0.0f, 11200.0f, 19200.0f, 24000.0f, 25600.0f, 24000.0f, 19200.0f, 11200.0f };
-
+  const float[] collumn_values = { 0.0f, 7.0f, 12.0f, 15.0f, 16.0f, 15.0f,
+      12.0f, 7.0f };
+  const float[] row_values = { 0.0f, 11200.0f, 19200.0f, 24000.0f, 25600.0f,
+      24000.0f, 19200.0f, 11200.0f };
+  std::unique_ptr<float> stddev_sq(new float[vcsmc::kNyuvBufferSize]);
+  float* stddev_sq_ptr = stddev_sq.get();
+  std::memset(stddev_sq_ptr, 0, vcsmc::kNyuvBufferSizeBytes);
+  for (size_t y = 0; y < vcsmc::kFrameHeightPixels / vcsmc::kWindowSize; ++y) {
+    for (size_t x = 0; x < vcsmc::kTargetFrameWidthPixels / vcsmc::kWindowSize;
+         ++x) {
+      stddev_sq_ptr = stddev_sq.get() +
+          (y * (vcsmc::kTargetFrameWidthPixels + vcsmc::kWindowSize) *
+          vcsmc::kWindowSize) + (x * vcsmc::kWindowSize);
+      for (size_t i = 0; i < vcsmc::kWindowSize; ++i) {
+        for (size_t j = 0; j < vcsmc::kWindowSize; ++j) {
+          float sum = collumn_values[j] + row_values[i];
+          stddev_sq_ptr[0] = sum;
+          stddev_sq_ptr[1] = sum;
+          stddev_sq_ptr[2] = sum;
+          stddev_sq_ptr[3] = 1.0f;
+          stddev_sq_ptr += 4;
+        }
+        stddev_sq_ptr +=
+            (vcsmc::kTargetFrameWidthPixels + vcsmc::kWindowSize) * 4;
+      }
+    }
+  }
+  return stddev_sq;
 }
 
 
@@ -232,11 +258,20 @@ TEST(MssimTest, ComputedStatisticsTest) {
                            nyuv_mean_computed.get(),
                            vcsmc::kNyuvBufferSizeBytes));
 
+  std::unique_ptr<float> nyuv_stddevsq_generated =
+      MakePaddedTestStandardDeviationSquared();
+  ValidatePaddingWeights(nyuv_stddevsq_generated.get());
+
   std::unique_ptr<float> nyuv_stddevsq_computed =
       ComputePaddedStandardDeviationSquared(nyuv_input.get(),
                                             nyuv_mean_generated.get());
   ValidatePaddingWeights(nyuv_stddevsq_computed.get());
 
+  ASSERT_EQ(0, std::memcmp(nyuv_stddevsq_generated.get(),
+                           nyuv_stddevsq_computed.get(),
+                           vcsmc::kNyuvBufferSizeBytes));
+
+  /*
   printf("nyuv_input Y:\n");
   PrintBlock(nyuv_input.get(), 2);
 
@@ -265,6 +300,7 @@ TEST(MssimTest, ComputedStatisticsTest) {
   PrintBlock(nyuv_stddevsq_computed.get() + 2, 2);
   PrintBlock(nyuv_stddevsq_computed.get() + ((vcsmc::kTargetFrameWidthPixels + vcsmc::kWindowSize) * 4 * vcsmc::kWindowSize) + 2, 2);
   printf("\n");
+  */
 }
 
 
@@ -276,26 +312,65 @@ TEST(MssimTest, MeanTest) {
   ASSERT_EQ(cudaSuccess, cudaMalloc(&nyuv_device, vcsmc::kNyuvBufferSizeBytes));
   float4* mean_device;
   ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kNyuvBufferSizeBytes));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nyuv_device, nyuv_input.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+
   dim3 image_dim_block(16, 16);
   dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
                       (vcsmc::kFrameHeightPixels / 16) + 1);
-
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(nyuv_device, nyuv_input.get(),
-        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
   vcsmc::ComputeLocalMean<<<image_dim_block, image_dim_grid>>>(
       nyuv_device, mean_device);
+
   std::unique_ptr<float> mean_output(new float[vcsmc::kNyuvBufferSize]);
   ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_output.get(), mean_device,
       vcsmc::kNyuvBufferSizeBytes, cudaMemcpyDeviceToHost));
 
-  ASSERT_EQ(cudaSuccess, cudaFree(nyuv_device));
-  ASSERT_EQ(cudaSuccess, cudaFree(mean_device));
-
   std::unique_ptr<float> nyuv_mean_generated = MakePaddedTestMean();
 
-  ASSERT_EQ(0, std::memcmp(mean_output.get(),
+  EXPECT_EQ(0, std::memcmp(mean_output.get(),
                            nyuv_mean_generated.get(),
                            vcsmc::kNyuvBufferSizeBytes));
+
+  ASSERT_EQ(cudaSuccess, cudaFree(nyuv_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(mean_device));
+}
+
+TEST(MssimTest, StandardDeviationSquaredTest) {
+  std::unique_ptr<float> nyuv_input = MakePaddedTestInput();
+  std::unique_ptr<float> nyuv_mean = MakePaddedTestMean();
+
+  float4* nyuv_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&nyuv_device, vcsmc::kNyuvBufferSizeBytes));
+  float4* mean_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kNyuvBufferSizeBytes));
+  float4* stddevsq_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&stddevsq_device,
+      vcsmc::kNyuvBufferSizeBytes));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nyuv_device, nyuv_input.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_device, nyuv_mean.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+
+  dim3 image_dim_block(16, 16);
+  dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
+                      (vcsmc::kFrameHeightPixels / 16) + 1);
+  vcsmc::ComputeLocalStdDevSquared<<<image_dim_block, image_dim_grid>>>(
+      nyuv_device, mean_device, stddevsq_device);
+
+  std::unique_ptr<float> stddevsq_output(new float[vcsmc::kNyuvBufferSize]);
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(stddevsq_output.get(), stddevsq_device,
+      vcsmc::kNyuvBufferSizeBytes, cudaMemcpyDeviceToHost));
+
+  std::unique_ptr<float> nyuv_stddevsq_generated =
+      MakePaddedTestStandardDeviationSquared();
+
+  EXPECT_EQ(0, std::memcmp(stddevsq_output.get(),
+                           nyuv_stddevsq_generated.get(),
+                           vcsmc::kNyuvBufferSizeBytes));
+
+  ASSERT_EQ(cudaSuccess, cudaFree(nyuv_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(mean_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(stddevsq_device));
 }
 
 }  // namespace vcsmc
