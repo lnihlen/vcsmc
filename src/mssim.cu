@@ -5,9 +5,9 @@ namespace vcsmc {
 #define WINDOW_SIZE 8
 #define C1 ((0.01 * 100.0) * (0.01 * 100.0))
 #define C2 ((0.03 * 100.0) * (0.03 * 100.0))
-#define WEIGHT_L 0.5
-#define WEIGHT_A 0.25
-#define WEIGHT_B 0.25
+#define WEIGHT_Y 0.5
+#define WEIGHT_U 0.25
+#define WEIGHT_V 0.25
 #define IMAGE_WIDTH 320
 #define IMAGE_HEIGHT 192
 #define PADDED_IMAGE_WIDTH (IMAGE_WIDTH + WINDOW_SIZE)
@@ -17,18 +17,19 @@ __global__ void ComputeLocalMean(const float4* nyuv_in,
                                  float4* mean_out) {
   int x = (blockIdx.x * blockDim.x) + threadIdx.x;
   int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  int index = (y * PADDED_IMAGE_WIDTH) + x;
   float4 mean = make_float4(0.0, 0.0, 0.0, 0.0);
 
   // If we are running on the padding then mark the output as invalid too.
   if (x >= IMAGE_WIDTH || y >= IMAGE_HEIGHT) {
     if (x < PADDED_IMAGE_WIDTH && y < PADDED_IMAGE_HEIGHT) {
-      mean_out[(y * PADDED_IMAGE_WIDTH) + x] = mean;
+      mean_out[index] = mean;
     }
     return;
   }
 
   for (int i = 0; i < WINDOW_SIZE; ++i) {
-    int row_offset = ((y + i) * PADDED_IMAGE_WIDTH) + x;
+    int row_offset = index + (i * PADDED_IMAGE_WIDTH);
     for (int j = 0; j < WINDOW_SIZE; ++j) {
       float4 nyuv = nyuv_in[row_offset + j];
       // Fourth element to be 1.0 in valid elements, 0.0 in padding.
@@ -43,7 +44,7 @@ __global__ void ComputeLocalMean(const float4* nyuv_in,
                      mean.y / mean.w,
                      mean.z / mean.w,
                      1.0);
-  mean_out[(y * PADDED_IMAGE_WIDTH) + x] = mean;
+  mean_out[index] = mean;
 }
 
 __global__ void ComputeLocalStdDevSquared(const float4* nyuv_in,
@@ -51,19 +52,20 @@ __global__ void ComputeLocalStdDevSquared(const float4* nyuv_in,
                                           float4* stddevsq_out) {
   int x = (blockIdx.x * blockDim.x) + threadIdx.x;
   int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  int index = (y * PADDED_IMAGE_WIDTH) + x;
   float4 std_dev = make_float4(0.0, 0.0, 0.0, 0.0);
 
   if (x >= IMAGE_WIDTH || y >= IMAGE_HEIGHT) {
     if (x < PADDED_IMAGE_WIDTH && y < PADDED_IMAGE_HEIGHT) {
-      stddevsq_out[(y * PADDED_IMAGE_WIDTH) + x] = std_dev;
+      stddevsq_out[index] = std_dev;
     }
     return;
   }
 
-  float4 mean = mean_in[(y * PADDED_IMAGE_WIDTH) + x];
+  float4 mean = mean_in[index];
 
   for (int i = 0; i < WINDOW_SIZE; ++i) {
-    int row_offset = ((y + i) * PADDED_IMAGE_WIDTH) + x;
+    int row_offset = index + (i * PADDED_IMAGE_WIDTH);
     for (int j = 0; j < WINDOW_SIZE; ++j) {
       float4 nyuv = nyuv_in[row_offset + j];
       float4 del = make_float4(nyuv.x - mean.x,
@@ -77,12 +79,12 @@ __global__ void ComputeLocalStdDevSquared(const float4* nyuv_in,
     }
   }
 
-  float n_minus_one = min(std_dev.w - 1.0, 1.0);
+  float n_minus_one = max(std_dev.w - 1.0, 1.0);
   std_dev = make_float4(std_dev.x / n_minus_one,
                         std_dev.y / n_minus_one,
                         std_dev.z / n_minus_one,
                         1.0);
-  stddevsq_out[(y * PADDED_IMAGE_WIDTH) + x] = std_dev;
+  stddevsq_out[index] = std_dev;
 }
 
 __global__ void ComputeLocalCovariance(const float4* nyuv_a_in,
@@ -92,19 +94,21 @@ __global__ void ComputeLocalCovariance(const float4* nyuv_a_in,
                                        float4* cov_ab_out) {
   int x = (blockIdx.x * blockDim.x) + threadIdx.x;
   int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  int index = (y * PADDED_IMAGE_WIDTH) + x;
   float4 cov = make_float4(0.0, 0.0, 0.0, 0.0);
+
   if (x >= IMAGE_WIDTH || y >= IMAGE_HEIGHT) {
     if (x < PADDED_IMAGE_WIDTH && y < PADDED_IMAGE_HEIGHT) {
-      cov_ab_out[(y * PADDED_IMAGE_WIDTH) + x] = cov;
+      cov_ab_out[index] = cov;
     }
     return;
   }
 
-  float4 mean_a = mean_a_in[(y * PADDED_IMAGE_WIDTH) + x];
-  float4 mean_b = mean_b_in[(y * PADDED_IMAGE_WIDTH) + x];
+  float4 mean_a = mean_a_in[index];
+  float4 mean_b = mean_b_in[index];
 
   for (int i = 0; i < WINDOW_SIZE; ++i) {
-    int row_offset = ((y + i) * PADDED_IMAGE_WIDTH) + x;
+    int row_offset = index + (i * PADDED_IMAGE_WIDTH);
     for (int j = 0; j < WINDOW_SIZE; ++j) {
       float4 nyuv_a = nyuv_a_in[row_offset + j];
       float4 del_a = make_float4(nyuv_a.x - mean_a.x,
@@ -125,12 +129,12 @@ __global__ void ComputeLocalCovariance(const float4* nyuv_a_in,
     }
   }
 
-  float n_minus_one = min(cov.w - 1.0, 1.0);
+  float n_minus_one = max(cov.w - 1.0, 1.0);
   cov = make_float4(cov.x / n_minus_one,
                     cov.y / n_minus_one,
                     cov.z / n_minus_one,
                     1.0);
-  cov_ab_out[(y * PADDED_IMAGE_WIDTH) + x] = cov;
+  cov_ab_out[index] = cov;
 }
 
 __global__ void ComputeSSIM(const float4* mean_a_in,
@@ -164,9 +168,9 @@ __global__ void ComputeSSIM(const float4* mean_a_in,
   // Note we must calculate an unpadded offset for the ssim_out result, as
   // the output buffer needs no padding as there are no loops to unroll here.
   ssim_out[(y * IMAGE_WIDTH) + x] =
-      (WEIGHT_L * fabsf(ssim.x)) +
-      (WEIGHT_A * fabsf(ssim.y)) +
-      (WEIGHT_B * fabsf(ssim.z));
+      (WEIGHT_Y * fabsf(ssim.x)) +
+      (WEIGHT_U * fabsf(ssim.y)) +
+      (WEIGHT_V * fabsf(ssim.z));
 }
 
 // 320 * 192 = 61440 = 256 * 240
