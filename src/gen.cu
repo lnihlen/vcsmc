@@ -6,6 +6,7 @@
 #include <cassert>
 #include <chrono>
 #include <cinttypes>
+#include <deque>
 #include <fcntl.h>
 #include <gflags/gflags.h>
 #include <gperftools/profiler.h>
@@ -124,6 +125,16 @@ struct MssimScoreState {
     cudaFree(ssim_device);
     cudaFree(block_sum_device);
 
+    while (!block_sums_queue.empty()) {
+      cudaFree(block_sums_queue.front());
+      block_sums_queue.pop_front();
+    }
+
+    while (!sim_nyuv_queue.empty()) {
+      cudaFree(sim_nyuv_queue.front());
+      sim_nyuv_queue.pop_front();
+    }
+
     cudaStreamDestroy(stream);
   }
   MssimScoreState(const MssimScoreState&) = delete;
@@ -136,18 +147,19 @@ struct MssimScoreState {
   float* ssim_device = nullptr;
   float* block_sum_device = nullptr;
   float* final_sum_device = nullptr;
+  // Pinned memory allocation on the host is time-expensive, so we recycle the
+  // buffers as needed here.
+  std::deque<float*> block_sums_queue;
+  std::deque<float*> sim_nyuv_queue;
 };
 
 struct KernelScore {
  public:
-  KernelScore()
-    : sim_frame(new uint8[kLibZ26ImageSizeBytes]),
-      block_sums(new float[kBlockSumBufferSize]),
-      sim_nyuv(new float[vcsmc::kNyuvBufferSize]) {}
+  KernelScore() : sim_frame(new uint8[kLibZ26ImageSizeBytes]) {}
 
   std::shared_ptr<uint8> sim_frame;
-  std::shared_ptr<float> block_sums;
-  std::shared_ptr<float> sim_nyuv;
+  float* block_sums = nullptr;
+  float* sim_nyuv = nullptr;
   float score = 1.0;
   uint32 victories = 0;
   bool score_final = false;
@@ -170,7 +182,7 @@ typedef tbb::enumerable_thread_specific<MssimScoreState> MssimScoreStateList;
 // Sweeping an interesting thing under the rug for now - this map uses 32-bit
 // keys (size_t) but the fingerprints on the Kernel are 64-bit.
 typedef tbb::concurrent_unordered_map<std::shared_ptr<vcsmc::Kernel>,
-        KernelScore, KernelHash, KernelEqual> ScoreMap;
+        std::shared_ptr<KernelScore>, KernelHash, KernelEqual> ScoreMap;
 
 // Given a pointer to a completely empty Kernel this Job will populate it with
 // totally random bytecode.
@@ -252,7 +264,7 @@ class MutateKernelJob {
       // disregarding the 32 most significant bits of the fingerprint in the
       // hash. This results in hash table collisions and other sadness. TODO:
       // figure out why this happens with better Kernel unit testing on
-      // Kernel::Muate().
+      // Kernel::Mutate().
       while (target->fingerprint() == original->fingerprint() ||
              score_map_.find(target) != score_map_.end()) {
         for (size_t j = 0; j < number_of_mutations_; ++j)
@@ -291,16 +303,35 @@ class SimulateKernelJob {
           mssim_score_state_list_.local();
     for (size_t i = r.begin(); i < r.end(); ++i) {
       std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
-      KernelScore kernel_score;
+      std::shared_ptr<KernelScore> kernel_score(new KernelScore);
+
+      cudaError_t result;
+      if (score_state.block_sums_queue.empty()) {
+        result = cudaMallocHost(&(kernel_score->block_sums),
+                                sizeof(float) * kBlockSumBufferSize);
+        assert(result == cudaSuccess);
+      } else {
+        kernel_score->block_sums = score_state.block_sums_queue.front();
+        score_state.block_sums_queue.pop_front();
+      }
+
+      if (score_state.sim_nyuv_queue.empty()) {
+        result = cudaMallocHost(&(kernel_score->sim_nyuv),
+                                vcsmc::kNyuvBufferSizeBytes);
+        assert(result == cudaSuccess);
+      } else {
+        kernel_score->sim_nyuv = score_state.sim_nyuv_queue.front();
+        score_state.sim_nyuv_queue.pop_front();
+      }
 
       simulate_single_frame(kernel->bytecode(), kernel->bytecode_size(),
-          kernel_score.sim_frame.get());
+          kernel_score->sim_frame.get());
 
       // Convert simulated colors to nYUV for MSSIM computation.
-      float* nyuv = kernel_score.sim_nyuv.get();
+      float* nyuv = kernel_score->sim_nyuv;
       // Zero out the image, to also zero out the padding.
       std::memset(nyuv, 0, vcsmc::kNyuvBufferSizeBytes);
-      uint8* frame_pointer = kernel_score.sim_frame.get() +
+      uint8* frame_pointer = kernel_score->sim_frame.get() +
           (kLibZ26ImageWidth * kSimSkipLines);
       for (size_t j = 0; j < vcsmc::kFrameHeightPixels; ++j) {
         for (size_t k = 0; k < vcsmc::kFrameWidthPixels; ++k) {
@@ -342,7 +373,7 @@ class SimulateKernelJob {
       dim3 sum_dim_grid(kBlockSumBufferSize);
 
       cudaMemcpyAsync(score_state.sim_nyuv_device,
-                      kernel_score.sim_nyuv.get(),
+                      kernel_score->sim_nyuv,
                       vcsmc::kNyuvBufferSizeBytes,
                       cudaMemcpyHostToDevice,
                       score_state.stream);
@@ -369,13 +400,7 @@ class SimulateKernelJob {
       vcsmc::ComputeBlockSum<<<sum_dim_block, sum_dim_grid,
           kBlockSumBufferSize * sizeof(float), score_state.stream>>>(
           score_state.ssim_device, score_state.block_sum_device);
-      // TODO: it is very likely this copy is blocking. See
-      // http://docs.nvidia.com/cuda/cuda-runtime-api/api-sync-behavior.html#api-sync-behavior
-      // NEED TO USE cudaMallocHost for PINNED memory.
-      // Also can use cuda events to understand how many jobs deep the stream is,
-      // in a queue of events. If the card is too backed up, can go down the
-      // CPU route.
-      cudaMemcpyAsync(kernel_score.block_sums.get(),
+      cudaMemcpyAsync(kernel_score->block_sums,
                       score_state.block_sum_device,
                       sizeof(float) * kBlockSumBufferSize,
                       cudaMemcpyDeviceToHost,
@@ -414,22 +439,25 @@ class FinalizeScoreJob {
       std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
       ScoreMap::iterator kernel_score = score_map_.find(kernel);
       assert(kernel_score != score_map_.end());
-      assert(!kernel_score->second.score_final);
-      assert(kernel_score->second.block_sums.get() != nullptr);
+      assert(!kernel_score->second->score_final);
+      assert(kernel_score->second->block_sums != nullptr);
 
       float sum = 0.0f;
-      float* block_sums = kernel_score->second.block_sums.get();
+      float* block_sums = kernel_score->second->block_sums;
       for (size_t j = 0; j < kBlockSumBufferSize; ++j) {
         sum += block_sums[j];
       }
-      kernel_score->second.score = 1.0f - (sum /
+      kernel_score->second->score = 1.0f - (sum /
           static_cast<float>(vcsmc::kTargetFrameWidthPixels *
                              vcsmc::kFrameHeightPixels));
 
-      // Release temp float storage for savings.
-      kernel_score->second.block_sums.reset();
-      kernel_score->second.sim_nyuv.reset();
-      kernel_score->second.score_final = true;
+      // Recycle buffers.
+      score_state.block_sums_queue.push_back(kernel_score->second->block_sums);
+      kernel_score->second->block_sums = nullptr;
+      score_state.sim_nyuv_queue.push_back(kernel_score->second->sim_nyuv);
+      kernel_score->second->sim_nyuv = nullptr;
+
+      kernel_score->second->score_final = true;
     }
   }
 
@@ -458,7 +486,7 @@ class CompeteKernelJob {
       ScoreMap::iterator kernel_score_it = score_map_.find(kernel);
       assert(kernel_score_it != score_map_.end());
       uint32 victories = 0;
-      float kernel_score = kernel_score_it->second.score;
+      float kernel_score = kernel_score_it->second->score;
 
       std::uniform_int_distribution<size_t> tourney_distro(
           0, generation_->size() - 1);
@@ -467,11 +495,11 @@ class CompeteKernelJob {
         // Lower scores mean better performance.
         ScoreMap::const_iterator competing_kernel = score_map_.find(
             generation_->at(contestant_index));
-        if (kernel_score < competing_kernel->second.score)
+        if (kernel_score < competing_kernel->second->score)
           ++victories;
       }
 
-      kernel_score_it->second.victories = victories;
+      kernel_score_it->second->victories = victories;
     }
   }
  private:
@@ -492,7 +520,7 @@ void SaveState(vcsmc::Generation generation,
   }
   if (FLAGS_image_output_file != "") {
     vcsmc::Image min_sim_image(
-        global_minimum_score->second.sim_frame.get() +
+        global_minimum_score->second->sim_frame.get() +
         (kLibZ26ImageWidth * kSimSkipLines));
     vcsmc::SaveImage(&min_sim_image, FLAGS_image_output_file);
   }
@@ -679,7 +707,7 @@ int main(int argc, char* argv[]) {
 
   while (true) {
     if (global_minimum_score != score_map.end() &&
-        global_minimum_score->second.score <= target_error) {
+        global_minimum_score->second->score <= target_error) {
       printf("target error reached after %lu generations, terminating.\n",
              generation_count);
       break;
@@ -728,15 +756,15 @@ int main(int argc, char* argv[]) {
                     std::shared_ptr<vcsmc::Kernel> b) {
           ScoreMap::const_iterator a_score = score_map.find(a);
           ScoreMap::const_iterator b_score = score_map.find(b);
-          if (a_score->second.victories == b_score->second.victories)
-            return a_score->second.score < b_score->second.score;
+          if (a_score->second->victories == b_score->second->victories)
+            return a_score->second->score < b_score->second->score;
 
-          return a_score->second.victories > b_score->second.victories;
+          return a_score->second->victories > b_score->second->victories;
         });
 
     if (global_minimum_score == score_map.end() ||
-        score_map.find(generation->at(0))->second.score <
-        global_minimum_score->second.score) {
+        score_map.find(generation->at(0))->second->score <
+        global_minimum_score->second->score) {
       global_minimum = generation->at(0);
       global_minimum_score = score_map.find(generation->at(0));
     }
@@ -758,7 +786,7 @@ int main(int argc, char* argv[]) {
                "%s\n",
             generation_count,
             generation->at(0)->fingerprint(),
-            global_minimum_score->second.score,
+            global_minimum_score->second->score,
             diversity,
             simulation_count ? simulation_count * 1000000 / simulation_time_us
                 : 0,
@@ -784,10 +812,10 @@ int main(int argc, char* argv[]) {
       epoch_time = now;
     }
 
-    if (last_generation_score == global_minimum_score->second.score) {
+    if (last_generation_score == global_minimum_score->second->score) {
       ++streak;
     } else {
-      last_generation_score = global_minimum_score->second.score;
+      last_generation_score = global_minimum_score->second->score;
       streak = 0;
     }
 
