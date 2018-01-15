@@ -163,7 +163,7 @@ __global__ void ComputeSSIM(const float4* mean_a_in,
       (((2.0 * mean_a.z * mean_b.z) + C1) * ((2.0 * cov_ab.z) + C2)) /
           (((mean_a.z * mean_a.z) + (mean_b.z * mean_b.z) + C1) *
            (stddevsq_a.z + stddevsq_b.z + C2)),
-      0.0);
+      1.0);
 
   // Note we must calculate an unpadded offset for the ssim_out result, as
   // the output buffer needs no padding as there are no loops to unroll here.
@@ -173,20 +173,54 @@ __global__ void ComputeSSIM(const float4* mean_a_in,
       (WEIGHT_V * fabsf(ssim.z));
 }
 
-// 320 * 192 = 61440 = 256 * 240
-// Block size assumed to be 256, grid size 120. Each block needs 256 floats
-// of shared storage. Output will be 120 floats.
-#define SUM_BLOCK_SIZE 256
-
-// With thanks to the excellent presentation on parallel sums by Mark Harris,
-// http://developer.download.nvidia.com/compute/cuda/1.1-Beta/x86_website/
-//    projects/reduction/doc/reduction.pdf
+// Parallel summing algorithm. Blocks at 32x32 for 1024 threads per block, with
+// 10x6 blocks, returning 60 floats for final summation on host.
+//
+// * * * * * * * * * * * * * * * *  if (thread_id < 8) {
+// | | | | | | | | | | | | | | | |    block_shared[thread_id] +=
+// +-|-|-|-|-|-|-|-/ | | | | | | |       block_shared[thread_id + 8];
+// | +-|-|-|-|-|-|---/ | | | | | |  }
+// | | +-|-|-|-|-|-----/ | | | | |
+// | | | +-|-|-|-|-------/ | | | |
+// | | | | +-|-|-|-------- / | | |
+// | | | | | +-|-|-----------/ | |
+// | | | | | | +-|-------------/ |
+// | | | | | | | +---------------/
+// | | | | | | | |
+// * * * * * * * *                  if (thread_id < 4) {
+// | | | | | | | |                    block_shared[thread_id] +=
+// +-|-|-|-/ | | |                        block_shared[thread_id + 4];
+// | +-|-|---/ | |                  }
+// | | +-|-----/ |
+// | | | +-------/
+// | | | |
+// * * * *                          if (thread_id < 2) {
+// | | | |                            block_shared[thread_id] +=
+// +-|-/ |                                block_shared[thread_id + 2];
+// | +---/                          }
+// | |
+// * *                              if (thread_id == 0) {
+// | |                                block_shared[0] += block_shared[1];
+// +-/                              }
+// |
+// *
 __global__ void ComputeBlockSum(const float* ssim_in, float* block_sum_out) {
-  __shared__ float block_shared[SUM_BLOCK_SIZE];
-  int thread_id = threadIdx.x;
-  int global_id = (blockIdx.x * SUM_BLOCK_SIZE * 2) + thread_id;
-  block_shared[thread_id] =
-      ssim_in[global_id] + ssim_in[global_id + SUM_BLOCK_SIZE];
+  __shared__ float block_shared[1024];
+  int x = (blockIdx.x * blockDim.x) + threadIdx.x;
+  int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  int thread_id = (threadIdx.y * blockDim.x) + threadIdx.x;
+  int pixel_offset = (y * IMAGE_WIDTH) + x;
+  block_shared[thread_id] = ssim_in[pixel_offset];
+  __syncthreads();
+
+  if (thread_id < 512) {
+    block_shared[thread_id] += block_shared[thread_id + 512];
+  }
+  __syncthreads();
+
+  if (thread_id < 256) {
+    block_shared[thread_id] += block_shared[thread_id + 256];
+  }
   __syncthreads();
 
   if (thread_id < 128) {
@@ -201,15 +235,32 @@ __global__ void ComputeBlockSum(const float* ssim_in, float* block_sum_out) {
 
   if (thread_id < 32) {
     block_shared[thread_id] += block_shared[thread_id + 32];
-    block_shared[thread_id] += block_shared[thread_id + 16];
-    block_shared[thread_id] += block_shared[thread_id + 8];
-    block_shared[thread_id] += block_shared[thread_id + 4];
-    block_shared[thread_id] += block_shared[thread_id + 2];
-    block_shared[thread_id] += block_shared[thread_id + 1];
   }
+  __syncthreads();
+
+  if (thread_id < 16) {
+    block_shared[thread_id] += block_shared[thread_id + 16];
+  }
+  __syncthreads();
+
+  if (thread_id < 8) {
+    block_shared[thread_id] += block_shared[thread_id + 8];
+  }
+  __syncthreads();
+
+  if (thread_id < 4) {
+    block_shared[thread_id] += block_shared[thread_id + 4];
+  }
+  __syncthreads();
+
+  if (thread_id < 2) {
+    block_shared[thread_id] += block_shared[thread_id + 2];
+  }
+  __syncthreads();
 
   if (thread_id == 0) {
-    block_sum_out[blockIdx.x] = block_shared[0];
+    int block_index = (blockIdx.y * gridDim.x) + blockIdx.x;
+    block_sum_out[block_index] = block_shared[0] + block_shared[1];
   }
 }
 

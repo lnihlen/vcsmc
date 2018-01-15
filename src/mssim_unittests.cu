@@ -183,6 +183,7 @@ void ValidatePaddingWeights(const float* input) {
   ASSERT_EQ(vcsmc::kNyuvBufferSize, offset);
 }
 
+// Returns distance between |a| and |b| in ulps.
 int ulp_delta(float a, float b) {
   int* a_int = reinterpret_cast<int*>(&a);
   int* b_int = reinterpret_cast<int*>(&b);
@@ -228,10 +229,10 @@ TEST(MssimTest, MeanTest) {
   ASSERT_EQ(cudaSuccess, cudaMemcpy(nyuv_device, nyuv_input.get(),
         vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
 
-  dim3 image_dim_block(16, 16);
   dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
                       (vcsmc::kFrameHeightPixels / 16) + 1);
-  vcsmc::ComputeLocalMean<<<image_dim_block, image_dim_grid>>>(
+  dim3 image_dim_block(16, 16);
+  vcsmc::ComputeLocalMean<<<image_dim_grid, image_dim_block>>>(
       nyuv_device, mean_device);
 
   std::unique_ptr<float> mean_output(new float[vcsmc::kNyuvBufferSize]);
@@ -264,10 +265,10 @@ TEST(MssimTest, StandardDeviationSquaredTest) {
   ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_device, nyuv_mean.get(),
         vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
 
-  dim3 image_dim_block(16, 16);
   dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
                       (vcsmc::kFrameHeightPixels / 16) + 1);
-  vcsmc::ComputeLocalStdDevSquared<<<image_dim_block, image_dim_grid>>>(
+  dim3 image_dim_block(16, 16);
+  vcsmc::ComputeLocalStdDevSquared<<<image_dim_grid, image_dim_block>>>(
       nyuv_device, mean_device, stddevsq_device);
 
   std::unique_ptr<float> stddevsq_output(new float[vcsmc::kNyuvBufferSize]);
@@ -292,6 +293,79 @@ TEST(MssimTest, StandardDeviationSquaredTest) {
   ASSERT_EQ(cudaSuccess, cudaFree(nyuv_device));
   ASSERT_EQ(cudaSuccess, cudaFree(mean_device));
   ASSERT_EQ(cudaSuccess, cudaFree(stddevsq_device));
+}
+
+TEST(MssimTest, BlockSumTest) {
+  std::unique_ptr<float> zeros(new float[vcsmc::kFrameSizeBytes]);
+  std::memset(zeros.get(), 0, sizeof(float) * vcsmc::kFrameSizeBytes);
+
+  float* input_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&input_device, vcsmc::kFrameSizeBytes *
+      sizeof(float)));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(input_device, zeros.get(),
+      vcsmc::kFrameSizeBytes * sizeof(float), cudaMemcpyHostToDevice));
+
+  float* results_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&results_device, 60 * sizeof(float)));
+
+  dim3 grid_dim(10, 6);
+  dim3 block_dim(32, 32);
+  vcsmc::ComputeBlockSum<<<grid_dim, block_dim, 1024 * sizeof(float)>>>(
+      input_device, results_device);
+
+  std::unique_ptr<float> results(new float[60]);
+  // Paint the results with 1.0 so we can detect that we actually got zeros back
+  // from the device.
+  for (size_t i = 0; i < 60; ++i) {
+    results.get()[i] = 1.0f;
+  }
+
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(results.get(), results_device,
+      60 * sizeof(float), cudaMemcpyDeviceToHost));
+
+  // Sums of all zeros should be zero.
+  for (size_t i = 0; i < 60; ++i) {
+    EXPECT_EQ(0.0f, results.get()[i]);
+  }
+
+  // Build blocks that contain values from -511 to +511, plus the index
+  // of the block in each block, so that they will sum to the block index.
+  std::unique_ptr<float> blocks(new float[vcsmc::kFrameSizeBytes]);
+  int block_counter = 0;
+  for (size_t i = 0; i < 6; ++i) {
+    for (size_t j = 0; j < 10; ++j) {
+      int pixel_counter = -511;
+      float* block_ptr = blocks.get() +
+          (((i * vcsmc::kTargetFrameWidthPixels) + j) * 32);
+      for (size_t y = 0; y < 32; ++y) {
+        for (size_t x = 0; x < 32; ++x) {
+          if (pixel_counter == 512) {
+            *block_ptr = static_cast<float>(block_counter);
+            ++block_counter;
+          } else {
+            *block_ptr = static_cast<float>(pixel_counter);
+          }
+          ++pixel_counter;
+          ++block_ptr;
+        }
+        block_ptr += vcsmc::kTargetFrameWidthPixels - 32;
+      }
+    }
+  }
+
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(input_device, blocks.get(),
+      vcsmc::kFrameSizeBytes * sizeof(float), cudaMemcpyHostToDevice));
+  vcsmc::ComputeBlockSum<<<grid_dim, block_dim, 1024 * sizeof(float)>>>(
+      input_device, results_device);
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(results.get(), results_device,
+      60 * sizeof(float), cudaMemcpyDeviceToHost));
+
+  for (size_t i = 0; i < 60; ++i) {
+    EXPECT_EQ(static_cast<float>(i), results.get()[i]);
+  }
+
+  ASSERT_EQ(cudaSuccess, cudaFree(results_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(input_device));
 }
 
 }  // namespace vcsmc

@@ -41,7 +41,7 @@ extern "C" {
 }
 
 const size_t kSimSkipLines = 23;
-const size_t kBlockSumBufferSize = 120;
+const size_t kBlockSumBufferSize = 60;
 
 DEFINE_bool(print_stats, true,
     "If true gen will print generation statistics to stdio after every "
@@ -364,41 +364,42 @@ class SimulateKernelJob {
         nyuv += vcsmc::kWindowSize * 4;
       }
 
-      dim3 image_dim_block(16, 16);
       dim3 padded_image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
                                  (vcsmc::kFrameHeightPixels / 16) + 1);
       dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16),
                           (vcsmc::kFrameHeightPixels / 16));
-      dim3 sum_dim_block(256);
-      dim3 sum_dim_grid(kBlockSumBufferSize);
+      dim3 image_dim_block(16, 16);
+      dim3 sum_dim_grid(vcsmc::kTargetFrameWidthPixels / 32,
+                        vcsmc::kFrameHeightPixels / 32);
+      dim3 sum_dim_block(32, 32);
 
       cudaMemcpyAsync(score_state.sim_nyuv_device,
                       kernel_score->sim_nyuv,
                       vcsmc::kNyuvBufferSizeBytes,
                       cudaMemcpyHostToDevice,
                       score_state.stream);
-      vcsmc::ComputeLocalMean<<<image_dim_block, padded_image_dim_grid, 0,
+      vcsmc::ComputeLocalMean<<<padded_image_dim_grid, image_dim_block, 0,
           score_state.stream>>>(score_state.sim_nyuv_device,
                                 score_state.sim_mean_device);
-      vcsmc::ComputeLocalStdDevSquared<<<image_dim_block, padded_image_dim_grid,
+      vcsmc::ComputeLocalStdDevSquared<<<padded_image_dim_grid, image_dim_block,
           0, score_state.stream>>>(score_state.sim_nyuv_device,
                                    score_state.sim_mean_device,
                                    score_state.sim_stddevsq_device);
-      vcsmc::ComputeLocalCovariance<<<image_dim_block, padded_image_dim_grid, 0,
+      vcsmc::ComputeLocalCovariance<<<padded_image_dim_grid, image_dim_block, 0,
           score_state.stream>>>(score_state.sim_nyuv_device,
                                 score_state.sim_mean_device,
                                 target_nyuv_device_,
                                 target_mean_device_,
                                 score_state.sim_cov_device);
-      vcsmc::ComputeSSIM<<<image_dim_block, image_dim_grid, 0,
+      vcsmc::ComputeSSIM<<<image_dim_grid, image_dim_block, 0,
           score_state.stream>>>(score_state.sim_mean_device,
                                 score_state.sim_stddevsq_device,
                                 target_mean_device_,
                                 target_stddevsq_device_,
                                 score_state.sim_cov_device,
                                 score_state.ssim_device);
-      vcsmc::ComputeBlockSum<<<sum_dim_block, sum_dim_grid,
-          kBlockSumBufferSize * sizeof(float), score_state.stream>>>(
+      vcsmc::ComputeBlockSum<<<sum_dim_grid, sum_dim_block,
+          1024 * sizeof(float), score_state.stream>>>(
           score_state.ssim_device, score_state.block_sum_device);
       cudaMemcpyAsync(kernel_score->block_sums,
                       score_state.block_sum_device,
@@ -578,9 +579,9 @@ int main(int argc, char* argv[]) {
   dim3 dim_block(16, 16);
   dim3 dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
                 (vcsmc::kFrameHeightPixels / 16) + 1);
-  vcsmc::ComputeLocalMean<<<dim_block, dim_grid, 0>>>(target_nyuv_device,
+  vcsmc::ComputeLocalMean<<<dim_grid, dim_block, 0>>>(target_nyuv_device,
       target_mean_device);
-  vcsmc::ComputeLocalStdDevSquared<<<dim_block, dim_grid, 0>>>(
+  vcsmc::ComputeLocalStdDevSquared<<<dim_grid, dim_block, 0>>>(
       target_nyuv_device, target_mean_device, target_stddevsq_device);
 
   vcsmc::SpecList audio_spec_list;
