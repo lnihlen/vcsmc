@@ -337,15 +337,15 @@ class SimulateKernelJob {
         for (size_t k = 0; k < vcsmc::kFrameWidthPixels; ++k) {
           uint8 col = *frame_pointer;
           if (col < 128) {
-            uint32 nyuv_index = col * 3;
+            uint32 nyuv_index = col * 4;
             nyuv[0] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index];
             nyuv[1] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 1];
             nyuv[2] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 2];
-            nyuv[3] = 1.0;
+            nyuv[3] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 3];
             nyuv[4] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index];
             nyuv[5] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 1];
             nyuv[6] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 2];
-            nyuv[7] = 1.0;
+            nyuv[7] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 3];
           } else {
             nyuv[0] = 0.0;
             nyuv[1] = 0.0;

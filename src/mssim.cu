@@ -3,8 +3,8 @@
 namespace vcsmc {
 
 #define WINDOW_SIZE 8
-#define C1 ((0.01 * 100.0) * (0.01 * 100.0))
-#define C2 ((0.03 * 100.0) * (0.03 * 100.0))
+#define C1 0.0001
+#define C2 0.0009
 #define WEIGHT_Y 0.5
 #define WEIGHT_U 0.25
 #define WEIGHT_V 0.25
@@ -47,6 +47,7 @@ __global__ void ComputeLocalMean(const float4* nyuv_in,
   mean_out[index] = mean;
 }
 
+// TODO: rename to ComputeVariance()
 __global__ void ComputeLocalStdDevSquared(const float4* nyuv_in,
                                           const float4* mean_in,
                                           float4* stddevsq_out) {
@@ -68,14 +69,15 @@ __global__ void ComputeLocalStdDevSquared(const float4* nyuv_in,
     int row_offset = index + (i * PADDED_IMAGE_WIDTH);
     for (int j = 0; j < WINDOW_SIZE; ++j) {
       float4 nyuv = nyuv_in[row_offset + j];
+      float pad = nyuv.w;
       float4 del = make_float4(nyuv.x - mean.x,
                                nyuv.y - mean.y,
                                nyuv.z - mean.z,
                                0.0);
-      std_dev = make_float4(std_dev.x + (del.x * del.x),
-                            std_dev.y + (del.y * del.y),
-                            std_dev.z + (del.z * del.z),
-                            std_dev.w + nyuv.w);
+      std_dev = make_float4(std_dev.x + (del.x * del.x * pad),
+                            std_dev.y + (del.y * del.y * pad),
+                            std_dev.z + (del.z * del.z * pad),
+                            std_dev.w + pad);
     }
   }
 
@@ -111,6 +113,7 @@ __global__ void ComputeLocalCovariance(const float4* nyuv_a_in,
     int row_offset = index + (i * PADDED_IMAGE_WIDTH);
     for (int j = 0; j < WINDOW_SIZE; ++j) {
       float4 nyuv_a = nyuv_a_in[row_offset + j];
+      float pad = nyuv_a.w;
       float4 del_a = make_float4(nyuv_a.x - mean_a.x,
                                  nyuv_a.y - mean_a.y,
                                  nyuv_a.z - mean_a.z,
@@ -122,10 +125,10 @@ __global__ void ComputeLocalCovariance(const float4* nyuv_a_in,
                                  nyuv_b.z - mean_b.z,
                                  0.0);
 
-      cov = make_float4(cov.x + (del_a.x * del_b.x),
-                        cov.y + (del_a.y * del_b.y),
-                        cov.z + (del_a.z * del_b.z),
-                        cov.w + nyuv_a.w);
+      cov = make_float4(cov.x + (del_a.x * del_b.x * pad),
+                        cov.y + (del_a.y * del_b.y * pad),
+                        cov.z + (del_a.z * del_b.z * pad),
+                        cov.w + pad);
     }
   }
 

@@ -7,7 +7,8 @@
 
 namespace {
 
-std::unique_ptr<float> MakePaddedTestInput() {
+std::unique_ptr<float> MakePaddedTestInput(float slope = 1.0f,
+                                           float intercept = 0.0f) {
   std::unique_ptr<float> nyuv_input(new float[vcsmc::kNyuvBufferSize]);
   float* nyuv_ptr = nyuv_input.get();
 
@@ -18,10 +19,10 @@ std::unique_ptr<float> MakePaddedTestInput() {
   // (i / kWindowSize, i / kWindowSize + 1000, -(i / kWindowSize + 1000))
   for (size_t i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
     for (size_t j = 0; j < vcsmc::kTargetFrameWidthPixels; ++j) {
-      float val = static_cast<float>(
+      float val = (static_cast<float>(
           ((i / vcsmc::kWindowSize) *
           (vcsmc::kTargetFrameWidthPixels / vcsmc::kWindowSize)) +
-          (j / vcsmc::kWindowSize));
+          (j / vcsmc::kWindowSize)) * slope) + intercept;
       *nyuv_ptr = val;
       ++nyuv_ptr;
       *nyuv_ptr = val + 0.5f;
@@ -38,6 +39,7 @@ std::unique_ptr<float> MakePaddedTestInput() {
   return nyuv_input;
 }
 
+// Assumes MakePaddedTestInput was called with default arguments.
 std::unique_ptr<float> MakePaddedTestMean() {
   std::unique_ptr<float> mean(new float[vcsmc::kNyuvBufferSize]);
   float* mean_ptr = mean.get();
@@ -131,13 +133,14 @@ std::unique_ptr<float> ComputePaddedStandardDeviationSquared(
         uint32 offset = stddevsq_offset +
             ((y * (vcsmc::kTargetFrameWidthPixels + vcsmc::kWindowSize)) * 4);
         for (size_t x = 0; x < vcsmc::kWindowSize; ++x) {
+          float pad = input[offset + 3];
           float del_y = input[offset] - mean_y;
-          sum_y += del_y * del_y;
+          sum_y += del_y * del_y * pad;
           float del_u = input[offset + 1] - mean_u;
-          sum_u += del_u * del_u;
+          sum_u += del_u * del_u * pad;
           float del_v = input[offset + 2] - mean_v;
-          sum_v += del_v * del_v;
-          n += input[offset + 3];
+          sum_v += del_v * del_v * pad;
+          n += pad;
           offset += 4;
         }
       }
@@ -279,20 +282,131 @@ TEST(MssimTest, StandardDeviationSquaredTest) {
   std::unique_ptr<float> nyuv_stddevsq_computed =
       ComputePaddedStandardDeviationSquared(nyuv_input.get(), nyuv_mean.get());
 
-  for (size_t i = 0; i < vcsmc::kNyuvBufferSize; i += 4) {
-    EXPECT_LE(ulp_delta(nyuv_stddevsq_computed.get()[i],
-                        stddevsq_output.get()[i]), 32);
-    EXPECT_LE(ulp_delta(nyuv_stddevsq_computed.get()[i + 1],
-                        stddevsq_output.get()[i + 1]), 32);
-    EXPECT_LE(ulp_delta(nyuv_stddevsq_computed.get()[i + 2],
-                        stddevsq_output.get()[i + 2]), 32);
-    EXPECT_EQ(nyuv_stddevsq_computed.get()[i + 3],
-              stddevsq_output.get()[i + 3]);
-  }
+  EXPECT_EQ(0, std::memcmp(nyuv_stddevsq_computed.get(),
+                           stddevsq_output.get(),
+                           vcsmc::kNyuvBufferSizeBytes));
 
   ASSERT_EQ(cudaSuccess, cudaFree(nyuv_device));
   ASSERT_EQ(cudaSuccess, cudaFree(mean_device));
   ASSERT_EQ(cudaSuccess, cudaFree(stddevsq_device));
+}
+
+TEST(MssimTest, CovarianceTest) {
+  std::unique_ptr<float> nyuv_input = MakePaddedTestInput();
+  std::unique_ptr<float> nyuv_mean = MakePaddedTestMean();
+
+  float4* nyuv_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&nyuv_device, vcsmc::kNyuvBufferSizeBytes));
+  float4* mean_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kNyuvBufferSizeBytes));
+  float4* covariance_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&covariance_device,
+                                    vcsmc::kNyuvBufferSizeBytes));
+
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nyuv_device, nyuv_input.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_device, nyuv_mean.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+
+  // Covariance of variable with itself should be equal to variance, or
+  // standard deviation squared.
+  dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
+                      (vcsmc::kFrameHeightPixels / 16) + 1);
+  dim3 image_dim_block(16, 16);
+  vcsmc::ComputeLocalCovariance<<<image_dim_grid, image_dim_block>>>(
+      nyuv_device, mean_device, nyuv_device, mean_device, covariance_device);
+
+  std::unique_ptr<float> covariance(new float[vcsmc::kNyuvBufferSize]);
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(covariance.get(), covariance_device,
+      vcsmc::kNyuvBufferSizeBytes, cudaMemcpyDeviceToHost));
+  ValidatePaddingWeights(covariance.get());
+
+  std::unique_ptr<float> variance_computed =
+      ComputePaddedStandardDeviationSquared(nyuv_input.get(), nyuv_mean.get());
+
+  EXPECT_EQ(0, std::memcmp(variance_computed.get(),
+                           covariance.get(),
+                           vcsmc::kNyuvBufferSizeBytes));
+
+  // cov(X + a, Y + b) = cov(X, Y) for constants a,b, random variables X, Y.
+  std::unique_ptr<float> nyuv_plus_a = MakePaddedTestInput(1.0f, 2.0f);
+  std::unique_ptr<float> nyuv_mean_a = ComputePaddedMean(nyuv_plus_a.get());
+  std::unique_ptr<float> nyuv_plus_b = MakePaddedTestInput(1.0f, -4.0f);
+  std::unique_ptr<float> nyuv_mean_b = ComputePaddedMean(nyuv_plus_b.get());
+
+  float4* nyuv_a_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&nyuv_a_device,
+                                    vcsmc::kNyuvBufferSizeBytes));
+  float4* mean_a_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_a_device,
+                                    vcsmc::kNyuvBufferSizeBytes));
+  float4* nyuv_b_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&nyuv_b_device,
+                                    vcsmc::kNyuvBufferSizeBytes));
+  float4* mean_b_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_b_device,
+                                    vcsmc::kNyuvBufferSizeBytes));
+
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nyuv_a_device, nyuv_plus_a.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_a_device, nyuv_mean_a.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nyuv_b_device, nyuv_plus_b.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_b_device, nyuv_mean_b.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+
+  vcsmc::ComputeLocalCovariance<<<image_dim_grid, image_dim_block>>>(
+      nyuv_a_device, mean_a_device, nyuv_b_device, mean_b_device,
+      covariance_device);
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(covariance.get(), covariance_device,
+      vcsmc::kNyuvBufferSizeBytes, cudaMemcpyDeviceToHost));
+  ValidatePaddingWeights(covariance.get());
+
+  EXPECT_EQ(0, std::memcmp(variance_computed.get(),
+                           covariance.get(),
+                           vcsmc::kNyuvBufferSizeBytes));
+
+  // cov(aX, bY) = ab cov(X,Y) for constants a,b, random variables X, Y.
+  std::unique_ptr<float> nyuv_times_a = MakePaddedTestInput(-5.0f, 0.0f);
+  nyuv_mean_a = ComputePaddedMean(nyuv_times_a.get());
+  std::unique_ptr<float> nyuv_times_b = MakePaddedTestInput(3.0f, 0.0f);
+  nyuv_mean_b = ComputePaddedMean(nyuv_times_b.get());
+
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nyuv_a_device, nyuv_times_a.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_a_device, nyuv_mean_a.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nyuv_b_device, nyuv_times_b.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_b_device, nyuv_mean_b.get(),
+        vcsmc::kNyuvBufferSizeBytes, cudaMemcpyHostToDevice));
+
+  vcsmc::ComputeLocalCovariance<<<image_dim_grid, image_dim_block>>>(
+      nyuv_a_device, mean_a_device, nyuv_b_device, mean_b_device,
+      covariance_device);
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(covariance.get(), covariance_device,
+      vcsmc::kNyuvBufferSizeBytes, cudaMemcpyDeviceToHost));
+  ValidatePaddingWeights(covariance.get());
+
+  for (size_t i = 0; i < vcsmc::kNyuvBufferSize; i += 4) {
+    EXPECT_GT(16, ulp_delta(-15.0f * variance_computed.get()[i],
+                           covariance.get()[i]));
+    EXPECT_GT(16, ulp_delta(-15.0f * variance_computed.get()[i + 1],
+                           covariance.get()[i + 1]));
+    EXPECT_GT(16, ulp_delta(-15.0f * variance_computed.get()[i + 2],
+                           covariance.get()[i + 2]));
+    EXPECT_EQ(variance_computed.get()[i + 3],
+              covariance.get()[i + 3]);
+  }
+
+  ASSERT_EQ(cudaSuccess, cudaFree(nyuv_a_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(mean_a_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(nyuv_b_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(mean_b_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(covariance_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(mean_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(nyuv_device));
 }
 
 TEST(MssimTest, BlockSumTest) {
