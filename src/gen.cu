@@ -79,7 +79,9 @@ DEFINE_string(seed_generation_file, "",
 DEFINE_string(generation_output_file, "",
     "Optional path to output yaml file for generation saves.");
 DEFINE_string(image_output_file, "",
-    "Optional file to save minimum-error simulated image to.");
+    "Optional file to save minimum-error simulated image to. Can be a "
+    "pathspec, in which case the generation number will be appended. "
+    "Example: out/gen-%05lu.png");
 DEFINE_string(global_minimum_output_file, "out/minimum.yaml",
     "Required file path to save global minimum error kernel to.");
 DEFINE_string(audio_spec_list_file, "",
@@ -512,7 +514,8 @@ class CompeteKernelJob {
 
 void SaveState(vcsmc::Generation generation,
                const std::shared_ptr<vcsmc::Kernel>& global_minimum,
-               const ScoreMap::const_iterator& global_minimum_score) {
+               const ScoreMap::const_iterator& global_minimum_score,
+               size_t generation_count) {
   if (FLAGS_generation_output_file != "") {
     if (!vcsmc::SaveGenerationFile(generation, FLAGS_generation_output_file)) {
       fprintf(stderr, "error saving final generation file %s\n",
@@ -523,7 +526,9 @@ void SaveState(vcsmc::Generation generation,
     vcsmc::Image min_sim_image(
         global_minimum_score->second->sim_frame.get() +
         (kLibZ26ImageWidth * kSimSkipLines));
-    vcsmc::SaveImage(&min_sim_image, FLAGS_image_output_file);
+    char buf[1024];
+    snprintf(buf, 1024, FLAGS_image_output_file.c_str(), generation_count);
+    vcsmc::SaveImage(&min_sim_image, std::string(buf));
   }
   if (!vcsmc::SaveKernelToFile(global_minimum,
         FLAGS_global_minimum_output_file)) {
@@ -809,7 +814,10 @@ int main(int argc, char* argv[]) {
       tourney_time_us = 0;
       mutate_count = 0;
       mutate_time_us = 0;
-      SaveState(generation, global_minimum, global_minimum_score);
+      SaveState(generation,
+                global_minimum,
+                global_minimum_score,
+                generation_count);
       epoch_time = now;
     }
 
@@ -869,7 +877,10 @@ int main(int argc, char* argv[]) {
     ProfilerStop();
   }
 
-  SaveState(generation, global_minimum, global_minimum_score);
+  SaveState(generation,
+            global_minimum,
+            global_minimum_score,
+            generation_count);
 
   if (FLAGS_append_kernel_binary != "") {
     vcsmc::AppendKernelBinary(global_minimum, FLAGS_append_kernel_binary);
