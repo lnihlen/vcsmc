@@ -336,7 +336,7 @@ class SimulateKernelJob {
       uint8* frame_pointer = kernel_score->sim_frame.get() +
           (kLibZ26ImageWidth * kSimSkipLines);
       for (size_t j = 0; j < vcsmc::kFrameHeightPixels; ++j) {
-        for (size_t k = 0; k < vcsmc::kFrameWidthPixels; ++k) {
+        for (size_t k = 0; k < vcsmc::kTargetFrameWidthPixels; k += 2) {
           uint8 col = *frame_pointer;
           if (col < 128) {
             uint32 nyuv_index = col * 4;
@@ -581,9 +581,9 @@ int main(int argc, char* argv[]) {
              input_nyuv.get(),
              vcsmc::kNyuvBufferSizeBytes,
              cudaMemcpyHostToDevice);
-  dim3 dim_block(16, 16);
   dim3 dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
                 (vcsmc::kFrameHeightPixels / 16) + 1);
+  dim3 dim_block(16, 16);
   vcsmc::ComputeLocalMean<<<dim_grid, dim_block, 0>>>(target_nyuv_device,
       target_mean_device);
   vcsmc::ComputeLocalStdDevSquared<<<dim_grid, dim_block, 0>>>(
