@@ -1,4 +1,4 @@
-// build_laba_table - generates atari_laba_nyuv_color_table.h/cc in the provided
+// build_laba_table - generates atari_laba_laba_color_table.h/cc in the provided
 // output directory. Converts RGBA Atari colors to Lab colors.
 
 #include <fcntl.h>

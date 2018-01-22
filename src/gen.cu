@@ -24,8 +24,9 @@
 #include "cuda_runtime.h"
 #include "tbb/tbb.h"
 
-#include "atari_ntsc_nyuv_color_table.h"
+#include "atari_ntsc_laba_color_table.h"
 #include "bit_map.h"
+#include "ciede_2k.h"
 #include "color.h"
 #include "cuda_utils.h"
 #include "image.h"
@@ -99,13 +100,13 @@ struct MssimScoreState {
     result = cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
     assert(result == cudaSuccess);
 
-    result = cudaMalloc(&sim_nyuv_device, vcsmc::kNyuvBufferSizeBytes);
+    result = cudaMalloc(&sim_laba_device, vcsmc::kLabaBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&sim_mean_device, vcsmc::kNyuvBufferSizeBytes);
+    result = cudaMalloc(&sim_mean_device, vcsmc::kLabaBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&sim_stddevsq_device, vcsmc::kNyuvBufferSizeBytes);
+    result = cudaMalloc(&sim_stddevsq_device, vcsmc::kLabaBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&sim_cov_device, vcsmc::kNyuvBufferSizeBytes);
+    result = cudaMalloc(&sim_cov_device, vcsmc::kLabaBufferSizeBytes);
     assert(result == cudaSuccess);
     result = cudaMalloc(&ssim_device, sizeof(float) *
         vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels);
@@ -120,7 +121,7 @@ struct MssimScoreState {
     // Clear any pending work on this thread.
     cudaStreamSynchronize(stream);
 
-    cudaFree(sim_nyuv_device);
+    cudaFree(sim_laba_device);
     cudaFree(sim_mean_device);
     cudaFree(sim_stddevsq_device);
     cudaFree(sim_cov_device);
@@ -132,9 +133,9 @@ struct MssimScoreState {
       block_sums_queue.pop_front();
     }
 
-    while (!sim_nyuv_queue.empty()) {
-      cudaFree(sim_nyuv_queue.front());
-      sim_nyuv_queue.pop_front();
+    while (!sim_laba_queue.empty()) {
+      cudaFree(sim_laba_queue.front());
+      sim_laba_queue.pop_front();
     }
 
     cudaStreamDestroy(stream);
@@ -142,7 +143,7 @@ struct MssimScoreState {
   MssimScoreState(const MssimScoreState&) = delete;
 
   cudaStream_t stream;
-  float4* sim_nyuv_device = nullptr;
+  float4* sim_laba_device = nullptr;
   float4* sim_mean_device = nullptr;
   float4* sim_stddevsq_device = nullptr;
   float4* sim_cov_device = nullptr;
@@ -152,7 +153,7 @@ struct MssimScoreState {
   // Pinned memory allocation on the host is time-expensive, so we recycle the
   // buffers as needed here.
   std::deque<float*> block_sums_queue;
-  std::deque<float*> sim_nyuv_queue;
+  std::deque<float*> sim_laba_queue;
 };
 
 struct KernelScore {
@@ -161,7 +162,7 @@ struct KernelScore {
 
   std::shared_ptr<uint8> sim_frame;
   float* block_sums = nullptr;
-  float* sim_nyuv = nullptr;
+  float* sim_laba = nullptr;
   float score = 1.0;
   uint32 victories = 0;
   bool score_final = false;
@@ -289,13 +290,13 @@ class MutateKernelJob {
 class SimulateKernelJob {
  public:
   SimulateKernelJob(vcsmc::Generation generation,
-                    const float4* target_nyuv_device,
+                    const float4* target_laba_device,
                     const float4* target_mean_device,
                     const float4* target_stddevsq_device,
                     ScoreMap& score_map,
                     MssimScoreStateList& mssim_score_state_list)
     : generation_(generation),
-      target_nyuv_device_(target_nyuv_device),
+      target_laba_device_(target_laba_device),
       target_mean_device_(target_mean_device),
       target_stddevsq_device_(target_stddevsq_device),
       score_map_(score_map),
@@ -317,53 +318,53 @@ class SimulateKernelJob {
         score_state.block_sums_queue.pop_front();
       }
 
-      if (score_state.sim_nyuv_queue.empty()) {
-        result = cudaMallocHost(&(kernel_score->sim_nyuv),
-                                vcsmc::kNyuvBufferSizeBytes);
+      if (score_state.sim_laba_queue.empty()) {
+        result = cudaMallocHost(&(kernel_score->sim_laba),
+                                vcsmc::kLabaBufferSizeBytes);
         assert(result == cudaSuccess);
       } else {
-        kernel_score->sim_nyuv = score_state.sim_nyuv_queue.front();
-        score_state.sim_nyuv_queue.pop_front();
+        kernel_score->sim_laba = score_state.sim_laba_queue.front();
+        score_state.sim_laba_queue.pop_front();
       }
 
       simulate_single_frame(kernel->bytecode(), kernel->bytecode_size(),
           kernel_score->sim_frame.get());
 
       // Convert simulated colors to nYUV for MSSIM computation.
-      float* nyuv = kernel_score->sim_nyuv;
+      float* laba = kernel_score->sim_laba;
       // Zero out the image, to also zero out the padding.
-      std::memset(nyuv, 0, vcsmc::kNyuvBufferSizeBytes);
+      std::memset(laba, 0, vcsmc::kLabaBufferSizeBytes);
       uint8* frame_pointer = kernel_score->sim_frame.get() +
           (kLibZ26ImageWidth * kSimSkipLines);
       for (size_t j = 0; j < vcsmc::kFrameHeightPixels; ++j) {
         for (size_t k = 0; k < vcsmc::kTargetFrameWidthPixels; k += 2) {
           uint8 col = *frame_pointer;
           if (col < 128) {
-            uint32 nyuv_index = col * 4;
-            nyuv[0] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index];
-            nyuv[1] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 1];
-            nyuv[2] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 2];
-            nyuv[3] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 3];
-            nyuv[4] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index];
-            nyuv[5] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 1];
-            nyuv[6] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 2];
-            nyuv[7] = vcsmc::kAtariNtscNyuvColorTable[nyuv_index + 3];
+            uint32 laba_index = col * 4;
+            laba[0] = vcsmc::kAtariNtscLabaColorTable[laba_index];
+            laba[1] = vcsmc::kAtariNtscLabaColorTable[laba_index + 1];
+            laba[2] = vcsmc::kAtariNtscLabaColorTable[laba_index + 2];
+            laba[3] = vcsmc::kAtariNtscLabaColorTable[laba_index + 3];
+            laba[4] = vcsmc::kAtariNtscLabaColorTable[laba_index];
+            laba[5] = vcsmc::kAtariNtscLabaColorTable[laba_index + 1];
+            laba[6] = vcsmc::kAtariNtscLabaColorTable[laba_index + 2];
+            laba[7] = vcsmc::kAtariNtscLabaColorTable[laba_index + 3];
           } else {
-            nyuv[0] = 0.0;
-            nyuv[1] = 0.0;
-            nyuv[2] = 0.0;
-            nyuv[3] = 1.0;
-            nyuv[4] = 0.0;
-            nyuv[5] = 0.0;
-            nyuv[6] = 0.0;
-            nyuv[7] = 1.0;
+            laba[0] = 0.0;
+            laba[1] = 0.0;
+            laba[2] = 0.0;
+            laba[3] = 1.0;
+            laba[4] = 0.0;
+            laba[5] = 0.0;
+            laba[6] = 0.0;
+            laba[7] = 1.0;
           }
           frame_pointer += 2;
-          nyuv += 8;
+          laba += 8;
         }
 
         // Skip padding on right.
-        nyuv += vcsmc::kWindowSize * 4;
+        laba += vcsmc::kWindowSize * 4;
       }
 
       dim3 padded_image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
@@ -375,22 +376,22 @@ class SimulateKernelJob {
                         vcsmc::kFrameHeightPixels / 32);
       dim3 sum_dim_block(32, 32);
 
-      cudaMemcpyAsync(score_state.sim_nyuv_device,
-                      kernel_score->sim_nyuv,
-                      vcsmc::kNyuvBufferSizeBytes,
+      cudaMemcpyAsync(score_state.sim_laba_device,
+                      kernel_score->sim_laba,
+                      vcsmc::kLabaBufferSizeBytes,
                       cudaMemcpyHostToDevice,
                       score_state.stream);
       vcsmc::ComputeLocalMean<<<padded_image_dim_grid, image_dim_block, 0,
-          score_state.stream>>>(score_state.sim_nyuv_device,
+          score_state.stream>>>(score_state.sim_laba_device,
                                 score_state.sim_mean_device);
       vcsmc::ComputeLocalStdDevSquared<<<padded_image_dim_grid, image_dim_block,
-          0, score_state.stream>>>(score_state.sim_nyuv_device,
+          0, score_state.stream>>>(score_state.sim_laba_device,
                                    score_state.sim_mean_device,
                                    score_state.sim_stddevsq_device);
       vcsmc::ComputeLocalCovariance<<<padded_image_dim_grid, image_dim_block, 0,
-          score_state.stream>>>(score_state.sim_nyuv_device,
+          score_state.stream>>>(score_state.sim_laba_device,
                                 score_state.sim_mean_device,
-                                target_nyuv_device_,
+                                target_laba_device_,
                                 target_mean_device_,
                                 score_state.sim_cov_device);
       vcsmc::ComputeSSIM<<<image_dim_grid, image_dim_block, 0,
@@ -415,7 +416,7 @@ class SimulateKernelJob {
 
  private:
   vcsmc::Generation generation_;
-  const float4* target_nyuv_device_;
+  const float4* target_laba_device_;
   const float4* target_mean_device_;
   const float4* target_stddevsq_device_;
   ScoreMap& score_map_;
@@ -457,8 +458,8 @@ class FinalizeScoreJob {
       // Recycle buffers.
       score_state.block_sums_queue.push_back(kernel_score->second->block_sums);
       kernel_score->second->block_sums = nullptr;
-      score_state.sim_nyuv_queue.push_back(kernel_score->second->sim_nyuv);
-      kernel_score->second->sim_nyuv = nullptr;
+      score_state.sim_laba_queue.push_back(kernel_score->second->sim_laba);
+      kernel_score->second->sim_laba = nullptr;
 
       kernel_score->second->score_final = true;
     }
@@ -543,7 +544,7 @@ int main(int argc, char* argv[]) {
 
   if (!vcsmc::InitializeCuda(FLAGS_print_stats)) return -1;
 
-  // Read input image, vet, and convert to Nyuv color.
+  // Read input image, vet, and convert to Laba color.
   std::unique_ptr<vcsmc::Image> input_image = vcsmc::LoadImage(
       FLAGS_input_image_file);
   if (!input_image) {
@@ -556,38 +557,38 @@ int main(int argc, char* argv[]) {
     fprintf(stderr, "bad image dimensions on input image file %s.\n",
         FLAGS_input_image_file.c_str());
   }
-  std::unique_ptr<float> input_nyuv(new float[vcsmc::kNyuvBufferSize]);
-  float* input_nyuv_ptr = input_nyuv.get();
+  std::unique_ptr<float> input_laba(new float[vcsmc::kLabaBufferSize]);
+  float* input_laba_ptr = input_laba.get();
   const uint32* pixel_ptr = input_image->pixels();
-  std::memset(input_nyuv_ptr, 0, vcsmc::kNyuvBufferSizeBytes);
+  std::memset(input_laba_ptr, 0, vcsmc::kLabaBufferSizeBytes);
   for (size_t i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
     for (size_t j = 0; j < vcsmc::kTargetFrameWidthPixels; ++j) {
-      vcsmc::RgbaToNormalizedYuv(reinterpret_cast<const uint8*>(pixel_ptr),
-          input_nyuv_ptr);
-      input_nyuv_ptr[3] = 1.0f;
+      vcsmc::RgbaToLaba(reinterpret_cast<const uint8*>(pixel_ptr),
+          input_laba_ptr);
+      input_laba_ptr[3] = 1.0f;
       ++pixel_ptr;
-      input_nyuv_ptr += 4;
+      input_laba_ptr += 4;
     }
-    input_nyuv_ptr += (4 * vcsmc::kWindowSize);
+    input_laba_ptr += (4 * vcsmc::kWindowSize);
   }
-  // Copy input Nyuv colors to device, compute mean and stddev asynchronously.
-  float4* target_nyuv_device;
-  cudaMalloc(&target_nyuv_device, vcsmc::kNyuvBufferSizeBytes);
+  // Copy input Laba colors to device, compute mean and stddev asynchronously.
+  float4* target_laba_device;
+  cudaMalloc(&target_laba_device, vcsmc::kLabaBufferSizeBytes);
   float4* target_mean_device;
-  cudaMalloc(&target_mean_device, vcsmc::kNyuvBufferSizeBytes);
+  cudaMalloc(&target_mean_device, vcsmc::kLabaBufferSizeBytes);
   float4* target_stddevsq_device;
-  cudaMalloc(&target_stddevsq_device, vcsmc::kNyuvBufferSizeBytes);
-  cudaMemcpy(target_nyuv_device,
-             input_nyuv.get(),
-             vcsmc::kNyuvBufferSizeBytes,
+  cudaMalloc(&target_stddevsq_device, vcsmc::kLabaBufferSizeBytes);
+  cudaMemcpy(target_laba_device,
+             input_laba.get(),
+             vcsmc::kLabaBufferSizeBytes,
              cudaMemcpyHostToDevice);
   dim3 dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
                 (vcsmc::kFrameHeightPixels / 16) + 1);
   dim3 dim_block(16, 16);
-  vcsmc::ComputeLocalMean<<<dim_grid, dim_block, 0>>>(target_nyuv_device,
+  vcsmc::ComputeLocalMean<<<dim_grid, dim_block, 0>>>(target_laba_device,
       target_mean_device);
   vcsmc::ComputeLocalStdDevSquared<<<dim_grid, dim_block, 0>>>(
-      target_nyuv_device, target_mean_device, target_stddevsq_device);
+      target_laba_device, target_mean_device, target_stddevsq_device);
 
   vcsmc::SpecList audio_spec_list;
   if (FLAGS_audio_spec_list_file != "") {
@@ -725,7 +726,7 @@ int main(int argc, char* argv[]) {
     auto start_of_simulation = std::chrono::high_resolution_clock::now();
     tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
         SimulateKernelJob(generation,
-                          target_nyuv_device,
+                          target_laba_device,
                           target_mean_device,
                           target_stddevsq_device,
                           score_map,
@@ -767,6 +768,11 @@ int main(int argc, char* argv[]) {
 
           return a_score->second->victories > b_score->second->victories;
         });
+
+    // Validate sort.
+    assert(score_map.find(generation->at(0))->second->score <
+           score_map.find(generation->at(generation->size() - 1))->second->
+           score);
 
     if (global_minimum_score == score_map.end() ||
         score_map.find(generation->at(0))->second->score <

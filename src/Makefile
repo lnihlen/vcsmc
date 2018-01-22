@@ -49,8 +49,7 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/serialization_unittests.o
 
-vcsmc: $(OUT)/find_ciede_max_distance                                          \
-       $(OUT)/gen                                                              \
+vcsmc: $(OUT)/gen                                                              \
        $(OUT)/pcm                                                              \
        $(OUT)/respec
 
@@ -70,12 +69,6 @@ $(OUT)/atari_ntsc_laba_color_table.o: $(OUT)/build_laba_table
 	$(CC) -c -o $@ $(OUT)/atari_ntsc_laba_color_table.cc $(CFLAGS) $(OPT)        \
     $(INCLUDES)
 
-$(OUT)/atari_ntsc_nyuv_color_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
-$(OUT)/atari_ntsc_nyuv_color_table.o: $(OUT)/build_nyuv_table
-	$(OUT)/build_nyuv_table --output_directory=../out
-	$(CC) -c -o $@ $(OUT)/atari_ntsc_nyuv_color_table.cc $(CFLAGS) $(OPT)        \
-    $(INCLUDES)
-
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CC) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES) -I$(GTEST_INCLUDE)
 
@@ -87,24 +80,20 @@ $(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
                          $(OUT)/build_laba_table.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
-$(OUT)/build_nyuv_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
-                         $(OUT)/build_nyuv_table.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
-
 $(OUT)/gen: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/gen.o                      \
-            $(OUT)/atari_ntsc_nyuv_color_table.o
+            $(OUT)/atari_ntsc_laba_color_table.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/pcm: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ)                                   \
-            $(OUT)/atari_ntsc_nyuv_color_table.o $(OUT)/pcm.o
+            $(OUT)/atari_ntsc_laba_color_table.o $(OUT)/pcm.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/respec: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ)                                \
-               $(OUT)/atari_ntsc_nyuv_color_table.o $(OUT)/respec.o
+               $(OUT)/atari_ntsc_laba_color_table.o $(OUT)/respec.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
-    $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/atari_ntsc_nyuv_color_table.o |           \
+    $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/atari_ntsc_laba_color_table.o |           \
     $(OUTTESTS)/
 	$(NVCC) -o $@ $^ $(LIBZ26_LIB) $(INCLUDES) $(LDFLAGS) $(LIBS)                \
     $(GTEST_LIB) -Xcompiler "$(OPT) $(CFLAGS)"
@@ -115,8 +104,8 @@ $(OUTTESTS)/:
 .PHONY: clean
 clean:
 	rm -rf $(COLOR_OBJ) $(IMAGE_OBJ) $(OBJ) $(TEST_OBJ)                          \
-    $(OUT)/build_nyuv_table{,.o}                                               \
-    $(OUT)/atari_ntsc_nyuv_color_table.{cc,o}                                  \
+    $(OUT)/build_laba_table{,.o}                                               \
+    $(OUT)/atari_ntsc_laba_color_table.{cc,o}                                  \
     $(OUT)/gen{,.o}                                                            \
     $(OUT)/pcm{,.o}                                                            \
     $(OUT)/respec{,.o}                                                         \

@@ -13,7 +13,7 @@ namespace vcsmc {
 #define PADDED_IMAGE_WIDTH (IMAGE_WIDTH + WINDOW_SIZE)
 #define PADDED_IMAGE_HEIGHT (IMAGE_HEIGHT + WINDOW_SIZE)
 
-__global__ void ComputeLocalMean(const float4* nyuv_in,
+__global__ void ComputeLocalMean(const float4* laba_in,
                                  float4* mean_out) {
   int x = (blockIdx.x * blockDim.x) + threadIdx.x;
   int y = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -31,12 +31,12 @@ __global__ void ComputeLocalMean(const float4* nyuv_in,
   for (int i = 0; i < WINDOW_SIZE; ++i) {
     int row_offset = index + (i * PADDED_IMAGE_WIDTH);
     for (int j = 0; j < WINDOW_SIZE; ++j) {
-      float4 nyuv = nyuv_in[row_offset + j];
+      float4 laba = laba_in[row_offset + j];
       // Fourth element to be 1.0 in valid elements, 0.0 in padding.
-      mean = make_float4(mean.x + nyuv.x,
-                         mean.y + nyuv.y,
-                         mean.z + nyuv.z,
-                         mean.w + nyuv.w);
+      mean = make_float4(mean.x + laba.x,
+                         mean.y + laba.y,
+                         mean.z + laba.z,
+                         mean.w + laba.w);
     }
   }
 
@@ -48,7 +48,7 @@ __global__ void ComputeLocalMean(const float4* nyuv_in,
 }
 
 // TODO: rename to ComputeVariance()
-__global__ void ComputeLocalStdDevSquared(const float4* nyuv_in,
+__global__ void ComputeLocalStdDevSquared(const float4* laba_in,
                                           const float4* mean_in,
                                           float4* stddevsq_out) {
   int x = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -68,11 +68,11 @@ __global__ void ComputeLocalStdDevSquared(const float4* nyuv_in,
   for (int i = 0; i < WINDOW_SIZE; ++i) {
     int row_offset = index + (i * PADDED_IMAGE_WIDTH);
     for (int j = 0; j < WINDOW_SIZE; ++j) {
-      float4 nyuv = nyuv_in[row_offset + j];
-      float pad = nyuv.w;
-      float4 del = make_float4(nyuv.x - mean.x,
-                               nyuv.y - mean.y,
-                               nyuv.z - mean.z,
+      float4 laba = laba_in[row_offset + j];
+      float pad = laba.w;
+      float4 del = make_float4(laba.x - mean.x,
+                               laba.y - mean.y,
+                               laba.z - mean.z,
                                0.0);
       std_dev = make_float4(std_dev.x + (del.x * del.x * pad),
                             std_dev.y + (del.y * del.y * pad),
@@ -89,9 +89,9 @@ __global__ void ComputeLocalStdDevSquared(const float4* nyuv_in,
   stddevsq_out[index] = std_dev;
 }
 
-__global__ void ComputeLocalCovariance(const float4* nyuv_a_in,
+__global__ void ComputeLocalCovariance(const float4* laba_a_in,
                                        const float4* mean_a_in,
-                                       const float4* nyuv_b_in,
+                                       const float4* laba_b_in,
                                        const float4* mean_b_in,
                                        float4* cov_ab_out) {
   int x = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -112,17 +112,17 @@ __global__ void ComputeLocalCovariance(const float4* nyuv_a_in,
   for (int i = 0; i < WINDOW_SIZE; ++i) {
     int row_offset = index + (i * PADDED_IMAGE_WIDTH);
     for (int j = 0; j < WINDOW_SIZE; ++j) {
-      float4 nyuv_a = nyuv_a_in[row_offset + j];
-      float pad = nyuv_a.w;
-      float4 del_a = make_float4(nyuv_a.x - mean_a.x,
-                                 nyuv_a.y - mean_a.y,
-                                 nyuv_a.z - mean_a.z,
+      float4 laba_a = laba_a_in[row_offset + j];
+      float pad = laba_a.w;
+      float4 del_a = make_float4(laba_a.x - mean_a.x,
+                                 laba_a.y - mean_a.y,
+                                 laba_a.z - mean_a.z,
                                  0.0);
 
-      float4 nyuv_b = nyuv_b_in[row_offset + j];
-      float4 del_b = make_float4(nyuv_b.x - mean_b.x,
-                                 nyuv_b.y - mean_b.y,
-                                 nyuv_b.z - mean_b.z,
+      float4 laba_b = laba_b_in[row_offset + j];
+      float4 del_b = make_float4(laba_b.x - mean_b.x,
+                                 laba_b.y - mean_b.y,
+                                 laba_b.z - mean_b.z,
                                  0.0);
 
       cov = make_float4(cov.x + (del_a.x * del_b.x * pad),
