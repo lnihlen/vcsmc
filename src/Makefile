@@ -31,6 +31,7 @@ IMAGE_OBJ=$(OUT)/bit_map.o                                                     \
           $(OUT)/value_map.o
 
 OBJ=$(OUT)/assembler.o                                                         \
+    $(OUT)/ciede_2k.o                                                          \
     $(OUT)/cuda_utils.o                                                        \
     $(OUT)/kernel.o                                                            \
     $(OUT)/mssim.o                                                             \
@@ -42,6 +43,7 @@ OBJ=$(OUT)/assembler.o                                                         \
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
+         $(OUTTESTS)/ciede_2k_unittests.o                                      \
          $(OUTTESTS)/kernel_unittests.o                                        \
          $(OUTTESTS)/mssim_unittests.o                                         \
          $(OUTTESTS)/range_unittests.o                                         \
@@ -62,6 +64,12 @@ $(OUT)/%.o: %.cc $(DEPS)
 $(OUT)/%.o: %.cu $(DEPS)
 	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -Xcompiler "$(OPT) $(CFLAGS)"
 
+$(OUT)/atari_ntsc_laba_color_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
+$(OUT)/atari_ntsc_laba_color_table.o: $(OUT)/build_laba_table
+	$(OUT)/build_laba_table --output_directory=../out
+	$(CC) -c -o $@ $(OUT)/atari_ntsc_laba_color_table.cc $(CFLAGS) $(OPT)        \
+    $(INCLUDES)
+
 $(OUT)/atari_ntsc_nyuv_color_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
 $(OUT)/atari_ntsc_nyuv_color_table.o: $(OUT)/build_nyuv_table
 	$(OUT)/build_nyuv_table --output_directory=../out
@@ -74,6 +82,10 @@ $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 $(OUTTESTS)/%.o: %.cu $(DEPS)
 	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -I$(GTEST_INCLUDE)               \
     -Xcompiler "$(OPT)"
+
+$(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
+                         $(OUT)/build_laba_table.o
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/build_nyuv_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
                          $(OUT)/build_nyuv_table.o
