@@ -1,179 +1,132 @@
 #include "mssim.h"
 
+#include "color.h"
+
 namespace vcsmc {
 
-#define WINDOW_SIZE 8
-#define C1 0.0001
-#define C2 0.0009
-#define WEIGHT_Y 0.5
-#define WEIGHT_U 0.25
-#define WEIGHT_V 0.25
-#define IMAGE_WIDTH 320
-#define IMAGE_HEIGHT 192
-#define PADDED_IMAGE_WIDTH (IMAGE_WIDTH + WINDOW_SIZE)
-#define PADDED_IMAGE_HEIGHT (IMAGE_HEIGHT + WINDOW_SIZE)
+__global__ void LabaToNormalizedL(const float4* laba_in,
+                                  float* nl_out) {
+  size_t x = (blockIdx.x * blockDim.x) + threadIdx.x;
+  size_t y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  size_t index = (y * kTargetFrameWidthPixels) + x;
 
-__global__ void ComputeLocalMean(const float4* laba_in,
-                                 float4* mean_out) {
-  int x = (blockIdx.x * blockDim.x) + threadIdx.x;
-  int y = (blockIdx.y * blockDim.y) + threadIdx.y;
-  int index = (y * PADDED_IMAGE_WIDTH) + x;
-  float4 mean = make_float4(0.0, 0.0, 0.0, 0.0);
-
-  // If we are running on the padding then mark the output as invalid too.
-  if (x >= IMAGE_WIDTH || y >= IMAGE_HEIGHT) {
-    if (x < PADDED_IMAGE_WIDTH && y < PADDED_IMAGE_HEIGHT) {
-      mean_out[index] = mean;
-    }
+  if (x >= kTargetFrameWidthPixels || y >= kFrameHeightPixels) {
     return;
   }
 
-  for (int i = 0; i < WINDOW_SIZE; ++i) {
-    int row_offset = index + (i * PADDED_IMAGE_WIDTH);
-    for (int j = 0; j < WINDOW_SIZE; ++j) {
-      float4 laba = laba_in[row_offset + j];
-      // Fourth element to be 1.0 in valid elements, 0.0 in padding.
-      mean = make_float4(mean.x + laba.x,
-                         mean.y + laba.y,
-                         mean.z + laba.z,
-                         mean.w + laba.w);
-    }
-  }
-
-  mean = make_float4(mean.x / mean.w,
-                     mean.y / mean.w,
-                     mean.z / mean.w,
-                     1.0);
-  mean_out[index] = mean;
+  float4 laba = laba_in[index];
+  nl_out[index] = laba.x / kMaxLab;
 }
 
-// TODO: rename to ComputeVariance()
-__global__ void ComputeLocalStdDevSquared(const float4* laba_in,
-                                          const float4* mean_in,
-                                          float4* stddevsq_out) {
-  int x = (blockIdx.x * blockDim.x) + threadIdx.x;
-  int y = (blockIdx.y * blockDim.y) + threadIdx.y;
-  int index = (y * PADDED_IMAGE_WIDTH) + x;
-  float4 std_dev = make_float4(0.0, 0.0, 0.0, 0.0);
+__global__ void ComputeMean(const float* nl_in,
+                            float* mean_out) {
+  size_t x = (blockIdx.x * blockDim.x) + threadIdx.x;
+  size_t y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  size_t index = (y * kTargetFrameWidthPixels) + x;
 
-  if (x >= IMAGE_WIDTH || y >= IMAGE_HEIGHT) {
-    if (x < PADDED_IMAGE_WIDTH && y < PADDED_IMAGE_HEIGHT) {
-      stddevsq_out[index] = std_dev;
-    }
+  if (x >= kTargetFrameWidthPixels || y >= kFrameHeightPixels) {
     return;
   }
 
-  float4 mean = mean_in[index];
-
-  for (int i = 0; i < WINDOW_SIZE; ++i) {
-    int row_offset = index + (i * PADDED_IMAGE_WIDTH);
-    for (int j = 0; j < WINDOW_SIZE; ++j) {
-      float4 laba = laba_in[row_offset + j];
-      float pad = laba.w;
-      float4 del = make_float4(laba.x - mean.x,
-                               laba.y - mean.y,
-                               laba.z - mean.z,
-                               0.0);
-      std_dev = make_float4(std_dev.x + (del.x * del.x * pad),
-                            std_dev.y + (del.y * del.y * pad),
-                            std_dev.z + (del.z * del.z * pad),
-                            std_dev.w + pad);
+  float sum = 0.0;
+  float n = 0.0;
+  for (size_t i = 0; i < min(kWindowSize, kFrameHeightPixels - y); ++i) {
+    size_t row_offset = index + (i * kTargetFrameWidthPixels);
+    for (size_t j = 0; j < min(kWindowSize, kTargetFrameWidthPixels - x); ++j) {
+      sum = sum + nl_in[row_offset + j];
+      n = n + 1.0;
     }
   }
 
-  float n_minus_one = max(std_dev.w - 1.0, 1.0);
-  std_dev = make_float4(std_dev.x / n_minus_one,
-                        std_dev.y / n_minus_one,
-                        std_dev.z / n_minus_one,
-                        1.0);
-  stddevsq_out[index] = std_dev;
+  n = max(n, 1.0);
+  mean_out[index] = sum / n;
 }
 
-__global__ void ComputeLocalCovariance(const float4* laba_a_in,
-                                       const float4* mean_a_in,
-                                       const float4* laba_b_in,
-                                       const float4* mean_b_in,
-                                       float4* cov_ab_out) {
-  int x = (blockIdx.x * blockDim.x) + threadIdx.x;
-  int y = (blockIdx.y * blockDim.y) + threadIdx.y;
-  int index = (y * PADDED_IMAGE_WIDTH) + x;
-  float4 cov = make_float4(0.0, 0.0, 0.0, 0.0);
+__global__ void ComputeVariance(const float* nl_in,
+                                const float* mean_in,
+                                float* variance_out) {
+  size_t x = (blockIdx.x * blockDim.x) + threadIdx.x;
+  size_t y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  size_t index = (y * kTargetFrameWidthPixels) + x;
 
-  if (x >= IMAGE_WIDTH || y >= IMAGE_HEIGHT) {
-    if (x < PADDED_IMAGE_WIDTH && y < PADDED_IMAGE_HEIGHT) {
-      cov_ab_out[index] = cov;
-    }
+  if (x >= kTargetFrameWidthPixels || y >= kFrameHeightPixels) {
     return;
   }
 
-  float4 mean_a = mean_a_in[index];
-  float4 mean_b = mean_b_in[index];
-
-  for (int i = 0; i < WINDOW_SIZE; ++i) {
-    int row_offset = index + (i * PADDED_IMAGE_WIDTH);
-    for (int j = 0; j < WINDOW_SIZE; ++j) {
-      float4 laba_a = laba_a_in[row_offset + j];
-      float pad = laba_a.w;
-      float4 del_a = make_float4(laba_a.x - mean_a.x,
-                                 laba_a.y - mean_a.y,
-                                 laba_a.z - mean_a.z,
-                                 0.0);
-
-      float4 laba_b = laba_b_in[row_offset + j];
-      float4 del_b = make_float4(laba_b.x - mean_b.x,
-                                 laba_b.y - mean_b.y,
-                                 laba_b.z - mean_b.z,
-                                 0.0);
-
-      cov = make_float4(cov.x + (del_a.x * del_b.x * pad),
-                        cov.y + (del_a.y * del_b.y * pad),
-                        cov.z + (del_a.z * del_b.z * pad),
-                        cov.w + pad);
+  float mean = mean_in[index];
+  float sum = 0.0;
+  float n = 0.0;
+  for (size_t i = 0; i < min(kWindowSize, kFrameHeightPixels - y); ++i) {
+    size_t row_offset = index + (i * kTargetFrameWidthPixels);
+    for (size_t j = 0; j < min(kWindowSize, kTargetFrameWidthPixels - x); ++j) {
+      float del = nl_in[row_offset + j] - mean;
+      sum = sum + (del * del);
+      n = n + 1.0;
     }
   }
 
-  float n_minus_one = max(cov.w - 1.0, 1.0);
-  cov = make_float4(cov.x / n_minus_one,
-                    cov.y / n_minus_one,
-                    cov.z / n_minus_one,
-                    1.0);
-  cov_ab_out[index] = cov;
+  float n_minus_one = max(n - 1.0, 1.0);
+  variance_out[index] = sum / n_minus_one;
 }
 
-__global__ void ComputeSSIM(const float4* mean_a_in,
-                            const float4* stddevsq_a_in,
-                            const float4* mean_b_in,
-                            const float4* stddevsq_b_in,
-                            const float4* cov_ab_in,
+__global__ void ComputeCovariance(const float* nl_a_in,
+                                  const float* mean_a_in,
+                                  const float* nl_b_in,
+                                  const float* mean_b_in,
+                                  float* cov_ab_out) {
+  size_t x = (blockIdx.x * blockDim.x) + threadIdx.x;
+  size_t y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  size_t index = (y * kTargetFrameWidthPixels) + x;
+
+  if (x >= kTargetFrameWidthPixels || y >= kFrameHeightPixels) {
+    return;
+  }
+
+  float mean_a = mean_a_in[index];
+  float mean_b = mean_b_in[index];
+  float sum = 0.0;
+  float n = 0.0;
+  for (size_t i = 0; i < min(kWindowSize, kFrameHeightPixels - y); ++i) {
+    size_t row_offset = index + (i * kTargetFrameWidthPixels);
+    for (size_t j = 0; j < min(kWindowSize, kTargetFrameWidthPixels - x); ++j) {
+      sum = sum + ((nl_a_in[row_offset + j] - mean_a) *
+                   (nl_b_in[row_offset + j] - mean_b));
+      n = n + 1.0;
+    }
+  }
+
+  float n_minus_one = max(n - 1.0, 1.0);
+  cov_ab_out[index] = sum / n_minus_one;
+}
+
+
+const float kC1 = 0.0001;
+const float kC2 = 0.0009;
+
+__global__ void ComputeSSIM(const float* mean_a_in,
+                            const float* variance_a_in,
+                            const float* mean_b_in,
+                            const float* variance_b_in,
+                            const float* cov_ab_in,
                             float* ssim_out) {
-  int x = (blockIdx.x * blockDim.x) + threadIdx.x;
-  int y = (blockIdx.y * blockDim.y) + threadIdx.y;
-  if (x >= IMAGE_WIDTH || y >= IMAGE_HEIGHT)
-    return;
-  int pixel_offset = (y * PADDED_IMAGE_WIDTH) + x;
-  float4 mean_a = mean_a_in[pixel_offset];
-  float4 stddevsq_a = stddevsq_a_in[pixel_offset];
-  float4 mean_b = mean_b_in[pixel_offset];
-  float4 stddevsq_b = stddevsq_b_in[pixel_offset];
-  float4 cov_ab = cov_ab_in[pixel_offset];
-  float4 ssim = make_float4(
-      (((2.0 * mean_a.x * mean_b.x) + C1) * ((2.0 * cov_ab.x) + C2)) /
-          (((mean_a.x * mean_a.x) + (mean_b.x * mean_b.x) + C1) *
-           (stddevsq_a.x + stddevsq_b.x + C2)),
-      (((2.0 * mean_a.y * mean_b.y) + C1) * ((2.0 * cov_ab.y) + C2)) /
-          (((mean_a.y * mean_a.y) + (mean_b.y * mean_b.y) + C1) *
-           (stddevsq_a.y + stddevsq_b.y + C2)),
-      (((2.0 * mean_a.z * mean_b.z) + C1) * ((2.0 * cov_ab.z) + C2)) /
-          (((mean_a.z * mean_a.z) + (mean_b.z * mean_b.z) + C1) *
-           (stddevsq_a.z + stddevsq_b.z + C2)),
-      1.0);
+  size_t x = (blockIdx.x * blockDim.x) + threadIdx.x;
+  size_t y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  size_t index = (y * kTargetFrameWidthPixels) + x;
 
-  // Note we must calculate an unpadded offset for the ssim_out result, as
-  // the output buffer needs no padding as there are no loops to unroll here.
-  ssim_out[(y * IMAGE_WIDTH) + x] =
-      (WEIGHT_Y * fabsf(ssim.x)) +
-      (WEIGHT_U * fabsf(ssim.y)) +
-      (WEIGHT_V * fabsf(ssim.z));
+  if (x >= kTargetFrameWidthPixels || y >= kFrameHeightPixels) {
+    return;
+  }
+
+  float mean_a = mean_a_in[index];
+  float variance_a = variance_a_in[index];
+  float mean_b = mean_b_in[index];
+  float variance_b = variance_b_in[index];
+  float cov_ab = cov_ab_in[index];
+  float ssim = (((2.0 * mean_a * mean_b) + kC1) * ((2.0 * cov_ab) + kC2)) /
+                (((mean_a * mean_a) + (mean_b * mean_b) + kC1) *
+                 (variance_a + variance_b + kC2));
+
+  ssim_out[index] = fabs(ssim);
 }
 
 // Parallel summing algorithm. Blocks at 32x32 for 1024 threads per block, with
@@ -209,10 +162,10 @@ __global__ void ComputeSSIM(const float4* mean_a_in,
 // *
 __global__ void ComputeBlockSum(const float* ssim_in, float* block_sum_out) {
   __shared__ float block_shared[1024];
-  int x = (blockIdx.x * blockDim.x) + threadIdx.x;
-  int y = (blockIdx.y * blockDim.y) + threadIdx.y;
-  int thread_id = (threadIdx.y * blockDim.x) + threadIdx.x;
-  int pixel_offset = (y * IMAGE_WIDTH) + x;
+  size_t x = (blockIdx.x * blockDim.x) + threadIdx.x;
+  size_t y = (blockIdx.y * blockDim.y) + threadIdx.y;
+  size_t thread_id = (threadIdx.y * blockDim.x) + threadIdx.x;
+  size_t pixel_offset = (y * kTargetFrameWidthPixels) + x;
   block_shared[thread_id] = ssim_in[pixel_offset];
   __syncthreads();
 
@@ -262,7 +215,7 @@ __global__ void ComputeBlockSum(const float* ssim_in, float* block_sum_out) {
   __syncthreads();
 
   if (thread_id == 0) {
-    int block_index = (blockIdx.y * gridDim.x) + blockIdx.x;
+    size_t block_index = (blockIdx.y * gridDim.x) + blockIdx.x;
     block_sum_out[block_index] = block_shared[0] + block_shared[1];
   }
 }

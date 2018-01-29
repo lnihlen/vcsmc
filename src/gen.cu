@@ -102,14 +102,15 @@ struct MssimScoreState {
 
     result = cudaMalloc(&sim_laba_device, vcsmc::kLabaBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&sim_mean_device, vcsmc::kLabaBufferSizeBytes);
+    result = cudaMalloc(&sim_nl_device, vcsmc::kLBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&sim_stddevsq_device, vcsmc::kLabaBufferSizeBytes);
+    result = cudaMalloc(&sim_mean_device, vcsmc::kLBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&sim_cov_device, vcsmc::kLabaBufferSizeBytes);
+    result = cudaMalloc(&sim_variance_device, vcsmc::kLBufferSizeBytes);
     assert(result == cudaSuccess);
-    result = cudaMalloc(&ssim_device, sizeof(float) *
-        vcsmc::kTargetFrameWidthPixels * vcsmc::kFrameHeightPixels);
+    result = cudaMalloc(&sim_cov_device, vcsmc::kLBufferSizeBytes);
+    assert(result == cudaSuccess);
+    result = cudaMalloc(&ssim_device, vcsmc::kLBufferSizeBytes);
     assert(result == cudaSuccess);
     result = cudaMalloc(&block_sum_device, sizeof(float) * kBlockSumBufferSize);
     assert(result == cudaSuccess);
@@ -122,15 +123,16 @@ struct MssimScoreState {
     cudaStreamSynchronize(stream);
 
     cudaFree(sim_laba_device);
+    cudaFree(sim_nl_device);
     cudaFree(sim_mean_device);
-    cudaFree(sim_stddevsq_device);
+    cudaFree(sim_variance_device);
     cudaFree(sim_cov_device);
     cudaFree(ssim_device);
     cudaFree(block_sum_device);
 
-    while (!block_sums_queue.empty()) {
-      cudaFree(block_sums_queue.front());
-      block_sums_queue.pop_front();
+    while (!ssim_block_sums_queue.empty()) {
+      cudaFree(ssim_block_sums_queue.front());
+      ssim_block_sums_queue.pop_front();
     }
 
     while (!sim_laba_queue.empty()) {
@@ -144,15 +146,16 @@ struct MssimScoreState {
 
   cudaStream_t stream;
   float4* sim_laba_device = nullptr;
-  float4* sim_mean_device = nullptr;
-  float4* sim_stddevsq_device = nullptr;
-  float4* sim_cov_device = nullptr;
+  float* sim_nl_device = nullptr;
+  float* sim_mean_device = nullptr;
+  float* sim_variance_device = nullptr;
+  float* sim_cov_device = nullptr;
   float* ssim_device = nullptr;
   float* block_sum_device = nullptr;
   float* final_sum_device = nullptr;
   // Pinned memory allocation on the host is time-expensive, so we recycle the
   // buffers as needed here.
-  std::deque<float*> block_sums_queue;
+  std::deque<float*> ssim_block_sums_queue;
   std::deque<float*> sim_laba_queue;
 };
 
@@ -161,9 +164,9 @@ struct KernelScore {
   KernelScore() : sim_frame(new uint8[kLibZ26ImageSizeBytes]) {}
 
   std::shared_ptr<uint8> sim_frame;
-  float* block_sums = nullptr;
+  float* ssim_block_sums = nullptr;
   float* sim_laba = nullptr;
-  float score = 1.0;
+  float mssim = 0.0f;
   uint32 victories = 0;
   bool score_final = false;
 };
@@ -290,15 +293,15 @@ class MutateKernelJob {
 class SimulateKernelJob {
  public:
   SimulateKernelJob(vcsmc::Generation generation,
-                    const float4* target_laba_device,
-                    const float4* target_mean_device,
-                    const float4* target_stddevsq_device,
+                    const float* target_nl_device,
+                    const float* target_mean_device,
+                    const float* target_variance_device,
                     ScoreMap& score_map,
                     MssimScoreStateList& mssim_score_state_list)
     : generation_(generation),
-      target_laba_device_(target_laba_device),
+      target_nl_device_(target_nl_device),
       target_mean_device_(target_mean_device),
-      target_stddevsq_device_(target_stddevsq_device),
+      target_variance_device_(target_variance_device),
       score_map_(score_map),
       mssim_score_state_list_(mssim_score_state_list) {}
   void operator()(const tbb::blocked_range<size_t>& r) const {
@@ -309,13 +312,14 @@ class SimulateKernelJob {
       std::shared_ptr<KernelScore> kernel_score(new KernelScore);
 
       cudaError_t result;
-      if (score_state.block_sums_queue.empty()) {
-        result = cudaMallocHost(&(kernel_score->block_sums),
+      if (score_state.ssim_block_sums_queue.empty()) {
+        result = cudaMallocHost(&(kernel_score->ssim_block_sums),
                                 sizeof(float) * kBlockSumBufferSize);
         assert(result == cudaSuccess);
       } else {
-        kernel_score->block_sums = score_state.block_sums_queue.front();
-        score_state.block_sums_queue.pop_front();
+        kernel_score->ssim_block_sums =
+            score_state.ssim_block_sums_queue.front();
+        score_state.ssim_block_sums_queue.pop_front();
       }
 
       if (score_state.sim_laba_queue.empty()) {
@@ -367,44 +371,39 @@ class SimulateKernelJob {
         laba += vcsmc::kWindowSize * 4;
       }
 
-      dim3 padded_image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
-                                 (vcsmc::kFrameHeightPixels / 16) + 1);
-      dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16),
-                          (vcsmc::kFrameHeightPixels / 16));
-      dim3 image_dim_block(16, 16);
-      dim3 sum_dim_grid(vcsmc::kTargetFrameWidthPixels / 32,
+      dim3 dim_grid(vcsmc::kTargetFrameWidthPixels / 32,
                         vcsmc::kFrameHeightPixels / 32);
-      dim3 sum_dim_block(32, 32);
-
+      dim3 dim_block(32, 32);
       cudaMemcpyAsync(score_state.sim_laba_device,
                       kernel_score->sim_laba,
                       vcsmc::kLabaBufferSizeBytes,
                       cudaMemcpyHostToDevice,
                       score_state.stream);
-      vcsmc::ComputeLocalMean<<<padded_image_dim_grid, image_dim_block, 0,
-          score_state.stream>>>(score_state.sim_laba_device,
-                                score_state.sim_mean_device);
-      vcsmc::ComputeLocalStdDevSquared<<<padded_image_dim_grid, image_dim_block,
-          0, score_state.stream>>>(score_state.sim_laba_device,
-                                   score_state.sim_mean_device,
-                                   score_state.sim_stddevsq_device);
-      vcsmc::ComputeLocalCovariance<<<padded_image_dim_grid, image_dim_block, 0,
-          score_state.stream>>>(score_state.sim_laba_device,
-                                score_state.sim_mean_device,
-                                target_laba_device_,
-                                target_mean_device_,
-                                score_state.sim_cov_device);
-      vcsmc::ComputeSSIM<<<image_dim_grid, image_dim_block, 0,
-          score_state.stream>>>(score_state.sim_mean_device,
-                                score_state.sim_stddevsq_device,
-                                target_mean_device_,
-                                target_stddevsq_device_,
-                                score_state.sim_cov_device,
-                                score_state.ssim_device);
-      vcsmc::ComputeBlockSum<<<sum_dim_grid, sum_dim_block,
+      vcsmc::LabaToNormalizedL<<<dim_grid, dim_block, 0, score_state.stream>>>(
+          score_state.sim_laba_device, score_state.sim_nl_device);
+      vcsmc::ComputeMean<<<dim_grid, dim_block, 0, score_state.stream>>>(
+          score_state.sim_nl_device, score_state.sim_mean_device);
+      vcsmc::ComputeVariance<<<dim_grid, dim_block, 0, score_state.stream>>>(
+          score_state.sim_nl_device,
+          score_state.sim_mean_device,
+          score_state.sim_variance_device);
+      vcsmc::ComputeCovariance<<<dim_grid, dim_block, 0, score_state.stream>>>(
+          score_state.sim_nl_device,
+          score_state.sim_mean_device,
+          target_nl_device_,
+          target_mean_device_,
+          score_state.sim_cov_device);
+      vcsmc::ComputeSSIM<<<dim_grid, dim_block, 0, score_state.stream>>>(
+          score_state.sim_mean_device,
+          score_state.sim_variance_device,
+          target_mean_device_,
+          target_variance_device_,
+          score_state.sim_cov_device,
+          score_state.ssim_device);
+      vcsmc::ComputeBlockSum<<<dim_grid, dim_block,
           1024 * sizeof(float), score_state.stream>>>(
           score_state.ssim_device, score_state.block_sum_device);
-      cudaMemcpyAsync(kernel_score->block_sums,
+      cudaMemcpyAsync(kernel_score->ssim_block_sums,
                       score_state.block_sum_device,
                       sizeof(float) * kBlockSumBufferSize,
                       cudaMemcpyDeviceToHost,
@@ -416,9 +415,9 @@ class SimulateKernelJob {
 
  private:
   vcsmc::Generation generation_;
-  const float4* target_laba_device_;
-  const float4* target_mean_device_;
-  const float4* target_stddevsq_device_;
+  const float* target_nl_device_;
+  const float* target_mean_device_;
+  const float* target_variance_device_;
   ScoreMap& score_map_;
   MssimScoreStateList& mssim_score_state_list_;
 };
@@ -444,20 +443,21 @@ class FinalizeScoreJob {
       ScoreMap::iterator kernel_score = score_map_.find(kernel);
       assert(kernel_score != score_map_.end());
       assert(!kernel_score->second->score_final);
-      assert(kernel_score->second->block_sums != nullptr);
+      assert(kernel_score->second->ssim_block_sums != nullptr);
 
-      float sum = 0.0f;
-      float* block_sums = kernel_score->second->block_sums;
+      float ssim_sum = 0.0f;
+      float* ssim_block_sums = kernel_score->second->ssim_block_sums;
       for (size_t j = 0; j < kBlockSumBufferSize; ++j) {
-        sum += block_sums[j];
+        ssim_sum += ssim_block_sums[j];
       }
-      kernel_score->second->score = 1.0f - (sum /
+      kernel_score->second->mssim = ssim_sum /
           static_cast<float>(vcsmc::kTargetFrameWidthPixels *
-                             vcsmc::kFrameHeightPixels));
+                             vcsmc::kFrameHeightPixels);
 
       // Recycle buffers.
-      score_state.block_sums_queue.push_back(kernel_score->second->block_sums);
-      kernel_score->second->block_sums = nullptr;
+      score_state.ssim_block_sums_queue.push_back(
+          kernel_score->second->ssim_block_sums);
+      kernel_score->second->ssim_block_sums = nullptr;
       score_state.sim_laba_queue.push_back(kernel_score->second->sim_laba);
       kernel_score->second->sim_laba = nullptr;
 
@@ -490,7 +490,7 @@ class CompeteKernelJob {
       ScoreMap::iterator kernel_score_it = score_map_.find(kernel);
       assert(kernel_score_it != score_map_.end());
       uint32 victories = 0;
-      float kernel_score = kernel_score_it->second->score;
+      float kernel_score = kernel_score_it->second->mssim;
 
       std::uniform_int_distribution<size_t> tourney_distro(
           0, generation_->size() - 1);
@@ -499,7 +499,7 @@ class CompeteKernelJob {
         // Lower scores mean better performance.
         ScoreMap::const_iterator competing_kernel = score_map_.find(
             generation_->at(contestant_index));
-        if (kernel_score < competing_kernel->second->score)
+        if (kernel_score < competing_kernel->second->mssim)
           ++victories;
       }
 
@@ -574,21 +574,25 @@ int main(int argc, char* argv[]) {
   // Copy input Laba colors to device, compute mean and stddev asynchronously.
   float4* target_laba_device;
   cudaMalloc(&target_laba_device, vcsmc::kLabaBufferSizeBytes);
-  float4* target_mean_device;
-  cudaMalloc(&target_mean_device, vcsmc::kLabaBufferSizeBytes);
-  float4* target_stddevsq_device;
-  cudaMalloc(&target_stddevsq_device, vcsmc::kLabaBufferSizeBytes);
+  float* target_nl_device;
+  cudaMalloc(&target_nl_device, vcsmc::kLBufferSizeBytes);
+  float* target_mean_device;
+  cudaMalloc(&target_mean_device, vcsmc::kLBufferSizeBytes);
+  float* target_variance_device;
+  cudaMalloc(&target_variance_device, vcsmc::kLBufferSizeBytes);
   cudaMemcpy(target_laba_device,
              input_laba.get(),
              vcsmc::kLabaBufferSizeBytes,
              cudaMemcpyHostToDevice);
-  dim3 dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
-                (vcsmc::kFrameHeightPixels / 16) + 1);
-  dim3 dim_block(16, 16);
-  vcsmc::ComputeLocalMean<<<dim_grid, dim_block, 0>>>(target_laba_device,
+  dim3 dim_grid(vcsmc::kTargetFrameWidthPixels / 32,
+                vcsmc::kFrameHeightPixels / 32);
+  dim3 dim_block(32, 32);
+  vcsmc::LabaToNormalizedL<<<dim_grid, dim_block>>>(
+      target_laba_device, target_nl_device);
+  vcsmc::ComputeMean<<<dim_grid, dim_block>>>(target_nl_device,
       target_mean_device);
-  vcsmc::ComputeLocalStdDevSquared<<<dim_grid, dim_block, 0>>>(
-      target_laba_device, target_mean_device, target_stddevsq_device);
+  vcsmc::ComputeVariance<<<dim_grid, dim_block>>>(
+      target_nl_device, target_mean_device, target_variance_device);
 
   vcsmc::SpecList audio_spec_list;
   if (FLAGS_audio_spec_list_file != "") {
@@ -714,7 +718,7 @@ int main(int argc, char* argv[]) {
 
   while (true) {
     if (global_minimum_score != score_map.end() &&
-        global_minimum_score->second->score <= target_error) {
+        global_minimum_score->second->mssim <= target_error) {
       printf("target error reached after %lu generations, terminating.\n",
              generation_count);
       break;
@@ -726,9 +730,9 @@ int main(int argc, char* argv[]) {
     auto start_of_simulation = std::chrono::high_resolution_clock::now();
     tbb::parallel_for(full_range_sim_needed ? full_range : back_half,
         SimulateKernelJob(generation,
-                          target_laba_device,
+                          target_nl_device,
                           target_mean_device,
-                          target_stddevsq_device,
+                          target_variance_device,
                           score_map,
                           mssim_score_state_list));
     simulation_count += full_range_sim_needed ?
@@ -764,19 +768,19 @@ int main(int argc, char* argv[]) {
           ScoreMap::const_iterator a_score = score_map.find(a);
           ScoreMap::const_iterator b_score = score_map.find(b);
           if (a_score->second->victories == b_score->second->victories)
-            return a_score->second->score < b_score->second->score;
+            return a_score->second->mssim < b_score->second->mssim;
 
           return a_score->second->victories > b_score->second->victories;
         });
 
     // Validate sort.
-    assert(score_map.find(generation->at(0))->second->score <
+    assert(score_map.find(generation->at(0))->second->mssim <
            score_map.find(generation->at(generation->size() - 1))->second->
-           score);
+           mssim);
 
     if (global_minimum_score == score_map.end() ||
-        score_map.find(generation->at(0))->second->score <
-        global_minimum_score->second->score) {
+        score_map.find(generation->at(0))->second->mssim <
+        global_minimum_score->second->mssim) {
       global_minimum = generation->at(0);
       global_minimum_score = score_map.find(generation->at(0));
     }
@@ -798,7 +802,7 @@ int main(int argc, char* argv[]) {
                "%s\n",
             generation_count,
             generation->at(0)->fingerprint(),
-            global_minimum_score->second->score,
+            global_minimum_score->second->mssim,
             diversity,
             simulation_count ? simulation_count * 1000000 / simulation_time_us
                 : 0,
@@ -827,10 +831,10 @@ int main(int argc, char* argv[]) {
       epoch_time = now;
     }
 
-    if (last_generation_score == global_minimum_score->second->score) {
+    if (last_generation_score == global_minimum_score->second->mssim) {
       ++streak;
     } else {
-      last_generation_score = global_minimum_score->second->score;
+      last_generation_score = global_minimum_score->second->mssim;
       streak = 0;
     }
 

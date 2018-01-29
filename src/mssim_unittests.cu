@@ -5,45 +5,34 @@
 
 #include "gtest/gtest.h"
 
+#include "color.h"
+
 namespace {
 
-std::unique_ptr<float> MakePaddedTestInput(float slope = 1.0f,
-                                           float intercept = 0.0f) {
-  std::unique_ptr<float> laba_input(new float[vcsmc::kLabaBufferSize]);
-  float* laba_ptr = laba_input.get();
-
-  // Zero laba buffer to include padding.
-  std::memset(laba_ptr, 0, vcsmc::kLabaBufferSizeBytes);
+std::unique_ptr<float> MakeTestInput(float slope = 1.0f,
+                                     float intercept = 0.0f) {
+  std::unique_ptr<float> nl_input(new float[vcsmc::kLBufferSize]);
+  float* nl_ptr = nl_input.get();
 
   // Populate each block of pixels starting from upper left hand corner with
   // (i / kWindowSize, i / kWindowSize + 1000, -(i / kWindowSize + 1000))
   for (size_t i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
     for (size_t j = 0; j < vcsmc::kTargetFrameWidthPixels; ++j) {
-      float val = (static_cast<float>(
+      *nl_ptr = (static_cast<float>(
           ((i / vcsmc::kWindowSize) *
           (vcsmc::kTargetFrameWidthPixels / vcsmc::kWindowSize)) +
           (j / vcsmc::kWindowSize)) * slope) + intercept;
-      *laba_ptr = val;
-      ++laba_ptr;
-      *laba_ptr = val + 0.5f;
-      ++laba_ptr;
-      *laba_ptr = -(val + 0.5f);
-      ++laba_ptr;
-      *laba_ptr = 1.0f;
-      ++laba_ptr;
+      ++nl_ptr;
     }
-    // Skip padding on right.
-    laba_ptr +=  4 * vcsmc::kWindowSize;
   }
 
-  return laba_input;
+  return nl_input;
 }
 
-// Assumes MakePaddedTestInput was called with default arguments.
-std::unique_ptr<float> MakePaddedTestMean() {
-  std::unique_ptr<float> mean(new float[vcsmc::kLabaBufferSize]);
+// Assumes MakeTestInput was called with default arguments.
+std::unique_ptr<float> MakeTestMean() {
+  std::unique_ptr<float> mean(new float[vcsmc::kLBufferSize]);
   float* mean_ptr = mean.get();
-  std::memset(mean_ptr, 0, vcsmc::kLabaBufferSizeBytes);
 
   for (size_t i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
     // Last kWindowSize rows have same values due to absent higher-value lower
@@ -55,104 +44,71 @@ std::unique_ptr<float> MakePaddedTestMean() {
       // sample next row.
       size_t x = j > vcsmc::kTargetFrameWidthPixels - vcsmc::kWindowSize ?
           vcsmc::kTargetFrameWidthPixels - vcsmc::kWindowSize : j;
-      float target = static_cast<float>(
+      *mean_ptr = static_cast<float>(
           x + (y * vcsmc::kTargetFrameWidthPixels / vcsmc::kWindowSize))
           / static_cast<float>(vcsmc::kWindowSize);
-      *mean_ptr = target;
-      ++mean_ptr;
-      *mean_ptr = target + 0.5f;
-      ++mean_ptr;
-      *mean_ptr = -(target + 0.5f);
-      ++mean_ptr;
-      *mean_ptr = 1.0f;
       ++mean_ptr;
     }
-
-    // Skip padding at end of row.
-    mean_ptr += vcsmc::kWindowSize * 4;
   }
 
   return mean;
 }
 
-std::unique_ptr<float> ComputePaddedMean(const float* input) {
-  std::unique_ptr<float> mean(new float[vcsmc::kLabaBufferSize]);
+std::unique_ptr<float> ComputeTestMean(const float* input) {
+  std::unique_ptr<float> mean(new float[vcsmc::kLBufferSize]);
   float* mean_ptr = mean.get();
-  std::memset(mean_ptr, 0, vcsmc::kLabaBufferSizeBytes);
 
   for (size_t i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
     for (size_t j = 0; j < vcsmc::kTargetFrameWidthPixels; ++j) {
-      uint32 mean_offset =
-          ((i * (vcsmc::kTargetFrameWidthPixels + vcsmc::kWindowSize)) + j) * 4;
-      float sum_y = 0.0f;
-      float sum_u = 0.0f;
-      float sum_v = 0.0f;
+      uint32 mean_offset = (i * vcsmc::kTargetFrameWidthPixels) + j;
+      float sum = 0.0f;
       float n = 0.0f;
       for (size_t y = 0; y < vcsmc::kWindowSize; ++y) {
         if (i + y >= vcsmc::kFrameHeightPixels) continue;
-        uint32 offset = mean_offset +
-            (y * (vcsmc::kTargetFrameWidthPixels + vcsmc::kWindowSize)) * 4;
+        uint32 offset = mean_offset + (y * vcsmc::kTargetFrameWidthPixels);
         for (size_t x = 0; x < vcsmc::kWindowSize; ++x) {
           if (j + x >= vcsmc::kTargetFrameWidthPixels) continue;
-          sum_y += input[offset];
-          sum_u += input[offset + 1];
-          sum_v += input[offset + 2];
-          n += input[offset + 3];
-          offset += 4;
+          sum += input[offset];
+          n += 1.0;
+          ++offset;
         }
       }
-      mean_ptr[mean_offset] = sum_y / n;
-      mean_ptr[mean_offset + 1] = sum_u / n;
-      mean_ptr[mean_offset + 2] = sum_v / n;
-      mean_ptr[mean_offset + 3] = 1.0f;
+      mean_ptr[mean_offset] = sum / n;
     }
   }
 
   return mean;
 }
 
-std::unique_ptr<float> ComputePaddedStandardDeviationSquared(
-    const float* input,
-    const float* mean) {
-  std::unique_ptr<float> stddevsq(new float[vcsmc::kLabaBufferSize]);
-  float* stddevsq_ptr = stddevsq.get();
-  std::memset(stddevsq_ptr, 0, vcsmc::kLabaBufferSizeBytes);
+std::unique_ptr<float> ComputeTestVariance(const float* input,
+                                           const float* input_mean) {
+  std::unique_ptr<float> variance(new float[vcsmc::kLBufferSize]);
+  float* variance_ptr = variance.get();
+  std::memset(variance_ptr, 0, vcsmc::kLBufferSizeBytes);
 
   for (size_t i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
     for (size_t j = 0; j < vcsmc::kTargetFrameWidthPixels; ++j) {
-      uint32 stddevsq_offset =
-          ((i * (vcsmc::kTargetFrameWidthPixels + vcsmc::kWindowSize)) + j) * 4;
-      float sum_y = 0.0f;
-      float sum_u = 0.0f;
-      float sum_v = 0.0f;
-      float mean_y = mean[stddevsq_offset];
-      float mean_u = mean[stddevsq_offset + 1];
-      float mean_v = mean[stddevsq_offset + 2];
+      uint32 variance_offset = (i * vcsmc::kTargetFrameWidthPixels) + j;
+      float sum = 0.0f;
+      float mean = input_mean[variance_offset];
       float n = 0.0f;
       for (size_t y = 0; y < vcsmc::kWindowSize; ++y) {
-        uint32 offset = stddevsq_offset +
-            ((y * (vcsmc::kTargetFrameWidthPixels + vcsmc::kWindowSize)) * 4);
+        if (i + y >= vcsmc::kFrameHeightPixels) continue;
+        uint32 offset = variance_offset + (y * vcsmc::kTargetFrameWidthPixels);
         for (size_t x = 0; x < vcsmc::kWindowSize; ++x) {
-          float pad = input[offset + 3];
-          float del_y = input[offset] - mean_y;
-          sum_y += del_y * del_y * pad;
-          float del_u = input[offset + 1] - mean_u;
-          sum_u += del_u * del_u * pad;
-          float del_v = input[offset + 2] - mean_v;
-          sum_v += del_v * del_v * pad;
-          n += pad;
-          offset += 4;
+          if (j + x >= vcsmc::kTargetFrameWidthPixels) continue;
+          float del = input[offset] - mean;
+          sum += del * del;
+          n += 1.0;
+          ++offset;
         }
       }
       float n_minus_one = std::max(1.0f, n - 1.0f);
-      stddevsq_ptr[stddevsq_offset] = sum_y / n_minus_one;
-      stddevsq_ptr[stddevsq_offset + 1] = sum_u / n_minus_one;
-      stddevsq_ptr[stddevsq_offset + 2] = sum_v / n_minus_one;
-      stddevsq_ptr[stddevsq_offset + 3] = 1.0f;
+      variance_ptr[variance_offset] = sum / n_minus_one;
     }
   }
 
-  return stddevsq;
+  return variance;
 }
 
 float Ssim(float mean_a,
@@ -168,73 +124,24 @@ float Ssim(float mean_a,
                    (variance_a + variance_b + kC2)));
 }
 
-std::unique_ptr<float> ComputeTestSSIM(const float* padded_mean_a,
-                                       const float* padded_variance_a,
-                                       const float* padded_mean_b,
-                                       const float* padded_variance_b,
-                                       const float* padded_covariance_ab) {
-  std::unique_ptr<float> ssim(new float[vcsmc::kFrameSizeBytes]);
+std::unique_ptr<float> ComputeTestSSIM(const float* mean_a,
+                                       const float* variance_a,
+                                       const float* mean_b,
+                                       const float* variance_b,
+                                       const float* covariance_ab) {
+  std::unique_ptr<float> ssim(new float[vcsmc::kLBufferSize]);
   for (size_t i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
     for (size_t j = 0; j < vcsmc::kTargetFrameWidthPixels; ++j) {
-      size_t padded_index =
-        ((i * (vcsmc::kTargetFrameWidthPixels + vcsmc::kWindowSize)) + j) * 4;
-      float ssim_y = Ssim(padded_mean_a[padded_index],
-                          padded_variance_a[padded_index],
-                          padded_mean_b[padded_index],
-                          padded_variance_b[padded_index],
-                          padded_covariance_ab[padded_index]);
-
-      float ssim_u = Ssim(padded_mean_a[padded_index + 1],
-                          padded_variance_a[padded_index + 1],
-                          padded_mean_b[padded_index + 1],
-                          padded_variance_b[padded_index + 1],
-                          padded_covariance_ab[padded_index + 1]);
-
-      float ssim_v = Ssim(padded_mean_a[padded_index + 2],
-                          padded_variance_a[padded_index + 2],
-                          padded_mean_b[padded_index + 2],
-                          padded_variance_b[padded_index + 2],
-                          padded_covariance_ab[padded_index + 2]);
-
-      ssim.get()[(i * vcsmc::kTargetFrameWidthPixels) + j] =
-          (0.5f * ssim_y) +
-          (0.25f * ssim_u) +
-          (0.25f * ssim_v);
+      size_t index = (i * vcsmc::kTargetFrameWidthPixels) + j;
+      ssim.get()[index] = Ssim(mean_a[index],
+                               variance_a[index],
+                               mean_b[index],
+                               variance_b[index],
+                               covariance_ab[index]);
     }
   }
 
   return ssim;
-}
-
-// Given a padded float array |input| ensure that the fourth element of each
-// float4 vector is a 1.0f in the area of valid data, and 0.0f in the area of
-// padding.
-void ValidatePaddingWeights(const float* input) {
-  uint32 offset = 0;
-  for (size_t i = 0; i < vcsmc::kFrameHeightPixels; ++i) {
-    for (size_t j = 0; j < vcsmc::kTargetFrameWidthPixels; ++j) {
-      EXPECT_EQ(1.0f, input[offset + 3]);
-      offset += 4;
-    }
-
-    for (size_t j = 0; j < vcsmc::kWindowSize; ++j) {
-      EXPECT_EQ(0.0f, input[offset]);
-      EXPECT_EQ(0.0f, input[offset + 1]);
-      EXPECT_EQ(0.0f, input[offset + 2]);
-      EXPECT_EQ(0.0f, input[offset + 3]);
-      offset += 4;
-    }
-  }
-
-  for (size_t i = 0;
-       i < 4 * vcsmc::kWindowSize *
-       (vcsmc::kTargetFrameWidthPixels + vcsmc::kWindowSize); ++i) {
-    EXPECT_EQ(0.0f, input[offset]);
-    ++offset;
-  }
-
-  // Should have checked every float in the buffer.
-  ASSERT_EQ(vcsmc::kLabaBufferSize, offset);
 }
 
 // Returns distance between |a| and |b| in ulps.
@@ -251,241 +158,252 @@ namespace vcsmc {
 // Sanity-check our own computed functions against our generated synthetic
 // inputs.
 TEST(MssimTest, ComputedStatisticsTest) {
-  std::unique_ptr<float> laba_input = MakePaddedTestInput();
-  ValidatePaddingWeights(laba_input.get());
+  std::unique_ptr<float> nl_mean_generated = MakeTestMean();
+  std::unique_ptr<float> nl_input = MakeTestInput();
+  std::unique_ptr<float> nl_mean_computed = ComputeTestMean(nl_input.get());
 
-  std::unique_ptr<float> laba_mean_generated = MakePaddedTestMean();
-  ValidatePaddingWeights(laba_mean_generated.get());
-
-  std::unique_ptr<float> laba_mean_computed =
-    ComputePaddedMean(laba_input.get());
-  ValidatePaddingWeights(laba_mean_computed.get());
-
-  ASSERT_EQ(0, std::memcmp(laba_mean_generated.get(),
-                           laba_mean_computed.get(),
-                           vcsmc::kLabaBufferSizeBytes));
-
-  std::unique_ptr<float> laba_stddevsq_computed =
-      ComputePaddedStandardDeviationSquared(laba_input.get(),
-                                            laba_mean_generated.get());
-  ValidatePaddingWeights(laba_stddevsq_computed.get());
+  ASSERT_EQ(0, std::memcmp(nl_mean_generated.get(),
+                           nl_mean_computed.get(),
+                           vcsmc::kLBufferSizeBytes));
 }
 
+TEST(MssimTest, LabaToNormalizedLTest) {
+  std::unique_ptr<float> laba_input(new float[vcsmc::kLabaBufferSize]);
+  for (size_t i = 0; i < vcsmc::kLabaBufferSize; i += 4) {
+    float i_float = static_cast<float>(i / 4);
+    laba_input.get()[i] = i_float;
+    laba_input.get()[i + 1] = -i_float + 3.0;
+    laba_input.get()[i + 2] = 61440.0f - i_float;
+    laba_input.get()[i + 3] = 1.0f;
+  }
+
+  float4* laba_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&laba_device, vcsmc::kLabaBufferSizeBytes));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(laba_device, laba_input.get(),
+      vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
+  float* nl_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&nl_device, vcsmc::kLabaBufferSizeBytes));
+
+  dim3 dim_grid(vcsmc::kTargetFrameWidthPixels / 32,
+                vcsmc::kFrameHeightPixels / 32);
+  dim3 dim_block(32, 32);
+  vcsmc::LabaToNormalizedL<<<dim_grid, dim_block>>>(laba_device, nl_device);
+
+  std::unique_ptr<float> nl_input(new float[vcsmc::kLBufferSize]);
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nl_input.get(), nl_device,
+      vcsmc::kLBufferSizeBytes, cudaMemcpyDeviceToHost));
+
+  for (size_t i = 0; i < vcsmc::kLBufferSize; ++i) {
+    EXPECT_EQ(static_cast<float>(i) / vcsmc::kMaxLab,
+              nl_input.get()[i]);
+  }
+
+  ASSERT_EQ(cudaSuccess, cudaFree(nl_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(laba_device));
+}
 
 TEST(MssimTest, MeanTest) {
-  std::unique_ptr<float> laba_input = MakePaddedTestInput();
+  std::unique_ptr<float> nl_input = MakeTestInput();
 
   // Copy laba buffer to device, compute mean, copy it back.
-  float4* laba_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&laba_device, vcsmc::kLabaBufferSizeBytes));
-  float4* mean_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kLabaBufferSizeBytes));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(laba_device, laba_input.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
+  float* nl_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&nl_device, vcsmc::kLBufferSizeBytes));
+  float* mean_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kLBufferSizeBytes));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nl_device, nl_input.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
 
-  dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
-                      (vcsmc::kFrameHeightPixels / 16) + 1);
-  dim3 image_dim_block(16, 16);
-  vcsmc::ComputeLocalMean<<<image_dim_grid, image_dim_block>>>(
-      laba_device, mean_device);
+  dim3 dim_grid(vcsmc::kTargetFrameWidthPixels / 32,
+                vcsmc::kFrameHeightPixels / 32);
+  dim3 dim_block(32, 32);
+  vcsmc::ComputeMean<<<dim_grid, dim_block>>>(nl_device, mean_device);
 
-  std::unique_ptr<float> mean_output(new float[vcsmc::kLabaBufferSize]);
+  std::unique_ptr<float> mean_output(new float[vcsmc::kLBufferSize]);
   ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_output.get(), mean_device,
-      vcsmc::kLabaBufferSizeBytes, cudaMemcpyDeviceToHost));
+      vcsmc::kLBufferSizeBytes, cudaMemcpyDeviceToHost));
 
-  std::unique_ptr<float> laba_mean_generated = MakePaddedTestMean();
+  std::unique_ptr<float> mean_generated = MakeTestMean();
 
   EXPECT_EQ(0, std::memcmp(mean_output.get(),
-                           laba_mean_generated.get(),
-                           vcsmc::kLabaBufferSizeBytes));
+                           mean_generated.get(),
+                           vcsmc::kLBufferSizeBytes));
 
-  ASSERT_EQ(cudaSuccess, cudaFree(laba_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(nl_device));
   ASSERT_EQ(cudaSuccess, cudaFree(mean_device));
 }
 
-TEST(MssimTest, StandardDeviationSquaredTest) {
-  std::unique_ptr<float> laba_input = MakePaddedTestInput();
-  std::unique_ptr<float> laba_mean = MakePaddedTestMean();
+TEST(MssimTest, VarianceTest) {
+  std::unique_ptr<float> nl_input = MakeTestInput();
+  std::unique_ptr<float> nl_mean = MakeTestMean();
 
-  float4* laba_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&laba_device, vcsmc::kLabaBufferSizeBytes));
-  float4* mean_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kLabaBufferSizeBytes));
-  float4* stddevsq_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&stddevsq_device,
-      vcsmc::kLabaBufferSizeBytes));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(laba_device, laba_input.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_device, laba_mean.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
+  float* nl_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&nl_device, vcsmc::kLBufferSizeBytes));
+  float* mean_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kLBufferSizeBytes));
+  float* variance_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&variance_device,
+        vcsmc::kLBufferSizeBytes));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nl_device, nl_input.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_device, nl_mean.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
 
-  dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
-                      (vcsmc::kFrameHeightPixels / 16) + 1);
-  dim3 image_dim_block(16, 16);
-  vcsmc::ComputeLocalStdDevSquared<<<image_dim_grid, image_dim_block>>>(
-      laba_device, mean_device, stddevsq_device);
+  dim3 dim_grid(vcsmc::kTargetFrameWidthPixels / 32,
+                vcsmc::kFrameHeightPixels / 32);
+  dim3 dim_block(32, 32);
+  vcsmc::ComputeVariance<<<dim_grid, dim_block>>>(
+      nl_device, mean_device, variance_device);
 
-  std::unique_ptr<float> stddevsq_output(new float[vcsmc::kLabaBufferSize]);
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(stddevsq_output.get(), stddevsq_device,
-      vcsmc::kLabaBufferSizeBytes, cudaMemcpyDeviceToHost));
-  ValidatePaddingWeights(stddevsq_output.get());
+  std::unique_ptr<float> variance_output(new float[vcsmc::kLBufferSize]);
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(variance_output.get(), variance_device,
+      vcsmc::kLBufferSizeBytes, cudaMemcpyDeviceToHost));
 
-  std::unique_ptr<float> laba_stddevsq_computed =
-      ComputePaddedStandardDeviationSquared(laba_input.get(), laba_mean.get());
+  std::unique_ptr<float> variance_computed =
+      ComputeTestVariance(nl_input.get(), nl_mean.get());
 
-  EXPECT_EQ(0, std::memcmp(laba_stddevsq_computed.get(),
-                           stddevsq_output.get(),
-                           vcsmc::kLabaBufferSizeBytes));
+  EXPECT_EQ(0, std::memcmp(variance_computed.get(),
+                           variance_output.get(),
+                           vcsmc::kLBufferSizeBytes));
 
-  ASSERT_EQ(cudaSuccess, cudaFree(laba_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(nl_device));
   ASSERT_EQ(cudaSuccess, cudaFree(mean_device));
-  ASSERT_EQ(cudaSuccess, cudaFree(stddevsq_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(variance_device));
 }
 
 TEST(MssimTest, CovarianceTest) {
-  std::unique_ptr<float> laba_input = MakePaddedTestInput();
-  std::unique_ptr<float> laba_mean = MakePaddedTestMean();
+  std::unique_ptr<float> nl_input = MakeTestInput();
+  std::unique_ptr<float> nl_mean = MakeTestMean();
 
-  float4* laba_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&laba_device, vcsmc::kLabaBufferSizeBytes));
-  float4* mean_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kLabaBufferSizeBytes));
-  float4* covariance_device;
+  float* nl_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&nl_device, vcsmc::kLBufferSizeBytes));
+  float* mean_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kLBufferSizeBytes));
+  float* covariance_device;
   ASSERT_EQ(cudaSuccess, cudaMalloc(&covariance_device,
-                                    vcsmc::kLabaBufferSizeBytes));
+                                    vcsmc::kLBufferSizeBytes));
 
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(laba_device, laba_input.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_device, laba_mean.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nl_device, nl_input.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_device, nl_mean.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
 
   // Covariance of variable with itself should be equal to variance, or
   // standard deviation squared.
-  dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
-                      (vcsmc::kFrameHeightPixels / 16) + 1);
-  dim3 image_dim_block(16, 16);
-  vcsmc::ComputeLocalCovariance<<<image_dim_grid, image_dim_block>>>(
-      laba_device, mean_device, laba_device, mean_device, covariance_device);
+  dim3 dim_grid(vcsmc::kTargetFrameWidthPixels / 32,
+                vcsmc::kFrameHeightPixels / 32);
+  dim3 dim_block(32, 32);
+  vcsmc::ComputeCovariance<<<dim_grid, dim_block>>>(
+      nl_device, mean_device, nl_device, mean_device, covariance_device);
 
-  std::unique_ptr<float> covariance(new float[vcsmc::kLabaBufferSize]);
+  std::unique_ptr<float> covariance(new float[vcsmc::kLBufferSize]);
   ASSERT_EQ(cudaSuccess, cudaMemcpy(covariance.get(), covariance_device,
-      vcsmc::kLabaBufferSizeBytes, cudaMemcpyDeviceToHost));
-  ValidatePaddingWeights(covariance.get());
+      vcsmc::kLBufferSizeBytes, cudaMemcpyDeviceToHost));
 
   std::unique_ptr<float> variance_computed =
-      ComputePaddedStandardDeviationSquared(laba_input.get(), laba_mean.get());
+      ComputeTestVariance(nl_input.get(), nl_mean.get());
 
   EXPECT_EQ(0, std::memcmp(variance_computed.get(),
                            covariance.get(),
-                           vcsmc::kLabaBufferSizeBytes));
+                           vcsmc::kLBufferSizeBytes));
 
   // cov(X + a, Y + b) = cov(X, Y) for constants a,b, random variables X, Y.
-  std::unique_ptr<float> laba_plus_a = MakePaddedTestInput(1.0f, 2.0f);
-  std::unique_ptr<float> laba_mean_a = ComputePaddedMean(laba_plus_a.get());
-  std::unique_ptr<float> laba_plus_b = MakePaddedTestInput(1.0f, -4.0f);
-  std::unique_ptr<float> laba_mean_b = ComputePaddedMean(laba_plus_b.get());
+  std::unique_ptr<float> nl_plus_a = MakeTestInput(1.0f, 2.0f);
+  std::unique_ptr<float> nl_mean_a = ComputeTestMean(nl_plus_a.get());
+  std::unique_ptr<float> nl_plus_b = MakeTestInput(1.0f, -4.0f);
+  std::unique_ptr<float> nl_mean_b = ComputeTestMean(nl_plus_b.get());
 
-  float4* laba_a_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&laba_a_device,
-                                    vcsmc::kLabaBufferSizeBytes));
-  float4* mean_a_device;
+  float* nl_a_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&nl_a_device,
+                                    vcsmc::kLBufferSizeBytes));
+  float* mean_a_device;
   ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_a_device,
-                                    vcsmc::kLabaBufferSizeBytes));
-  float4* laba_b_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&laba_b_device,
-                                    vcsmc::kLabaBufferSizeBytes));
-  float4* mean_b_device;
+                                    vcsmc::kLBufferSizeBytes));
+  float* nl_b_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&nl_b_device,
+                                    vcsmc::kLBufferSizeBytes));
+  float* mean_b_device;
   ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_b_device,
-                                    vcsmc::kLabaBufferSizeBytes));
+                                    vcsmc::kLBufferSizeBytes));
 
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(laba_a_device, laba_plus_a.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_a_device, laba_mean_a.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(laba_b_device, laba_plus_b.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_b_device, laba_mean_b.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nl_a_device, nl_plus_a.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_a_device, nl_mean_a.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nl_b_device, nl_plus_b.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_b_device, nl_mean_b.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
 
-  vcsmc::ComputeLocalCovariance<<<image_dim_grid, image_dim_block>>>(
-      laba_a_device, mean_a_device, laba_b_device, mean_b_device,
+  vcsmc::ComputeCovariance<<<dim_grid, dim_block>>>(
+      nl_a_device, mean_a_device, nl_b_device, mean_b_device,
       covariance_device);
   ASSERT_EQ(cudaSuccess, cudaMemcpy(covariance.get(), covariance_device,
-      vcsmc::kLabaBufferSizeBytes, cudaMemcpyDeviceToHost));
-  ValidatePaddingWeights(covariance.get());
+      vcsmc::kLBufferSizeBytes, cudaMemcpyDeviceToHost));
 
   EXPECT_EQ(0, std::memcmp(variance_computed.get(),
                            covariance.get(),
-                           vcsmc::kLabaBufferSizeBytes));
+                           vcsmc::kLBufferSizeBytes));
 
   // cov(aX, bY) = ab cov(X,Y) for constants a,b, random variables X, Y.
-  std::unique_ptr<float> laba_times_a = MakePaddedTestInput(-5.0f, 0.0f);
-  laba_mean_a = ComputePaddedMean(laba_times_a.get());
-  std::unique_ptr<float> laba_times_b = MakePaddedTestInput(3.0f, 0.0f);
-  laba_mean_b = ComputePaddedMean(laba_times_b.get());
+  std::unique_ptr<float> nl_times_a = MakeTestInput(-5.0f, 0.0f);
+  nl_mean_a = ComputeTestMean(nl_times_a.get());
+  std::unique_ptr<float> nl_times_b = MakeTestInput(3.0f, 0.0f);
+  nl_mean_b = ComputeTestMean(nl_times_b.get());
 
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(laba_a_device, laba_times_a.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_a_device, laba_mean_a.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(laba_b_device, laba_times_b.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_b_device, laba_mean_b.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nl_a_device, nl_times_a.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_a_device, nl_mean_a.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(nl_b_device, nl_times_b.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_b_device, nl_mean_b.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
 
-  vcsmc::ComputeLocalCovariance<<<image_dim_grid, image_dim_block>>>(
-      laba_a_device, mean_a_device, laba_b_device, mean_b_device,
+  vcsmc::ComputeCovariance<<<dim_grid, dim_block>>>(
+      nl_a_device, mean_a_device, nl_b_device, mean_b_device,
       covariance_device);
   ASSERT_EQ(cudaSuccess, cudaMemcpy(covariance.get(), covariance_device,
-      vcsmc::kLabaBufferSizeBytes, cudaMemcpyDeviceToHost));
-  ValidatePaddingWeights(covariance.get());
+      vcsmc::kLBufferSizeBytes, cudaMemcpyDeviceToHost));
 
-  for (size_t i = 0; i < vcsmc::kLabaBufferSize; i += 4) {
+  for (size_t i = 0; i < vcsmc::kLBufferSize; ++i) {
     EXPECT_GT(16, ulp_delta(-15.0f * variance_computed.get()[i],
-                           covariance.get()[i]));
-    EXPECT_GT(16, ulp_delta(-15.0f * variance_computed.get()[i + 1],
-                           covariance.get()[i + 1]));
-    EXPECT_GT(16, ulp_delta(-15.0f * variance_computed.get()[i + 2],
-                           covariance.get()[i + 2]));
-    EXPECT_EQ(variance_computed.get()[i + 3],
-              covariance.get()[i + 3]);
+                            covariance.get()[i]));
   }
 
-  ASSERT_EQ(cudaSuccess, cudaFree(laba_a_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(nl_a_device));
   ASSERT_EQ(cudaSuccess, cudaFree(mean_a_device));
-  ASSERT_EQ(cudaSuccess, cudaFree(laba_b_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(nl_b_device));
   ASSERT_EQ(cudaSuccess, cudaFree(mean_b_device));
   ASSERT_EQ(cudaSuccess, cudaFree(covariance_device));
   ASSERT_EQ(cudaSuccess, cudaFree(mean_device));
-  ASSERT_EQ(cudaSuccess, cudaFree(laba_device));
+  ASSERT_EQ(cudaSuccess, cudaFree(nl_device));
 }
 
 TEST(MssimTest, SsimTest) {
   // Check that SSIM(x, x) = 1.0.
-  std::unique_ptr<float> laba_input = MakePaddedTestInput();
-  std::unique_ptr<float> laba_mean = MakePaddedTestMean();
-  std::unique_ptr<float> laba_variance =
-      ComputePaddedStandardDeviationSquared(laba_input.get(), laba_mean.get());
+  std::unique_ptr<float> nl_input = MakeTestInput();
+  std::unique_ptr<float> nl_mean = MakeTestMean();
+  std::unique_ptr<float> nl_variance =
+      ComputeTestVariance(nl_input.get(), nl_mean.get());
 
-  float4* mean_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kLabaBufferSizeBytes));
-  float4* variance_device;
+  float* mean_device;
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_device, vcsmc::kLBufferSizeBytes));
+  float* variance_device;
   ASSERT_EQ(cudaSuccess, cudaMalloc(&variance_device,
-                                    vcsmc::kLabaBufferSizeBytes));
+                                    vcsmc::kLBufferSizeBytes));
 
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_device, laba_mean.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(variance_device, laba_variance.get(),
-        vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_device, nl_mean.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(variance_device, nl_variance.get(),
+        vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
 
   float* ssim_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&ssim_device,
-        vcsmc::kFrameSizeBytes * sizeof(float)));
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&ssim_device, vcsmc::kLBufferSizeBytes));
 
-  dim3 image_dim_grid((vcsmc::kTargetFrameWidthPixels / 16) + 1,
-                      (vcsmc::kFrameHeightPixels / 16) + 1);
-  dim3 image_dim_block(16, 16);
-  vcsmc::ComputeSSIM<<<image_dim_grid, image_dim_block>>>(
+  dim3 dim_grid(vcsmc::kTargetFrameWidthPixels / 32,
+                vcsmc::kFrameHeightPixels / 32);
+  dim3 dim_block(32, 32);
+  vcsmc::ComputeSSIM<<<dim_grid, dim_block>>>(
       mean_device,
       variance_device,
       mean_device,
@@ -493,47 +411,44 @@ TEST(MssimTest, SsimTest) {
       variance_device,
       ssim_device);
 
-  std::unique_ptr<float> ssim(new float[vcsmc::kFrameSizeBytes]);
+  std::unique_ptr<float> ssim(new float[vcsmc::kLBufferSize]);
   ASSERT_EQ(cudaSuccess, cudaMemcpy(ssim.get(), ssim_device,
-        vcsmc::kFrameSizeBytes * sizeof(float), cudaMemcpyDeviceToHost));
+        vcsmc::kLBufferSizeBytes, cudaMemcpyDeviceToHost));
 
-  for (size_t i = 0; i < vcsmc::kFrameSizeBytes; ++i) {
-    EXPECT_EQ(1.0f, ssim.get()[i]);
+  for (size_t i = 0; i < vcsmc::kLBufferSize; ++i) {
+    EXPECT_GT(4, ulp_delta(1.0f, ssim.get()[i]));
   }
 
   // Compare device-computed SSIM with host-computed values.
-  std::unique_ptr<float> laba_b = MakePaddedTestInput(-11.0f, 4.0f);
-  std::unique_ptr<float> laba_b_mean = ComputePaddedMean(laba_b.get());
-  std::unique_ptr<float> laba_b_variance =
-      ComputePaddedStandardDeviationSquared(laba_b.get(), laba_b_mean.get());
+  std::unique_ptr<float> nl_b = MakeTestInput(-11.0f, 4.0f);
+  std::unique_ptr<float> nl_b_mean = ComputeTestMean(nl_b.get());
+  std::unique_ptr<float> nl_b_variance =
+      ComputeTestVariance(nl_b.get(), nl_b_mean.get());
 
   // Re-use cov(aX, X) = a variance(X) to build covariance values.
-  std::unique_ptr<float> covariance(new float[vcsmc::kLabaBufferSize]);
-  for (size_t i = 0; i < vcsmc::kLabaBufferSize; i += 4) {
-    covariance.get()[i] = laba_variance.get()[i] * -11.0f;
-    covariance.get()[i + 1] = laba_variance.get()[i] * -11.0f;
-    covariance.get()[i + 2] = laba_variance.get()[i] * -11.0f;
-    covariance.get()[i + 3] = laba_variance.get()[i];
+  std::unique_ptr<float> covariance(new float[vcsmc::kLBufferSize]);
+  for (size_t i = 0; i < vcsmc::kLBufferSize; ++i) {
+    covariance.get()[i] = nl_variance.get()[i] * -11.0f;
   }
 
-  float4* mean_b_device;
+  float* mean_b_device;
   ASSERT_EQ(cudaSuccess, cudaMalloc(&mean_b_device,
                                     vcsmc::kLabaBufferSizeBytes));
-  float4* variance_b_device;
+  float* variance_b_device;
   ASSERT_EQ(cudaSuccess, cudaMalloc(&variance_b_device,
                                     vcsmc::kLabaBufferSizeBytes));
-  float4* covariance_device;
+  float* covariance_device;
   ASSERT_EQ(cudaSuccess, cudaMalloc(&covariance_device,
                                     vcsmc::kLabaBufferSizeBytes));
 
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_b_device, laba_b_mean.get(),
-      vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(variance_b_device, laba_b_variance.get(),
-      vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(mean_b_device, nl_b_mean.get(),
+      vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
+  ASSERT_EQ(cudaSuccess, cudaMemcpy(variance_b_device, nl_b_variance.get(),
+      vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
   ASSERT_EQ(cudaSuccess, cudaMemcpy(covariance_device, covariance.get(),
-      vcsmc::kLabaBufferSizeBytes, cudaMemcpyHostToDevice));
+      vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
 
-  vcsmc::ComputeSSIM<<<image_dim_grid, image_dim_block>>>(
+  vcsmc::ComputeSSIM<<<dim_grid, dim_block>>>(
       mean_device,
       variance_device,
       mean_b_device,
@@ -542,16 +457,16 @@ TEST(MssimTest, SsimTest) {
       ssim_device);
 
   ASSERT_EQ(cudaSuccess, cudaMemcpy(ssim.get(), ssim_device,
-      vcsmc::kFrameSizeBytes * sizeof(float), cudaMemcpyDeviceToHost));
+      vcsmc::kLBufferSizeBytes, cudaMemcpyDeviceToHost));
 
   std::unique_ptr<float> ssim_computed = ComputeTestSSIM(
-      laba_mean.get(),
-      laba_variance.get(),
-      laba_b_mean.get(),
-      laba_b_variance.get(),
+      nl_mean.get(),
+      nl_variance.get(),
+      nl_b_mean.get(),
+      nl_b_variance.get(),
       covariance.get());
 
-  for (size_t i = 0; i < vcsmc::kFrameSizeBytes; ++i) {
+  for (size_t i = 0; i < vcsmc::kLBufferSize; ++i) {
     EXPECT_GT(4, ulp_delta(ssim_computed.get()[i], ssim.get()[i]));
   }
 
@@ -564,14 +479,13 @@ TEST(MssimTest, SsimTest) {
 }
 
 TEST(MssimTest, BlockSumTest) {
-  std::unique_ptr<float> zeros(new float[vcsmc::kFrameSizeBytes]);
-  std::memset(zeros.get(), 0, sizeof(float) * vcsmc::kFrameSizeBytes);
+  std::unique_ptr<float> zeros(new float[vcsmc::kLBufferSize]);
+  std::memset(zeros.get(), 0, vcsmc::kLBufferSizeBytes);
 
   float* input_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&input_device, vcsmc::kFrameSizeBytes *
-      sizeof(float)));
+  ASSERT_EQ(cudaSuccess, cudaMalloc(&input_device, vcsmc::kLBufferSizeBytes));
   ASSERT_EQ(cudaSuccess, cudaMemcpy(input_device, zeros.get(),
-      vcsmc::kFrameSizeBytes * sizeof(float), cudaMemcpyHostToDevice));
+      vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
 
   float* results_device;
   ASSERT_EQ(cudaSuccess, cudaMalloc(&results_device, 60 * sizeof(float)));
@@ -598,7 +512,7 @@ TEST(MssimTest, BlockSumTest) {
 
   // Build blocks that contain values from -511 to +511, plus the index
   // of the block in each block, so that they will sum to the block index.
-  std::unique_ptr<float> blocks(new float[vcsmc::kFrameSizeBytes]);
+  std::unique_ptr<float> blocks(new float[vcsmc::kLBufferSize]);
   int block_counter = 0;
   for (size_t i = 0; i < 6; ++i) {
     for (size_t j = 0; j < 10; ++j) {
@@ -622,7 +536,7 @@ TEST(MssimTest, BlockSumTest) {
   }
 
   ASSERT_EQ(cudaSuccess, cudaMemcpy(input_device, blocks.get(),
-      vcsmc::kFrameSizeBytes * sizeof(float), cudaMemcpyHostToDevice));
+      vcsmc::kLBufferSizeBytes, cudaMemcpyHostToDevice));
   vcsmc::ComputeBlockSum<<<grid_dim, block_dim, 1024 * sizeof(float)>>>(
       input_device, results_device);
   ASSERT_EQ(cudaSuccess, cudaMemcpy(results.get(), results_device,

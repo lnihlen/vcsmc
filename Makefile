@@ -5,8 +5,7 @@ export CC=clang
 # (also versioned) so that YCM will pick up the correct flags.
 # Also note that right now all the third_party/ builds have hard-coded CFLAGS
 # of their own and don't follow this variable.
-export CFLAGS=-std=c++11 -Wall -Wextra -Werror
-export OPT=-O2
+export CFLAGS=-std=c++11 -Wall -Wextra -Werror -fPIC
 export LDFLAGS=
 export LIBS=-lstdc++
 export OUT=$(CURDIR)/out
@@ -36,7 +35,11 @@ export LIBZ26_INCLUDE=$(CURDIR)/third_party/libz26/include
 export LIBZ26_LIB=$(OUT)/libz26/libz26.o
 export TBB_INCLUDE=$(CURDIR)/third_party/tbb/include
 
+all: export OPT=-O2
 all: depends vcsmc tests
+
+debug: export OPT=-O0 -g
+debug: depends vcsmc tests
 
 depends: | $(OUT)/
 	$(MAKE) -C third_party/ all
