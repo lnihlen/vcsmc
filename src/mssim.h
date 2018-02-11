@@ -11,6 +11,8 @@ const size_t kLBufferSize = kTargetFrameWidthPixels * kFrameHeightPixels;
 const size_t kLBufferSizeBytes = sizeof(float) * kLBufferSize;
 const size_t kLabaBufferSize = 4 * kLBufferSize;
 const size_t kLabaBufferSizeBytes = sizeof(float) * kLabaBufferSize;
+const size_t kBlockSumBufferSize = 60;
+const size_t kBlockSumBufferSizeBytes = sizeof(float) * kBlockSumBufferSize;
 
 // Given input buffer of L*a*b* color, reduces the output to single normalized
 // luminance value, normalized to [0,1].

@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include "constants.h"
+
 namespace vcsmc {
 
 // Test example data taken from the helpful implementation notes and advice in:
@@ -120,7 +122,8 @@ TEST(ColorTest, Ciede2kSharmaWuBalalTestData) {
       sizeof(float) * kSWBTestDataCount, cudaMemcpyDeviceToHost));
 
   for (size_t i = 0; i < kSWBTestDataCount; ++i) {
-    EXPECT_NEAR(expected_results[i], results.get()[i], 0.01f);
+    EXPECT_NEAR(expected_results[i] / vcsmc::kMaxCiede2kDistance,
+                results.get()[i], 0.01f);
   }
 
   ASSERT_EQ(cudaSuccess, cudaFree(results_device));

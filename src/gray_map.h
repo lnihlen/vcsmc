@@ -16,13 +16,19 @@ class GrayMap : public ValueMap {
   // and returns it, or nullptr on error.
   static std::unique_ptr<GrayMap> Load(const std::string& file_path);
 
+  // Saves a GrayMap given a float array, dimensions, and a file_path.
+  static void Save(const float* map,
+                   uint32 width,
+                   uint32 height,
+                   const std::string& file_path);
+
   void Save(const std::string& file_path);
 
-  const double* values() const { return values_.get(); }
-  double* values_writeable() { return values_.get(); }
+  const float* values() const { return values_.get(); }
+  float* values_writeable() { return values_.get(); }
 
  private:
-  std::unique_ptr<double[]> values_;
+  std::unique_ptr<float> values_;
 };
 
 }  // namespace vcsmc

@@ -48,4 +48,17 @@ void RgbaToLaba(const uint8* rgba, float* lab) {
   lab[2] = b_star;
 }
 
+std::unique_ptr<float> ImageToLabaArray(const Image* image) {
+  size_t pixel_count = image->width() * image->height();
+  std::unique_ptr<float> laba(new float[pixel_count * 4]);
+  float* lab_ptr = laba.get();
+  for (size_t i = 0; i < pixel_count; ++i) {
+    RgbaToLaba(reinterpret_cast<const uint8*>(image->pixels() + i), lab_ptr);
+    lab_ptr += 4;
+  }
+
+  return laba;
+}
+
+
 }  // namespace vcsmc

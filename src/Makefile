@@ -49,9 +49,11 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/serialization_unittests.o
 
-vcsmc: $(OUT)/gen                                                              \
+vcsmc: $(OUT)/ciede                                                            \
+       $(OUT)/gen                                                              \
        $(OUT)/pcm                                                              \
-       $(OUT)/respec
+       $(OUT)/respec                                                           \
+       $(OUT)/ssim
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 
@@ -80,6 +82,10 @@ $(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
                          $(OUT)/build_laba_table.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
+$(OUT)/ciede: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ)                                 \
+              $(OUT)/atari_ntsc_laba_color_table.o $(OUT)/ciede.o
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
+
 $(OUT)/gen: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/gen.o                      \
             $(OUT)/atari_ntsc_laba_color_table.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
@@ -90,6 +96,10 @@ $(OUT)/pcm: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ)                                   \
 
 $(OUT)/respec: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ)                                \
                $(OUT)/atari_ntsc_laba_color_table.o $(OUT)/respec.o
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
+
+$(OUT)/ssim: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ)                                  \
+             $(OUT)/atari_ntsc_laba_color_table.o $(OUT)/ssim.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \

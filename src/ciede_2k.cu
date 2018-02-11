@@ -4,19 +4,12 @@
 
 namespace vcsmc {
 
-// TODO: unify constants with regular C++ ones.
-#define WINDOW_SIZE 8
-#define IMAGE_WIDTH 320
-#define IMAGE_HEIGHT 192
-#define PADDED_IMAGE_WIDTH (IMAGE_WIDTH + WINDOW_SIZE)
-#define PADDED_IMAGE_HEIGHT (IMAGE_HEIGHT + WINDOW_SIZE)
-
 __global__ void Ciede2k(const float4* laba_a_in,
                         const float4* laba_b_in,
                         float* ciede_2k_out) {
   int x = (blockIdx.x * blockDim.x) + threadIdx.x;
   int y = (blockIdx.y * blockDim.y) + threadIdx.y;
-  int index = (y * PADDED_IMAGE_WIDTH) + x;
+  int index = (y * kTargetFrameWidthPixels) + x;
 
   float4 laba_a = laba_a_in[index];
   float4 laba_b = laba_b_in[index];
@@ -95,7 +88,7 @@ __global__ void Ciede2k(const float4* laba_a_in,
                            pow(del_H / S_H, 2.0) +
                            R_T * (del_C / S_C) * (del_H / S_H));
 
-  ciede_2k_out[(y * IMAGE_WIDTH) + x] = delta_e_out;
+  ciede_2k_out[index] = delta_e_out / kMaxCiede2kDistance;
 }
 
 }
