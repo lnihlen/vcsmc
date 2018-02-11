@@ -13,7 +13,7 @@ class TlsPrng {
  public:
   TlsPrng();
   ~TlsPrng();
-  TlsPrng(const TlsPrng& tls_prng) = delete;
+  TlsPrng(const TlsPrng&) = delete;
 
   typedef std::default_random_engine::result_type result_type;
   static constexpr uint32 min() { return std::default_random_engine::min(); }

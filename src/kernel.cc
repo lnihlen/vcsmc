@@ -1,35 +1,20 @@
 #include "kernel.h"
 
 #include <array>
-#include <cassert>
+#include <cmath>
 #include <cstring>
 #include <random>
 
-#include <farmhash.h>
-extern "C" {
-#include <libz26/libz26.h>
-}
+#include "farmhash.h"
 
 #include "assembler.h"
-#include "color.h"
-#include "color_distance_table.h"
-#include "color_table.h"
-#include "image.h"
-#include "image_file.h"
 
 namespace vcsmc {
 
-const size_t kSimSkipLines = 23;
 
 Kernel::Kernel()
   : specs_(new std::vector<Spec>()),
-    bytecode_size_(0),
-    total_dynamic_opcodes_(0),
-    fingerprint_(0),
-    score_valid_(false),
-    score_(1.0),
-    victories_(0) {
-}
+    total_dynamic_opcodes_(0) {}
 
 Kernel::Kernel(
     SpecList specs,
@@ -74,42 +59,29 @@ Kernel::Kernel(
       ++opcode_list_index;
     }
   }
-  RegenerateBytecode(total_byte_size);
+  bytecode_size_ = total_byte_size;
+  RegenerateBytecode();
 }
 
-bool Kernel::SaveImage(const std::string& file_name) const {
-  if (!score_valid_ || !sim_frame_) return false;
-  Image image(kTargetFrameWidthPixels, kFrameHeightPixels);
-  uint32* pix = image.pixels_writeable();
-  const uint8* sim = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
-  for (size_t i = 0; i < kTargetFrameWidthPixels * kFrameHeightPixels; i += 2) {
-    uint32 color;
-    if (*sim >= 128) {
-      color = 0xff00ff00;  // Bright green for undefined pixel.
-    } else {
-      assert(*sim < 128);
-      color = kAtariNTSCABGRColorTable[*sim];
-    }
-    *pix = color;
-    ++pix;
-    *pix = color;
-    ++pix;
-    sim += 2;
+std::shared_ptr<Kernel> Kernel::Clone() {
+  std::shared_ptr<Kernel> clone(new Kernel());
+  std::copy(specs_->begin(), specs_->end(),
+      std::back_inserter(*clone->specs_.get()));
+  for (size_t j = 0; j < opcodes_.size(); ++j) {
+    clone->opcodes_.emplace_back();
+    std::copy(opcodes_[j].begin(), opcodes_[j].end(),
+        std::back_inserter(clone->opcodes_.back()));
   }
-  return vcsmc::SaveImage(&image, file_name);
-}
+  std::copy(opcode_ranges_.begin(),
+            opcode_ranges_.end(),
+            std::back_inserter(clone->opcode_ranges_));
+  clone->bytecode_size_ = bytecode_size_;
 
-void Kernel::ClobberSpec(const SpecList new_specs) {
-  size_t target_spec_index = 0;
-  for (size_t i = 0; i < new_specs->size(); ++i) {
-    while (target_spec_index < specs_->size() &&
-           specs_->at(target_spec_index).range().start_time() <
-              new_specs->at(i).range().start_time()) {
-      ++target_spec_index;
-    }
-    specs_->at(target_spec_index) = new_specs->at(i);
-  }
-  RegenerateBytecode(bytecode_size_);
+  clone->total_dynamic_opcodes_ = total_dynamic_opcodes_;
+  std::copy(opcode_counts_.begin(),
+            opcode_counts_.end(),
+            std::back_inserter(clone->opcode_counts_));
+  return clone;
 }
 
 void Kernel::GenerateRandom(
@@ -194,68 +166,21 @@ void Kernel::GenerateRandom(
     opcode_counts_.push_back(total_dynamic_opcodes_);
   }
 
-  RegenerateBytecode(total_byte_size);
+  bytecode_size_ = total_byte_size;
+  RegenerateBytecode();
 }
 
-void Kernel::GenerateRandomKernelJob::operator()(
-    const tbb::blocked_range<size_t>& r) const {
-  TlsPrngList::reference tls_prng = tls_prng_list_.local();
-  for (size_t i = r.begin(); i < r.end(); ++i) {
-    std::shared_ptr<Kernel> kernel = generation_->at(i);
-    kernel->GenerateRandom(specs_, tls_prng);
-  }
-}
-
-void Kernel::ScoreKernelJob::operator()(
-    const tbb::blocked_range<size_t>& r) const {
-  for (size_t i = r.begin(); i < r.end(); ++i) {
-    generation_->at(i)->SimulateAndScore(target_colors_);
-  }
-}
-
-void Kernel::MutateKernelJob::operator()(
-    const tbb::blocked_range<size_t>& r) const {
-  TlsPrngList::reference tls_prng = tls_prng_list_.local();
-  for (size_t i = r.begin(); i < r.end(); ++i) {
-    std::shared_ptr<Kernel> original = source_generation_->at(i);
-    std::shared_ptr<Kernel> target =
-        target_generation_->at(i + target_index_offset_);
-    // Copy the internal program state of the original kernel to the target.
-    target->specs_.reset(new std::vector<Spec>());
-    std::copy(original->specs_->begin(), original->specs_->end(),
-        std::back_inserter(*target->specs_.get()));
-    target->opcodes_.clear();
-    for (size_t j = 0; j < original->opcodes_.size(); ++j) {
-      target->opcodes_.emplace_back();
-      std::copy(original->opcodes_[j].begin(), original->opcodes_[j].end(),
-          std::back_inserter(target->opcodes_.back()));
+void Kernel::ClobberSpec(const SpecList new_specs) {
+  size_t target_spec_index = 0;
+  for (size_t i = 0; i < new_specs->size(); ++i) {
+    while (target_spec_index < specs_->size() &&
+           specs_->at(target_spec_index).range().start_time() <
+              new_specs->at(i).range().start_time()) {
+      ++target_spec_index;
     }
-    target->opcode_ranges_.clear();
-    std::copy(original->opcode_ranges_.begin(),
-        original->opcode_ranges_.end(),
-        std::back_inserter(target->opcode_ranges_));
-    target->bytecode_size_ = original->bytecode_size_;
-
-    target->total_dynamic_opcodes_ = original->total_dynamic_opcodes_;
-    target->opcode_counts_.clear();
-    std::copy(original->opcode_counts_.begin(),
-        original->opcode_counts_.end(),
-        std::back_inserter(target->opcode_counts_));
-
-    // Now do the mutations to the target.
-    for (size_t j = 0; j < number_of_mutations_; ++j)
-      target->Mutate(tls_prng);
-
-    target->RegenerateBytecode(target->bytecode_size_);
+    specs_->at(target_spec_index) = new_specs->at(i);
   }
-}
-
-void Kernel::ClobberSpecJob::operator()(
-    const tbb::blocked_range<size_t>& r) const {
-  for (size_t i = r.begin(); i < r.end(); ++i) {
-    std::shared_ptr<Kernel> target = generation_->at(i);
-    target->ClobberSpec(specs_);
-  }
+  RegenerateBytecode();
 }
 
 uint32 Kernel::GenerateRandomOpcode(
@@ -374,11 +299,11 @@ void Kernel::AppendJmpSpec(uint32 current_cycle, size_t current_bank_size) {
       std::move(bytecode));
 }
 
-void Kernel::RegenerateBytecode(size_t bytecode_size) {
-  bytecode_size_ = bytecode_size;
-  score_valid_ = false;
-  score_ = 1.0;
-  bytecode_.reset(new uint8[bytecode_size]);
+// Given valid data in opcodes_ refills bytecode_ with the concatenated data in
+// opcodes_ and specs_, appends jumps and updates fingerprint_. Assumes
+// |bytecode_size_| is already valid.
+void Kernel::RegenerateBytecode() {
+  bytecode_.reset(new uint8[bytecode_size_]);
   dynamic_areas_.clear();
   uint32 current_cycle = 0;
   size_t current_range_index = 0;
@@ -415,25 +340,6 @@ void Kernel::RegenerateBytecode(size_t bytecode_size) {
   }
   fingerprint_ = util::Hash64(reinterpret_cast<const char*>(bytecode_.get()),
                               bytecode_size_);
-}
-
-void Kernel::SimulateAndScore(const uint8* target_colors) {
-  sim_frame_.reset(new uint8[kLibZ26ImageSizeBytes]);
-  std::memset(sim_frame_.get(), 0, kLibZ26ImageSizeBytes);
-  simulate_single_frame(bytecode_.get(), bytecode_size_, sim_frame_.get());
-  score_ = 0.0;
-  uint8* frame_pointer = sim_frame_.get() + (kLibZ26ImageWidth * kSimSkipLines);
-  for (size_t i = 0; i < kFrameSizeBytes; ++i) {
-    if (*frame_pointer >= 128) {
-      score_ += 1.0;
-    } else {
-      assert(*frame_pointer < 128);
-      score_ += kColorDistanceNTSC[(target_colors[i] * 128) + *frame_pointer];
-    }
-    ++frame_pointer;
-  }
-  score_ = score_ / static_cast<double>(kFrameSizeBytes);
-  score_valid_ = true;
 }
 
 size_t Kernel::OpcodeFieldIndex(size_t opcode_index) {

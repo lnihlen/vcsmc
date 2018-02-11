@@ -6,13 +6,11 @@
 #include <set>
 #include <string>
 
+#include "gtest/gtest.h"
 #include "tbb/tbb.h"
 
 #include "assembler.h"
-#include "color_distance_table.h"
-#include "color_table.h"
 #include "constants.h"
-#include "gtest/gtest.h"
 #include "serialization.h"
 #include "spec.h"
 #include "tls_prng.h"
@@ -95,146 +93,11 @@ void ValidateKernel(std::shared_ptr<vcsmc::Kernel> kernel) {
   EXPECT_EQ(kernel->specs()->size(), current_spec_index);
 }
 
-class GenerateBackgroundColorKernelJob {
- public:
-  GenerateBackgroundColorKernelJob(
-      vcsmc::Generation generation,
-      vcsmc::TlsPrngList& prng_list)
-      : generation_(generation), prng_list_(prng_list) {}
-  void operator()(const tbb::blocked_range<size_t>& r) const {
-    vcsmc::TlsPrngList::reference tls_prng = prng_list_.local();
-    for (size_t i = r.begin(); i < r.end(); ++i) {
-      std::shared_ptr<vcsmc::Kernel> kernel = generation_->at(i);
-      uint8 bg = i * 2;
-      vcsmc::SpecList specs(new std::vector<vcsmc::Spec>());
-      // We build a huge no-op kernel out of specs that handle the required
-      // vertical blanking and state initialization but also several specs that
-      // consist only of nops.
-      uint32 spec_cycles = 0;
-      size_t spec_size = 0;
-      std::unique_ptr<uint8[]> bytecode = vcsmc::AssembleString(
-          "lda #0\n"
-          "sta VBLANK\n"
-          "lda #2\n"
-          "sta VSYNC\n", &spec_cycles, &spec_size);
-      ASSERT_NE(nullptr, bytecode);
-      uint32 total_cycles = spec_cycles;
-      size_t total_size = spec_size;
-      specs->emplace_back(
-          vcsmc::Range(0, spec_cycles), spec_size, std::move(bytecode));
-
-      // Fill space between with nops.
-      spec_cycles = 228 - total_cycles;
-      // Ensure we can fill the space with only nops, which are two cycles each.
-      ASSERT_EQ(0u, spec_cycles % 2);
-      spec_size = spec_cycles / 2;
-      bytecode.reset(new uint8[spec_size]);
-      std::memset(bytecode.get(), vcsmc::NOP_Implied, spec_size);
-      specs->emplace_back(
-          vcsmc::Range(total_cycles, 228), spec_size, std::move(bytecode));
-      total_cycles += spec_cycles;
-      total_size += spec_size;
-
-      bytecode = vcsmc::AssembleString(
-          "lda #0\n"
-          "sta VSYNC\n"
-          "sta RESP0\n"
-          "sta RESP1\n"
-          "sta NUSIZ0\n"
-          "sta NUSIZ1\n"
-          "sta COLUP0\n"
-          "sta COLUP1\n"
-          "sta CTRLPF\n"
-          "sta REFP0\n"
-          "sta REFP1\n"
-          "sta PF0\n"
-          "sta PF1\n"
-          "sta PF2\n"
-          "sta AUDC0\n"
-          "sta AUDC1\n"
-          "sta AUDF0\n"
-          "sta AUDF1\n"
-          "sta AUDV0\n"
-          "sta AUDV1\n"
-          "sta GRP0\n"
-          "sta GRP1\n"
-          "sta ENAM0\n"
-          "sta ENAM1\n"
-          "sta ENABL\n"
-          "sta VDELP0\n"
-          "sta VDELP1\n"
-          "sta RESMP0\n"
-          "sta RESMP1\n"
-          "sta HMCLR\n", &spec_cycles, &spec_size);
-      ASSERT_NE(nullptr, bytecode);
-      specs->emplace_back(
-          vcsmc::Range(228, 228 + spec_cycles), spec_size, std::move(bytecode));
-      total_cycles += spec_cycles;
-      total_size += spec_size;
-
-      bytecode.reset(new uint8[4]);
-      bytecode.get()[0] = vcsmc::LDA_Immediate;
-      bytecode.get()[1] = bg;
-      bytecode.get()[2] = vcsmc::STA_ZeroPage;
-      bytecode.get()[3] = vcsmc::COLUBK;
-      specs->emplace_back(
-          vcsmc::Range(total_cycles, total_cycles + 5), 4, std::move(bytecode));
-      total_cycles += 5;
-      total_size += 4;
-
-      // Target is 17632 cycles, also tracking frame size so we can generate bank
-      // padding specs as needed.
-      while (total_cycles < 17632) {
-        spec_cycles = 17632 - total_cycles;
-        spec_size = spec_cycles / 2;
-        bool need_jmp = false;
-        if ((total_size % vcsmc::kBankSize) + spec_size >=
-            (vcsmc::kBankSize - vcsmc::kBankPadding - 3)) {
-          need_jmp = true;
-          spec_size = vcsmc::kBankSize - vcsmc::kBankPadding -
-              (total_size % vcsmc::kBankSize) - 3;
-          spec_cycles = spec_size * 2;
-        }
-        bytecode.reset(new uint8[spec_size]);
-        std::memset(bytecode.get(), vcsmc::NOP_Implied, spec_size);
-        specs->emplace_back(
-            vcsmc::Range(total_cycles, total_cycles + spec_cycles),
-            spec_size, std::move(bytecode));
-        total_size += spec_size;
-        total_cycles += spec_cycles;
-        if (need_jmp) {
-          // Let the kernel generation function generate the jump.
-          total_cycles += 3;
-          total_size += vcsmc::kBankSize - (total_size % vcsmc::kBankSize);
-        }
-      }
-
-      // More room for a jmp if needed.
-      total_cycles += 3;
-
-      // Append instruction to turn on VBLANK, then let kernel random generation
-      // fill rest of blank frame with noise.
-      bytecode = vcsmc::AssembleString(
-        "lda #$42\n"
-        "sta VBLANK\n", &spec_cycles, &spec_size);
-      specs->emplace_back(vcsmc::Range(total_cycles,
-          total_cycles + spec_cycles), spec_size, std::move(bytecode));
-
-      kernel->GenerateRandom(specs, tls_prng);
-      ValidateKernel(kernel);
-    }
-  }
-
- private:
-  vcsmc::Generation generation_;
-  vcsmc::TlsPrngList& prng_list_;
-};
-
 }
 
 namespace vcsmc {
 
-TEST(GenerateRandomKernelJobTest, GeneratesValidRandomKernel) {
+TEST(KernelTest, GeneratesValidRandomKernel) {
   SpecList specs = ParseSpecListString(
       "- first_cycle: 0\n"
       "  assembler: |\n"
@@ -259,64 +122,6 @@ TEST(GenerateRandomKernelJobTest, GeneratesValidRandomKernel) {
   ValidateKernel(kernel);
 }
 
-TEST(ScoreKernelJobTest, SimulatesSimpleFrameKernel) {
-  tbb::task_scheduler_init tbb_init;
-  TlsPrngList prng_list;
-
-  Generation generation(new std::vector<std::shared_ptr<Kernel>>);
-  for (size_t i = 0; i < 128; ++i) {
-    generation->emplace_back(new Kernel);
-  }
-  tbb::parallel_for(tbb::blocked_range<size_t>(0, 128),
-      GenerateBackgroundColorKernelJob(generation, prng_list));
-
-  std::unique_ptr<uint8[]> target_color(new uint8[kFrameSizeBytes]);
-  std::memset(target_color.get(), 0, kFrameSizeBytes);
-
-  tbb::parallel_for(tbb::blocked_range<size_t>(0, 128),
-      Kernel::ScoreKernelJob(generation, target_color.get()));
-
-  // Although differing by only one byte the fingerprints should also be unique
-  // for the individual kernels.
-  std::set<uint64> fingerprints;
-
-  for (size_t i = 0; i < 128; ++i) {
-    ASSERT_EQ(true, generation->at(i)->score_valid());
-    EXPECT_NEAR(
-        kColorDistanceNTSC[i] *
-            static_cast<double>(kFrameWidthPixels * kFrameHeightPixels),
-        generation->at(i)->score(),
-        0.1);
-    fingerprints.insert(generation->at(i)->fingerprint());
-  }
-
-  EXPECT_EQ(128u, fingerprints.size());
-}
-
-TEST(MutateKernelJobTest, MutatesSimpleFrameKernel) {
-  tbb::task_scheduler_init tbb_init;
-  TlsPrngList prng_list;
-
-  Generation generation(new std::vector<std::shared_ptr<Kernel>>);
-  for (size_t i = 0; i < 128; ++i) {
-    generation->emplace_back(new Kernel);
-  }
-  tbb::parallel_for(tbb::blocked_range<size_t>(0, 128),
-      GenerateBackgroundColorKernelJob(generation, prng_list));
-
-  Generation mutated_generation(new std::vector<std::shared_ptr<Kernel>>);
-  for (size_t i = 0; i < 128; ++i) {
-    mutated_generation->emplace_back(new Kernel);
-  }
-  tbb::parallel_for(tbb::blocked_range<size_t>(0, 128),
-      Kernel::MutateKernelJob(
-          generation, mutated_generation, 0, 128, prng_list));
-
-  for (size_t i = 0; i < 128; ++i) {
-    ValidateKernel(mutated_generation->at(i));
-    EXPECT_NE(generation->at(i)->fingerprint(),
-        mutated_generation->at(i)->fingerprint());
-  }
-}
+// TODO: test mutations?
 
 }  // namespace vcsmc

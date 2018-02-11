@@ -5,7 +5,7 @@ export CC=clang
 # (also versioned) so that YCM will pick up the correct flags.
 # Also note that right now all the third_party/ builds have hard-coded CFLAGS
 # of their own and don't follow this variable.
-export CFLAGS=-std=c++11 -Wall -Wextra -Werror -O2
+export CFLAGS=-std=c++11 -Wall -Wextra -Werror -fPIC
 export LDFLAGS=
 export LIBS=-lstdc++
 export OUT=$(CURDIR)/out
@@ -13,14 +13,14 @@ export UNAME:=$(shell uname)
 
 ifeq ($(UNAME), Darwin)
 export DYLIB=dylib
+export NVCC=/Developer/NVIDIA/CUDA-8.0/bin/nvcc -Wno-deprecated-gpu-targets
 endif
 
 ifeq ($(UNAME), Linux)
 export DYLIB=so
+export NVCC=/opt/cuda/bin/nvcc -Wno-deprecated-gpu-targets
 endif
 
-export DCMT_LIB=$(OUT)/dcmt/libdcmt.a
-export DCMT_INCLUDE=$(CURDIR)/third_party/dcmt/include
 export FARMHASH_LIB=$(OUT)/farmhash/lib/libfarmhash.a
 export FARMHASH_INCLUDE=$(OUT)/farmhash/include
 export GPERF_LIB=$(OUT)/gperftools/lib/libprofiler.a
@@ -35,13 +35,17 @@ export LIBZ26_INCLUDE=$(CURDIR)/third_party/libz26/include
 export LIBZ26_LIB=$(OUT)/libz26/libz26.o
 export TBB_INCLUDE=$(CURDIR)/third_party/tbb/include
 
+all: export OPT=-O2
 all: depends vcsmc tests
+
+debug: export OPT=-O0 -g
+debug: depends vcsmc tests
 
 depends: | $(OUT)/
 	$(MAKE) -C third_party/ all
 
 vcsmc: depends | $(OUT)/
-	$(MAKE) -C src/ all
+	$(MAKE) -C src/ vcsmc
 
 tests: depends vcsmc | $(OUT)/
 	$(MAKE) -C src/ tests
@@ -52,4 +56,7 @@ $(OUT)/:
 .PHONY: clean
 clean:
 	$(MAKE) -C src/ clean
+
+.PHONY: cleandeps
+cleandeps: clean
 	$(MAKE) -C third_party/ clean

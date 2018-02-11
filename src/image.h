@@ -15,6 +15,8 @@ class Image {
  public:
   // Constructs an Image that owns a pixel array.
   Image(uint32 width, uint32 height);
+  // Constructs an Image from raw Atari color bytes.
+  Image(const uint8* atari_colors);
   ~Image();
 
   uint32 width() const { return width_; }
@@ -30,8 +32,7 @@ class Image {
   const uint32 height_;
   std::unique_ptr<uint32[]> pixels_;
 
-  // Private default ctor means "don't call me."
-  Image() : width_(0), height_(0), pixels_(nullptr) {}
+  Image() = delete;
 };
 
 }  // namespace vcsmc
