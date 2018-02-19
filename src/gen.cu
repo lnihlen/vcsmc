@@ -827,10 +827,17 @@ int main(int argc, char* argv[]) {
       }
       auto now = std::chrono::high_resolution_clock::now();
       if (FLAGS_print_stats) {
+        uint64 throughput = 0;
+        if ((mutate_count == simulation_count) &&
+            (mutate_count == scoring_count)) {
+          uint64 pipeline_time_us = mutate_time_us + simulation_time_us +
+              scoring_time_us;
+          throughput = (mutate_count * 1000000) / pipeline_time_us;
+        }
         printf("gen: %7lu leader: %016" PRIx64 " score: %.8f ciede: %.8f "
                "ssim: %.8f sim: %7" PRIu64 " score: %7" PRIu64 " "
                "tourney: %7" PRIu64 " mutate: %7" PRIu64 " epoch: %7" PRIu64 " "
-               "elapsed: %7" PRIu64 "%s\n",
+               "elapsed: %7" PRIu64 " throughput: %7" PRIu64 "%s\n",
             generation_count,
             generation->at(0)->fingerprint(),
             global_minimum_score->second->score,
@@ -845,17 +852,24 @@ int main(int argc, char* argv[]) {
               now - epoch_time).count(),
             std::chrono::duration_cast<std::chrono::seconds>(
                 now - program_start_time).count(),
+            throughput,
             reroll ? " reroll" : "");
       }
+
       reroll = false;
+
       simulation_count = 0;
       simulation_time_us = 0;
+
       scoring_count = 0;
       scoring_time_us = 0;
+
       tourney_count = 0;
       tourney_time_us = 0;
+
       mutate_count = 0;
       mutate_time_us = 0;
+
       SaveState(generation,
                 global_minimum,
                 global_minimum_score,
