@@ -1,5 +1,3 @@
-export FARMHASH_OUT=$(OUT)/farmhash
-export FARMHASH_DIR=$(CURDIR)/farmhash
 export GPERF_OUT=$(OUT)/gperftools
 export GPERF_DIR=$(CURDIR)/gperftools
 export GTEST_OUT=$(OUT)/gtest
@@ -7,15 +5,10 @@ export GFLAGS_OUT=$(OUT)/gflags
 export LIBYAML_OUT=$(OUT)/libyaml
 export LIBZ26_OUT=$(OUT)/libz26
 export TBB_OUT=$(OUT)/tbb
+export XXHASH_OUT=$(OUT)/xxHash
+export XXHASH_DIR=$(CURDIR)/xxHash
 
-all: farmhash gperftools gtest gflags libyaml libz26 tbb
-
-farmhash: $(FARMHASH_OUT)/lib/libfarmhash.a | $(FARMHASH_OUT)
-
-$(FARMHASH_OUT)/lib/libfarmhash.a: export CFLAGS=-Wall -fPIC $(OPT)
-$(FARMHASH_OUT)/lib/libfarmhash.a: | $(FARMHASH_OUT)
-	cd $(FARMHASH_OUT); $(FARMHASH_DIR)/configure --prefix=$(FARMHASH_OUT)
-	$(MAKE) -C $(FARMHASH_OUT) install
+all: gperftools gtest gflags libyaml libz26 tbb xxhash
 
 gperftools: $(GPERF_DIR)/configure $(GPERF_OUT)/lib/libprofiler.a | $(GPERF_OUT)
 
@@ -44,11 +37,11 @@ $(GFLAGS_OUT)/lib/libgflags.a:
 	cmake -B$(GFLAGS_OUT) -Hgflags -G"Unix Makefiles"
 	$(MAKE) -C $(GFLAGS_OUT)
 
-libyaml: $(LIBYAML_OUT)/libyaml.a | $(LIBYAML_OUT)
+libyaml: $(LIBYAML_OUT)/libyaml_static.a | $(LIBYAML_OUT)
 
-$(LIBYAML_OUT)/libyaml.a: export CFLAGS=-Wall -fPIC $(OPT)
-$(LIBYAML_OUT)/libyaml.a: export CXX=$(CC)
-$(LIBYAML_OUT)/libyaml.a:
+$(LIBYAML_OUT)/libyaml_static.a: export CFLAGS=-Wall -fPIC $(OPT)
+$(LIBYAML_OUT)/libyaml_static.a: export CXX=$(CC)
+$(LIBYAML_OUT)/libyaml_static.a:
 	cmake -B$(LIBYAML_OUT) -Hlibyaml -G"Unix Makefiles"
 	$(MAKE) -C $(LIBYAML_OUT)
 
@@ -68,8 +61,14 @@ $(TBB_TARGET):
 	$(MAKE) -C tbb/
 	cp $(TBB_OUT)/tbb_release/*.$(DYLIB)* $(OUT)
 
-$(FARMHASH_OUT):
-	mkdir -p $(FARMHASH_OUT)
+xxhash: $(XXHASH_OUT)/libxxhash.a | $(XXHASH_OUT)
+
+$(XXHASH_OUT)/libxxhash.a: export CFLAGS=-Wall -fPIC $(OPT)
+$(XXHASH_OUT)/libxxhash.a: | $(XXHASH_OUT)
+	cd $(XXHASH_DIR); make libxxhash.a; mv libxxhash.a $(XXHASH_OUT); rm *.o
+
+$(XXHASH_OUT):
+	mkdir -p $(XXHASH_OUT)
 
 $(GPERF_OUT):
 	mkdir -p $(GPERF_OUT)
