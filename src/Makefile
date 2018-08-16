@@ -1,9 +1,9 @@
 # VCSMC src/ Makefile.
-# Dependencies: libpng, clang,CUDA, Intel TBB
+# Dependencies: libpng, clang, Intel TBB
 # tools dependencies: python colormath, Wand, ImageMagick
-INCLUDES=-I. -I$(FARMHASH_INCLUDE) -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)     \
+INCLUDES=-I. -I$(XXHASH_INCLUDE) -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)       \
     -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE) -I$(TBB_INCLUDE)
-LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(FARMHASH_LIB) $(GPERF_LIB)      \
+LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(XXHASH_LIB) $(GPERF_LIB)        \
     -L$(OUT) -ltbb -lcudart
 OUTTESTS=$(OUT)/tests
 
@@ -62,9 +62,6 @@ all: vcsmc tests
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES)
 
-$(OUT)/%.o: %.cu $(DEPS)
-	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -Xcompiler "$(OPT) $(CFLAGS)"
-
 $(OUT)/atari_ntsc_laba_color_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
 $(OUT)/atari_ntsc_laba_color_table.o: $(OUT)/build_laba_table
 	$(OUT)/build_laba_table --output_directory=../out
@@ -73,10 +70,6 @@ $(OUT)/atari_ntsc_laba_color_table.o: $(OUT)/build_laba_table
 
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CC) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES) -I$(GTEST_INCLUDE)
-
-$(OUTTESTS)/%.o: %.cu $(DEPS)
-	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -I$(GTEST_INCLUDE)               \
-    -Xcompiler "$(OPT)"
 
 $(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
                          $(OUT)/build_laba_table.o

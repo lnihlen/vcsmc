@@ -1,9 +1,7 @@
 # VCSMC main Makefile
 # assumes GNU make 3.80 or up
 export CC=clang
-# If changing CFLAGS it is good to change them in the .ycm_extra_conf.py file
-# (also versioned) so that YCM will pick up the correct flags.
-# Also note that right now all the third_party/ builds have hard-coded CFLAGS
+# Note that right now all the third_party/ builds have hard-coded CFLAGS
 # of their own and don't follow this variable.
 export CFLAGS=-std=c++11 -Wall -Wextra -Werror -fPIC
 export LDFLAGS=
@@ -13,16 +11,12 @@ export UNAME:=$(shell uname)
 
 ifeq ($(UNAME), Darwin)
 export DYLIB=dylib
-export NVCC=/Developer/NVIDIA/CUDA-8.0/bin/nvcc -Wno-deprecated-gpu-targets
 endif
 
 ifeq ($(UNAME), Linux)
 export DYLIB=so
-export NVCC=/opt/cuda/bin/nvcc -Wno-deprecated-gpu-targets
 endif
 
-export FARMHASH_LIB=$(OUT)/farmhash/lib/libfarmhash.a
-export FARMHASH_INCLUDE=$(OUT)/farmhash/include
 export GPERF_LIB=$(OUT)/gperftools/lib/libprofiler.a
 export GPERF_INCLUDE=$(OUT)/gperftools/include
 export GTEST_INCLUDE=$(CURDIR)/third_party/googletest/googletest/include
@@ -30,10 +24,12 @@ export GTEST_LIB=$(OUT)/gtest/libgtest.a
 export GFLAGS_INCLUDE=$(OUT)/gflags/include
 export GFLAGS_LIB=$(OUT)/gflags/lib/libgflags.a
 export LIBYAML_INCLUDE=$(CURDIR)/third_party/libyaml/include
-export LIBYAML_LIB=$(OUT)/libyaml/libyaml.a
+export LIBYAML_LIB=$(OUT)/libyaml/libyaml_static.a
 export LIBZ26_INCLUDE=$(CURDIR)/third_party/libz26/include
 export LIBZ26_LIB=$(OUT)/libz26/libz26.o
 export TBB_INCLUDE=$(CURDIR)/third_party/tbb/include
+export XXHASH_LIB=$(OUT)/xxHash/libxxhash.a
+export XXHASH_INCLUDE=$(CURDIR)/third_party/xxHash
 
 all: export OPT=-O2
 all: depends vcsmc tests
