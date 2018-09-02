@@ -11,10 +11,12 @@ export UNAME:=$(shell uname)
 
 ifeq ($(UNAME), Darwin)
 export DYLIB=dylib
+export NVCC=/Developer/NVIDIA/CUDA-8.0/bin/nvcc -Wno-deprecated-gpu-targets
 endif
 
 ifeq ($(UNAME), Linux)
 export DYLIB=so
+export NVCC=/opt/cuda/bin/nvcc -Wno-deprecated-gpu-targets
 endif
 
 export GPERF_LIB=$(OUT)/gperftools/lib/libprofiler.a

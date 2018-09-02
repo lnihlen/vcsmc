@@ -100,6 +100,13 @@ enum TIA : uint8 {
   TIA_COUNT  = 0x2d
 };
 
+enum Register {
+  A = 0,
+  X = 1,
+  Y = 2,
+  REGISTER_COUNT = 3
+};
+
 enum OpCode : uint8 {
   JMP_Absolute = 0x4c,
   LDA_Immediate = 0xa9,

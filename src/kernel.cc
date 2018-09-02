@@ -5,8 +5,6 @@
 #include <cstring>
 #include <random>
 
-#include "farmhash.h"
-
 #include "assembler.h"
 
 namespace vcsmc {
@@ -338,8 +336,9 @@ void Kernel::RegenerateBytecode() {
       ++current_spec_index;
     }
   }
-  fingerprint_ = util::Hash64(reinterpret_cast<const char*>(bytecode_.get()),
-                              bytecode_size_);
+//  fingerprint_ = util::Hash64(reinterpret_cast<const char*>(bytecode_.get()),
+//                              bytecode_size_);
+  fingerprint_ = 0;
 }
 
 size_t Kernel::OpcodeFieldIndex(size_t opcode_index) {

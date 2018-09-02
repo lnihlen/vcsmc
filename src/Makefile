@@ -1,5 +1,5 @@
 # VCSMC src/ Makefile.
-# Dependencies: libpng, clang, Intel TBB
+# Dependencies: libpng, clang, CUDA, Intel TBB
 # tools dependencies: python colormath, Wand, ImageMagick
 INCLUDES=-I. -I$(XXHASH_INCLUDE) -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)       \
     -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE) -I$(TBB_INCLUDE)
@@ -32,7 +32,9 @@ IMAGE_OBJ=$(OUT)/bit_map.o                                                     \
 
 OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/ciede_2k.o                                                          \
+    $(OUT)/codon_table.o                                                       \
     $(OUT)/cuda_utils.o                                                        \
+    $(OUT)/genome.o                                                            \
     $(OUT)/kernel.o                                                            \
     $(OUT)/mssim.o                                                             \
     $(OUT)/range.o                                                             \
@@ -62,14 +64,29 @@ all: vcsmc tests
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES)
 
+$(OUT)/%.o: %.cu $(DEPS)
+	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -Xcompiler "$(OPT) $(CFLAGS)"
+
 $(OUT)/atari_ntsc_laba_color_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
 $(OUT)/atari_ntsc_laba_color_table.o: $(OUT)/build_laba_table
 	$(OUT)/build_laba_table --output_directory=../out
 	$(CC) -c -o $@ $(OUT)/atari_ntsc_laba_color_table.cc $(CFLAGS) $(OPT)        \
     $(INCLUDES)
 
+$(OUT)/codon_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
+$(OUT)/codon_table.o: $(OUT)/build_codon_table
+	$(OUT)/build_codon_table --output_directory=../out
+	$(CC) -c -o $@ $(OUT)/codon_table.cc $(CFLAGS) $(OPT) $(INCLUDES)
+
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CC) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES) -I$(GTEST_INCLUDE)
+
+$(OUTTESTS)/%.o: %.cu $(DEPS)
+	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -I$(GTEST_INCLUDE)               \
+    -Xcompiler "$(OPT)"
+
+$(OUT)/build_codon_table: $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/build_codon_table.o
+	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
                          $(OUT)/build_laba_table.o
