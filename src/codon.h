@@ -13,7 +13,7 @@ namespace vcsmc {
 //  * A don't care mask, where bit value 0 means the same bit in the target
 //    byte value is a don't care.
 
-enum CodonAction : uint8 {
+enum Action : uint8 {
   kSetPF0          = 0,
   kSetPF1          = 1,
   kSetPF2          = 2,
@@ -62,7 +62,7 @@ typedef uint32 Codon;
 
 // Given an action, parameter, tia_value, and mask, returns a packed uint32
 // with those values.
-inline Codon MakeCodon(CodonAction action,
+inline Codon MakeCodon(Action action,
                        uint8 action_parameter,
                        uint8 tia_value,
                        uint8 tia_mask) {
@@ -70,6 +70,22 @@ inline Codon MakeCodon(CodonAction action,
          static_cast<uint32>(action_parameter) << 8 |
          static_cast<uint32>(tia_value) << 16 |
          static_cast<uint32>(tia_mask) << 24;
+}
+
+inline Action CodonAction(Codon codon) {
+  return static_cast<Action>(codon & 0x000000ff);
+}
+
+inline uint8 CodonActionParameter(Codon codon) {
+  return static_cast<uint8>((codon >> 8) & 0x000000ff);
+}
+
+inline uint8 CodonTIAValue(Codon codon) {
+  return static_cast<uint8>((codon >> 16) & 0x000000ff);
+}
+
+inline uint8 CodonTIAMask(Codon codon) {
+  return static_cast<uint8>((codon >> 24) & 0x000000ff);
 }
 
 }  // namespace vcsmtc

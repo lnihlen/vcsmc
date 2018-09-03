@@ -41,89 +41,90 @@ int main(int argc, char* argv[]) {
       vcsmc::kSetPF2, vcsmc::PF2, static_cast<uint8>(i), 0xff));
   }
 
-  // kSetCTRLPF_REF
+  // kSetCTRLPF_REF - note that the don't care mask for each of the CTRLPF and
+  // NUSIZ registers is set to include all bits impacted by the change.
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_REF, vcsmc::CTRLPF, 0x00, 0x01));
+    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_REF, vcsmc::CTRLPF, 0x00, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_REF, vcsmc::CTRLPF, 0x00, 0x01));
+    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_REF, vcsmc::CTRLPF, 0x01, 0x37));
 
   // kSetCTRLPF_SCORE
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_SCORE, vcsmc::CTRLPF, 0x00, 0x02));
+    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_SCORE, vcsmc::CTRLPF, 0x00, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_SCORE, vcsmc::CTRLPF, 0x02, 0x02));
+    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_SCORE, vcsmc::CTRLPF, 0x02, 0x37));
 
   // kSetCTRLPF_PFP
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_PFP, vcsmc::CTRLPF, 0x00, 0x04));
+    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_PFP, vcsmc::CTRLPF, 0x00, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_PFP, vcsmc::CTRLPF, 0x04, 0x04));
+    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_PFP, vcsmc::CTRLPF, 0x04, 0x37));
 
   // kSetCTRLPF_BALL (bits 4 and 5)
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_BALL, vcsmc::CTRLPF, 0x00, 0x30));
+    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_BALL, vcsmc::CTRLPF, 0x00, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_BALL, vcsmc::CTRLPF, 0x10, 0x30));
+    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_BALL, vcsmc::CTRLPF, 0x10, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_BALL, vcsmc::CTRLPF, 0x20, 0x30));
+    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_BALL, vcsmc::CTRLPF, 0x20, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_BALL, vcsmc::CTRLPF, 0x30, 0x30));
+    vcsmc::MakeCodon(vcsmc::kSetCTRLPF_BALL, vcsmc::CTRLPF, 0x30, 0x37));
 
   // kSetNUSIZ0_P0
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x00, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x00, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x01, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x01, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x02, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x02, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x03, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x03, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x04, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x04, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x05, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x05, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x06, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x06, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x07, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_P0, vcsmc::NUSIZ0, 0x07, 0x37));
 
   // kSetNUSIZ0_M0
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_M0, vcsmc::NUSIZ0, 0x00, 0x30));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_M0, vcsmc::NUSIZ0, 0x00, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_M0, vcsmc::NUSIZ0, 0x10, 0x30));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_M0, vcsmc::NUSIZ0, 0x10, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_M0, vcsmc::NUSIZ0, 0x20, 0x30));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_M0, vcsmc::NUSIZ0, 0x20, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_M0, vcsmc::NUSIZ0, 0x30, 0x30));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ0_M0, vcsmc::NUSIZ0, 0x30, 0x37));
 
   // kSetNUSIZ1_P1
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x00, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x00, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x01, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x01, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x02, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x02, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x03, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x03, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x04, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x04, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x05, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x05, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x06, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x06, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x07, 0x07));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_P1, vcsmc::NUSIZ1, 0x07, 0x37));
 
   // kSetNUSIZ1_M1
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_M1, vcsmc::NUSIZ1, 0x00, 0x30));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_M1, vcsmc::NUSIZ1, 0x00, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_M1, vcsmc::NUSIZ1, 0x10, 0x30));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_M1, vcsmc::NUSIZ1, 0x10, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_M1, vcsmc::NUSIZ1, 0x20, 0x30));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_M1, vcsmc::NUSIZ1, 0x20, 0x37));
   codons.push_back(
-    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_M1, vcsmc::NUSIZ1, 0x30, 0x30));
+    vcsmc::MakeCodon(vcsmc::kSetNUSIZ1_M1, vcsmc::NUSIZ1, 0x30, 0x37));
 
   // kStrobeRESP0
   codons.push_back(
@@ -236,7 +237,7 @@ int main(int argc, char* argv[]) {
   }
 
   // kWait
-  for (auto i = 2; i < 256; i += 2) {
+  for (auto i = 2; i < 256; ++i) {
     codons.push_back(vcsmc::MakeCodon(
       vcsmc::kWait, static_cast<uint8>(i), 0x00, 0xff));
   }

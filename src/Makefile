@@ -41,6 +41,7 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/serialization.o                                                     \
     $(OUT)/sound_file.o                                                        \
     $(OUT)/spec.o                                                              \
+    $(OUT)/state.o                                                             \
     $(OUT)/tls_prng.o
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \

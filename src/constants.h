@@ -108,6 +108,7 @@ enum Register {
 };
 
 enum OpCode : uint8 {
+  BIT_ZeroPage = 0x24,
   JMP_Absolute = 0x4c,
   LDA_Immediate = 0xa9,
   LDX_Immediate = 0xa2,
