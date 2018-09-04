@@ -1,6 +1,8 @@
 #ifndef SRC_CODON_H_
 #define SRC_CODON_H_
 
+#include <cassert>
+
 #include "constants.h"
 #include "types.h"
 
@@ -62,7 +64,7 @@ typedef uint32 Codon;
 
 // Given an action, parameter, tia_value, and mask, returns a packed uint32
 // with those values.
-inline Codon MakeCodon(Action action,
+inline Codon PackCodon(Action action,
                        uint8 action_parameter,
                        uint8 tia_value,
                        uint8 tia_mask) {
@@ -86,6 +88,182 @@ inline uint8 CodonTIAValue(Codon codon) {
 
 inline uint8 CodonTIAMask(Codon codon) {
   return static_cast<uint8>((codon >> 24) & 0x000000ff);
+}
+
+inline Codon MakeWaitCodon(uint8 duration) {
+  return PackCodon(kWait, duration, 0x00, 0xff);
+}
+
+inline Codon MakeTIACodon(Action action, uint8 value) {
+  TIA tia;
+  uint8 mask;
+  switch (action) {
+    case kSetPF0:
+      tia = PF0;
+      mask = 0xf0;
+      break;
+
+    case kSetPF1:
+      tia = PF1;
+      mask = 0xff;
+      break;
+
+    case kSetPF2:
+      tia = PF2;
+      mask = 0xff;
+      break;
+
+    case kSetCTRLPF_REF:
+      tia = CTRLPF;
+      mask = 0x01;
+      break;
+
+    case kSetCTRLPF_SCORE:
+      tia = CTRLPF;
+      mask = 0x02;
+      break;
+
+    case kSetCTRLPF_PFP:
+      tia = CTRLPF;
+      mask = 0x04;
+      break;
+
+    case kSetCTRLPF_BALL:
+      tia = CTRLPF;
+      mask = 0x30;
+      break;
+
+    case kSetNUSIZ0_P0:
+      tia = NUSIZ0;
+      mask = 0x07;
+      break;
+
+    case kSetNUSIZ0_M0:
+      tia = NUSIZ0;
+      mask = 0x30;
+      break;
+
+    case kSetNUSIZ1_P1:
+      tia = NUSIZ1;
+      mask = 0x07;
+      break;
+
+    case kSetNUSIZ1_M1:
+      tia = NUSIZ1;
+      mask = 0x30;
+      break;
+
+    case kStrobeRESP0:
+      tia = RESP0;
+      mask = 0x00;
+      break;
+
+    case kStrobeRESP1:
+      tia = RESP1;
+      mask = 0x00;
+      break;
+
+    case kStrobeRESM0:
+      tia = RESM0;
+      mask = 0x00;
+      break;
+
+    case kStrobeRESM1:
+      tia = RESM1;
+      mask = 0x00;
+      break;
+
+    case kStrobeRESBL:
+      tia = RESBL;
+      mask = 0x00;
+      break;
+
+    case kSetRESMP0:
+      tia = RESMP0;
+      mask = 0x02;
+      break;
+
+    case kSetRESMP1:
+      tia = RESMP1;
+      mask = 0x02;
+      break;
+
+    case kSetENAM0:
+      tia = ENAM0;
+      mask = 0x02;
+      break;
+
+    case kSetENAM1:
+      tia = ENAM1;
+      mask = 0x02;
+      break;
+
+    case kSetENABL:
+      tia = ENABL;
+      mask = 0x02;
+      break;
+
+    case kSetGRP0:
+      tia = GRP0;
+      mask = 0xff;
+      break;
+
+    case kSetGRP1:
+      tia = GRP1;
+      mask = 0xff;
+      break;
+
+    case kSetREFP0:
+      tia = REFP0;
+      mask = 0x08;
+      break;
+
+    case kSetREFP1:
+      tia = REFP1;
+      mask = 0x08;
+      break;
+
+    case kSetVDELP0:
+      tia = VDELP0;
+      mask = 0x01;
+      break;
+
+    case kSetVDELP1:
+      tia = VDELP1;
+      mask = 0x01;
+      break;
+
+    case kSetVDELBL:
+      tia = VDELBL;
+      mask = 0x01;
+      break;
+
+    case kSetCOLUP0:
+      tia = COLUP0;
+      mask = 0xfe;
+      break;
+
+    case kSetCOLUP1:
+      tia = COLUP1;
+      mask = 0xfe;
+      break;
+
+    case kSetCOLUPF:
+      tia = COLUPF;
+      mask = 0xfe;
+      break;
+
+    case kSetCOLUBK:
+      tia = COLUBK;
+      mask = 0xfe;
+      break;
+
+    default:
+      assert(false);
+      break;
+  }
+
+  return PackCodon(action, tia, value, mask);
 }
 
 }  // namespace vcsmtc

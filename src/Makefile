@@ -2,7 +2,7 @@
 # Dependencies: libpng, clang, CUDA, Intel TBB
 # tools dependencies: python colormath, Wand, ImageMagick
 INCLUDES=-I. -I$(XXHASH_INCLUDE) -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)       \
-    -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE) -I$(TBB_INCLUDE)
+    -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE) -I$(TBB_INCLUDE) -I$(OUT)
 LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(XXHASH_LIB) $(GPERF_LIB)        \
     -L$(OUT) -ltbb -lcudart
 OUTTESTS=$(OUT)/tests
@@ -44,13 +44,17 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/state.o                                                             \
     $(OUT)/tls_prng.o
 
+GEN_OBJ=$(OUT)/atari_ntsc_laba_color_table.o                                   \
+        $(OUT)/codon_table.o
+
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
          $(OUTTESTS)/ciede_2k_unittests.o                                      \
          $(OUTTESTS)/kernel_unittests.o                                        \
          $(OUTTESTS)/mssim_unittests.o                                         \
          $(OUTTESTS)/range_unittests.o                                         \
-         $(OUTTESTS)/serialization_unittests.o
+         $(OUTTESTS)/serialization_unittests.o                                 \
+         $(OUTTESTS)/state_unittests.o
 
 vcsmc: $(OUT)/ciede                                                            \
        $(OUT)/gen                                                              \
@@ -93,29 +97,23 @@ $(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
                          $(OUT)/build_laba_table.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
-$(OUT)/ciede: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ)                                 \
-              $(OUT)/atari_ntsc_laba_color_table.o $(OUT)/ciede.o
+$(OUT)/ciede: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/ciede.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
-$(OUT)/gen: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/gen.o                      \
-            $(OUT)/atari_ntsc_laba_color_table.o
+$(OUT)/gen: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/gen.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
-$(OUT)/pcm: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ)                                   \
-            $(OUT)/atari_ntsc_laba_color_table.o $(OUT)/pcm.o
+$(OUT)/pcm: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/pcm.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
-$(OUT)/respec: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ)                                \
-               $(OUT)/atari_ntsc_laba_color_table.o $(OUT)/respec.o
+$(OUT)/respec: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/respec.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
-$(OUT)/ssim: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ)                                  \
-             $(OUT)/atari_ntsc_laba_color_table.o $(OUT)/ssim.o
+$(OUT)/ssim: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/ssim.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
-    $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/atari_ntsc_laba_color_table.o |           \
-    $(OUTTESTS)/
+    $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) | $(OUTTESTS)/
 	$(NVCC) -o $@ $^ $(LIBZ26_LIB) $(INCLUDES) $(LDFLAGS) $(LIBS)                \
     $(GTEST_LIB) -Xcompiler "$(OPT) $(CFLAGS)"
 
@@ -125,10 +123,14 @@ $(OUTTESTS)/:
 .PHONY: clean
 clean:
 	rm -rf $(COLOR_OBJ) $(IMAGE_OBJ) $(OBJ) $(TEST_OBJ)                          \
-    $(OUT)/build_laba_table{,.o}                                               \
     $(OUT)/atari_ntsc_laba_color_table.{cc,o}                                  \
+    $(OUT)/build_codon_table{,.o}                                              \
+    $(OUT)/build_laba_table{,.o}                                               \
+    $(OUT)/ciede{,.o}                                                          \
+    $(OUT)/codon_table.{cc,h,o}                                                \
     $(OUT)/gen{,.o}                                                            \
     $(OUT)/pcm{,.o}                                                            \
+    $(OUT)/ssim{,.o}                                                           \
     $(OUT)/respec{,.o}                                                         \
     $(OUTTESTS)/run_unittests{,.o}
 

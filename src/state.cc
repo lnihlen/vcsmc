@@ -4,13 +4,13 @@
 
 namespace vcsmc {
 
-State::State() : current_time_(0) {
+State::State(uint32 current_time) : current_time_(current_time) {
   tia_.fill(0);
   registers_.fill(0);
   register_last_used_.fill(0);
 }
 
-Snippet State::Sequence(Codon codon) {
+Snippet State::Sequence(Codon codon) const {
   // Unpack Codon argument.
   Action action = CodonAction(codon);
   uint8 parameter = CodonActionParameter(codon);
@@ -36,6 +36,7 @@ Snippet State::Sequence(Codon codon) {
     }
 
     snippet.duration = parameter;
+    snippet.should_advance_register_rotation = false;
     return snippet;
   }
 
@@ -50,37 +51,57 @@ Snippet State::Sequence(Codon codon) {
   // target value (within mask) to see if any work at all needs to be done.
   uint8 current_tia = parameter < TIA_COUNT ? tia_[parameter] : 0;
 
+  // Strobes don't care about register values, only timing of the write, and
+  // so can use any register for bit. However, they can't be optimized out.
+  bool is_strobe = (action == kStrobeRESP0) ||
+                   (action == kStrobeRESP1) ||
+                   (action == kStrobeRESM0) ||
+                   (action == kStrobeRESM1) ||
+                   (action == kStrobeRESBL);
+
+  // It could be that the current value is already set in the TIA, making this
+  // Codon a no-op, in which case we return the current empty Snippet.
+  if (!is_strobe && ((tia_value & tia_mask) == (current_tia & tia_mask))) {
+    return snippet;
+  }
+
   switch (action) {
     case kSetCTRLPF_REF:
       // Preserve current state of CTRLPF bits 1,2,4,5.
       tia_value = (tia_value & 0x01) | (current_tia & 0b00110110);
+      tia_mask = 0x37;
       break;
 
     case kSetCTRLPF_SCORE:
       // Preserve current state of CTRLPF bits 0,2,4,5.
       tia_value = (tia_value & 0x02) | (current_tia & 0b00110101);
+      tia_mask = 0x37;
       break;
 
     case kSetCTRLPF_PFP:
       // Preserve current state of CTRLF bits 0,1,4,5.
       tia_value = (tia_value & 0x04) | (current_tia & 0b00110011);
+      tia_mask = 0x37;
       break;
 
     case kSetCTRLPF_BALL:
       // Preserve current state of CTRLPF bits 0,1,2.
       tia_value = (tia_value & 0x30) | (current_tia & 0b00000111);
+      tia_mask = 0x37;
       break;
 
     case kSetNUSIZ0_P0:
     case kSetNUSIZ1_P1:
       // Preserve current state of NUSIZ{0,1} bits 4,5.
       tia_value = (tia_value & 0x07) | (current_tia & 0b00110000);
+      tia_mask = 0x37;
     break;
 
     case kSetNUSIZ0_M0:
     case kSetNUSIZ1_M1:
       // Preserve current state of NUSIZ{0,1} bits 0,1,2.
       tia_value = (tia_value & 0x30) | (current_tia & 0b00000111);
+      tia_mask = 0x37;
       break;
 
     default:
@@ -90,7 +111,7 @@ Snippet State::Sequence(Codon codon) {
   // Check registers for possible match that fits needed value within mask.
   Register store_register;
 
-  if ((registers_[A] & tia_mask) == tia_value) {
+  if (is_strobe || ((registers_[A] & tia_mask) == tia_value)) {
     store_register = A;
   } else if ((registers_[X] & tia_mask) == tia_value) {
     store_register = X;
@@ -134,8 +155,31 @@ Snippet State::Sequence(Codon codon) {
     snippet.duration += 2;
   }
 
-  // It is now assumed that we have a register identified, and the desired value
-  // is also in that register.
+  assert(store_register != REGISTER_COUNT);
+
+  switch (store_register) {
+    case A:
+      snippet.Insert(STA_ZeroPage);
+      break;
+
+    case X:
+      snippet.Insert(STX_ZeroPage);
+      break;
+
+    case Y:
+      snippet.Insert(STY_ZeroPage);
+      break;
+
+    default:
+      assert(false);
+      break;
+  }
+
+  snippet.Insert(parameter);
+  snippet.duration += 3;
+
+  // Normal stores should update register usage, but strobes should not.
+  snippet.should_advance_register_rotation = !is_strobe;
 
   return snippet;
 }

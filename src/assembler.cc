@@ -295,7 +295,17 @@ bool ProcessLine(const std::string& line, std::vector<uint32>* opcodes) {
   std::transform(opcode_str.begin(), opcode_str.end(), opcode_str.begin(),
       ::tolower);
 
-  if (opcode_str == "jmp") {
+  if (opcode_str == "bit") {
+    // Bit tests require a zero page address argument.
+    if (tokens.size() != 2)
+      return false;
+    uint8 zero_page_address;
+    if (!ParseZeroPageAddress(tokens[1], &zero_page_address))
+      return false;
+    opcodes->push_back(PackOpCode(vcsmc::BIT_ZeroPage,
+          zero_page_address, 0));
+    return true;
+  } else if (opcode_str == "jmp") {
     // jmp needs a short argument
     if (tokens.size() != 2)
       return false;
@@ -332,14 +342,12 @@ bool ProcessLine(const std::string& line, std::vector<uint32>* opcodes) {
           return false;
       }
     }
-  } else if (opcode_str[0] == 'n') {
-    if (opcode_str[1] == 'o' && opcode_str[2] == 'p') {  // nop
-      // A nop requires no argument.
-      if (tokens.size() != 1)
-        return false;
-      opcodes->push_back(PackOpCode(vcsmc::NOP_Implied, 0, 0));
-      return true;
-    }
+  } else if (opcode_str == "nop") {
+    // A nop requires no argument.
+    if (tokens.size() != 1)
+      return false;
+    opcodes->push_back(PackOpCode(vcsmc::NOP_Implied, 0, 0));
+    return true;
   } else if (opcode_str[0] == 's') {
     if (opcode_str[1] == 't') {  // sta, stx, sty
       // Stores require an address argument.
@@ -449,6 +457,9 @@ size_t UnpackOpCode(uint32 packed_op, uint8* target) {
 
 size_t OpCodeBytes(OpCode op) {
   switch (op) {
+    case BIT_ZeroPage:
+      return 2;
+
     case JMP_Absolute:
       return 3;
 
@@ -471,6 +482,9 @@ size_t OpCodeBytes(OpCode op) {
 
 uint32 OpCodeCycles(OpCode op) {
   switch (op) {
+    case BIT_ZeroPage:
+      return 3;
+
     case JMP_Absolute:
       return 3;
 

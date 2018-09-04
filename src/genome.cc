@@ -13,6 +13,7 @@ void Genome::GenerateRandom(TlsPrngList::reference tls_prng) {
   }
 }
 
+/*
 const uint8* Genome::Sequence(const SpecList specs) {
   std::vector<uint8> opcodes;
   size_t bank_size = 0;
@@ -24,8 +25,8 @@ const uint8* Genome::Sequence(const SpecList specs) {
 
   while (current_cycle < kScreenSizeCycles) {
   }
-
   return nullptr;
 }
+*/
 
 }  // namespace vcsmc
