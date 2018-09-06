@@ -42,7 +42,7 @@ class State {
   State(uint32 current_time = 0);
 
   Snippet Sequence(Codon codon) const;
-  // Given the supplied Snippet, interpret the bytecode and update the State.
+  // Update all internal state to reflect the simulated execution of |snippet|.
   void Apply(const Snippet& snippet);
 
   uint8* tia() { return tia_.data(); }

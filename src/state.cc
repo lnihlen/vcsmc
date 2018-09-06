@@ -184,4 +184,80 @@ Snippet State::Sequence(Codon codon) const {
   return snippet;
 }
 
+void State::Apply(const Snippet& snippet) {
+  size_t offset = 0;
+  uint32 starting_time = current_time_;
+
+  while (offset < snippet.size) {
+    OpCode op = static_cast<OpCode>(snippet.bytecode[offset]);
+    ++offset;
+
+    switch (op) {
+      case BIT_ZeroPage:
+        ++offset;
+        current_time_ += 3;
+        break;
+
+      case JMP_Absolute:
+        offset += 2;
+        current_time_ += 3;
+        break;
+
+      case LDA_Immediate:
+        registers_[A] = snippet.bytecode[offset];
+        ++offset;
+        current_time_ += 2;
+        break;
+
+      case LDX_Immediate:
+        registers_[X] = snippet.bytecode[offset];
+        ++offset;
+        current_time_ += 2;
+        break;
+
+      case LDY_Immediate:
+        registers_[Y] = snippet.bytecode[offset];
+        ++offset;
+        current_time_ += 2;
+        break;
+
+      case NOP_Implied:
+        current_time_ += 2;
+        break;
+
+      case STA_ZeroPage:
+        tia_[snippet.bytecode[offset]] = registers_[A];
+        ++offset;
+        current_time_ += 3;
+        if (snippet.should_advance_register_rotation) {
+          register_last_used_[A] = current_time_;
+        }
+        break;
+
+      case STX_ZeroPage:
+        tia_[snippet.bytecode[offset]] = registers_[X];
+        ++offset;
+        current_time_ += 3;
+        if (snippet.should_advance_register_rotation) {
+          register_last_used_[X] = current_time_;
+        }
+        break;
+
+      case STY_ZeroPage:
+        tia_[snippet.bytecode[offset]] = registers_[Y];
+        current_time_ += 3;
+        if (snippet.should_advance_register_rotation) {
+          register_last_used_[Y] = current_time_;
+        }
+        break;
+
+      default:
+        assert(false);
+        break;
+    }
+  }
+
+  assert(starting_time + snippet.duration == current_time_);
+}
+
 }  // namespace vcsmc

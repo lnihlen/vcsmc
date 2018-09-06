@@ -24,6 +24,19 @@ bool IsStore(uint8 op) {
   return false;
 }
 
+bool IsLoadAndStorePair(uint8 op_load, uint8 op_store) {
+  if (op_load == vcsmc::LDA_Immediate) {
+    return op_store == vcsmc::STA_ZeroPage;
+  }
+  if (op_load == vcsmc::LDX_Immediate) {
+    return op_store == vcsmc::STX_ZeroPage;
+  }
+  if (op_load == vcsmc::LDY_Immediate) {
+    return op_store == vcsmc::STY_ZeroPage;
+  }
+  return false;
+}
+
 }
 
 namespace vcsmc {
@@ -188,6 +201,7 @@ TEST(StateTest, SequenceSharedTIAPreserveState) {
   EXPECT_TRUE(IsLoad(snippet.bytecode[0]));
   EXPECT_EQ(0b00100101u, snippet.bytecode[1]);
   EXPECT_TRUE(IsStore(snippet.bytecode[2]));
+  EXPECT_TRUE(IsLoadAndStorePair(snippet.bytecode[0], snippet.bytecode[2]));
   EXPECT_EQ(CTRLPF, snippet.bytecode[3]);
   EXPECT_EQ(5u, snippet.duration);
   EXPECT_TRUE(snippet.should_advance_register_rotation);
@@ -206,5 +220,20 @@ TEST(StateTest, SequenceSharedTIAReuseRegister) {
   EXPECT_TRUE(snippet.should_advance_register_rotation);
 }
 
+TEST(StateTest, ApplyEmptySnippetOnEmptyState) {
+  State state;
+  Snippet snippet;
+  state.Apply(snippet);
+  for (size_t i = 0; i < TIA_COUNT; ++i) {
+    EXPECT_EQ(0u, state.tia()[i]);
+  }
+  EXPECT_EQ(0u, state.registers()[A]);
+  EXPECT_EQ(0u, state.registers()[X]);
+  EXPECT_EQ(0u, state.registers()[Y]);
+  EXPECT_EQ(0u, state.register_last_used()[A]);
+  EXPECT_EQ(0u, state.register_last_used()[X]);
+  EXPECT_EQ(0u, state.register_last_used()[Y]);
+  EXPECT_EQ(0u, state.current_time());
+}
 
 }  // namespace vcsmc
