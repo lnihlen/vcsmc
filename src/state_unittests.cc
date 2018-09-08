@@ -37,6 +37,18 @@ bool IsLoadAndStorePair(uint8 op_load, uint8 op_store) {
   return false;
 }
 
+void ExpectEmptyState(vcsmc::State& state) {
+  for (size_t i = 0; i < vcsmc::TIA_COUNT; ++i) {
+    EXPECT_EQ(0u, state.tia()[i]);
+  }
+  EXPECT_EQ(0u, state.registers()[vcsmc::A]);
+  EXPECT_EQ(0u, state.registers()[vcsmc::X]);
+  EXPECT_EQ(0u, state.registers()[vcsmc::Y]);
+  EXPECT_EQ(0u, state.register_last_used()[vcsmc::A]);
+  EXPECT_EQ(0u, state.register_last_used()[vcsmc::X]);
+  EXPECT_EQ(0u, state.register_last_used()[vcsmc::Y]);
+}
+
 }
 
 namespace vcsmc {
@@ -224,16 +236,75 @@ TEST(StateTest, ApplyEmptySnippetOnEmptyState) {
   State state;
   Snippet snippet;
   state.Apply(snippet);
-  for (size_t i = 0; i < TIA_COUNT; ++i) {
-    EXPECT_EQ(0u, state.tia()[i]);
+  ExpectEmptyState(state);
+  EXPECT_EQ(0u, state.current_time());
+}
+
+TEST(StateTest, ApplyWaits) {
+  State state;
+  size_t accum = 0;
+  for (size_t i = 2; i < 256; ++i) {
+    Snippet snippet = state.Sequence(MakeWaitCodon(i));
+    state.Apply(snippet);
+    ExpectEmptyState(state);
+    accum += i;
+    EXPECT_EQ(accum, state.current_time());
   }
-  EXPECT_EQ(0u, state.registers()[A]);
-  EXPECT_EQ(0u, state.registers()[X]);
-  EXPECT_EQ(0u, state.registers()[Y]);
-  EXPECT_EQ(0u, state.register_last_used()[A]);
+}
+
+TEST(StateTest, ApplyJMPs) {
+  State state;
+  Snippet snippet;
+  snippet.Insert(JMP_Absolute);
+  snippet.Insert(0x0f);
+  snippet.Insert(0x00);
+  snippet.duration = 3;
+  state.Apply(snippet);
+  ExpectEmptyState(state);
+  EXPECT_EQ(3u, state.current_time());
+}
+
+TEST(StateTest, ApplyThreeLoadsShouldRotateRegisters) {
+  State state;
+  state.Apply(state.Sequence(MakeTIACodon(kSetGRP0, 0xff)));
+  EXPECT_EQ(5u, state.current_time());
+  EXPECT_EQ(5u, state.register_last_used()[A]);
   EXPECT_EQ(0u, state.register_last_used()[X]);
   EXPECT_EQ(0u, state.register_last_used()[Y]);
-  EXPECT_EQ(0u, state.current_time());
+  EXPECT_EQ(0xffu, state.tia()[GRP0]);
+  EXPECT_EQ(0xffu, state.registers()[A]);
+  EXPECT_EQ(0u, state.registers()[X]);
+  EXPECT_EQ(0u, state.registers()[Y]);
+
+  state.Apply(state.Sequence(MakeTIACodon(kSetPF1, 0xaa)));
+  EXPECT_EQ(10u, state.current_time());
+  EXPECT_EQ(5u, state.register_last_used()[A]);
+  EXPECT_EQ(10u, state.register_last_used()[X]);
+  EXPECT_EQ(0u, state.register_last_used()[Y]);
+  EXPECT_EQ(0xaau, state.tia()[PF1]);
+  EXPECT_EQ(0xffu, state.registers()[A]);
+  EXPECT_EQ(0xaau, state.registers()[X]);
+  EXPECT_EQ(0u, state.registers()[Y]);
+
+  state.Apply(state.Sequence(MakeTIACodon(kStrobeRESP1, 0x22)));
+  EXPECT_EQ(13u, state.current_time());
+  EXPECT_EQ(5u, state.register_last_used()[A]);
+  EXPECT_EQ(10u, state.register_last_used()[X]);
+  EXPECT_EQ(0u, state.register_last_used()[Y]);
+  EXPECT_EQ(0xaau, state.tia()[PF1]);
+  EXPECT_EQ(0xffu, state.registers()[A]);
+  EXPECT_EQ(0xaau, state.registers()[X]);
+  EXPECT_EQ(0u, state.registers()[Y]);
+
+  state.Apply(state.Sequence(MakeTIACodon(kSetCOLUBK, 0x77)));
+  EXPECT_EQ(18u, state.current_time());
+  EXPECT_EQ(5u, state.register_last_used()[A]);
+  EXPECT_EQ(10u, state.register_last_used()[X]);
+  EXPECT_EQ(18u, state.register_last_used()[Y]);
+  EXPECT_EQ(0x77u, state.tia()[COLUBK]);
+  EXPECT_EQ(0xffu, state.registers()[A]);
+  EXPECT_EQ(0xaau, state.registers()[X]);
+  EXPECT_EQ(0x77u, state.registers()[Y]);
 }
 
 }  // namespace vcsmc

@@ -245,6 +245,7 @@ void State::Apply(const Snippet& snippet) {
 
       case STY_ZeroPage:
         tia_[snippet.bytecode[offset]] = registers_[Y];
+        ++offset;
         current_time_ += 3;
         if (snippet.should_advance_register_rotation) {
           register_last_used_[Y] = current_time_;
