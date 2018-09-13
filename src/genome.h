@@ -15,11 +15,14 @@ class Genome {
   // saves the result into |bytecode_|.
   const uint8* Sequence(const SpecList specs);
 
-  const uint8* bytecode() { return bytecode_.get(); }
+
+
+  const uint8* bytecode() { return bytecode_.data(); }
 
  private:
   std::array<Codon, kFrameSizeCodons> codons_;
-  std::unique_ptr<uint8> bytecode_;
+  std::array<uint8, kMaxKernelSize> bytecode_;
+  size_t bytecode_size_ = 0;
 };
 
 }  // namespace vcsmc

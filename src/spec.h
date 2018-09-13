@@ -1,7 +1,7 @@
 #ifndef SRC_SPEC_H_
 #define SRC_SPEC_H_
 
-#include <memory>
+#include <array>
 #include <string>
 #include <vector>
 
@@ -37,6 +37,7 @@ class Spec {
 };
 
 typedef std::shared_ptr<std::vector<Spec>> SpecList;
+typedef std::vector<Spec>::const_iterator SpecIterator;
 
 }  // namespace vcsmc
 
