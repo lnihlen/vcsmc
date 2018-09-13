@@ -1,6 +1,9 @@
 #include "genome.h"
 
 #include "codon_table.h"
+#include "snippet.h"
+#include "state.h"
+
 
 namespace vcsmc {
 
@@ -37,7 +40,6 @@ Snippet Genome::SequenceNext(const State& state,
   // Priorities are implementing specs on time, not overflowing a bank, and
   // then sequencing the Codons. First early-out for an exact match of timing
   // for Spec.
-
 }
 
 

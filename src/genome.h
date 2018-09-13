@@ -15,8 +15,6 @@ class Genome {
   // saves the result into |bytecode_|.
   const uint8* Sequence(const SpecList specs);
 
-
-
   const uint8* bytecode() { return bytecode_.data(); }
 
  private:

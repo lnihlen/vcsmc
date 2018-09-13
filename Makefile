@@ -16,7 +16,7 @@ endif
 
 ifeq ($(UNAME), Linux)
 export DYLIB=so
-export NVCC=/opt/cuda/bin/nvcc -Wno-deprecated-gpu-targets
+export NVCC=nvcc -Wno-deprecated-gpu-targets
 endif
 
 export GPERF_LIB=$(OUT)/gperftools/lib/libprofiler.a

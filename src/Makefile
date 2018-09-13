@@ -16,7 +16,7 @@ endif
 
 ifeq ($(UNAME), Linux)
 CFLAGS+=-I/opt/cuda/include
-LDFLAGS+=-lpthread -lunwind -L/opt/cuda/lib64
+LDFLAGS+=-lpthread -lunwind -L/opt/cuda/lib64 -L/usr/lib/cuda/lib64
 endif
 
 DEPS=constants.h image_file.h types.h
@@ -35,12 +35,10 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/codon_table.o                                                       \
     $(OUT)/cuda_utils.o                                                        \
     $(OUT)/genome.o                                                            \
-    $(OUT)/kernel.o                                                            \
     $(OUT)/mssim.o                                                             \
     $(OUT)/range.o                                                             \
     $(OUT)/serialization.o                                                     \
     $(OUT)/sound_file.o                                                        \
-    $(OUT)/spec.o                                                              \
     $(OUT)/state.o                                                             \
     $(OUT)/tls_prng.o
 
@@ -57,9 +55,7 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/state_unittests.o
 
 vcsmc: $(OUT)/ciede                                                            \
-       $(OUT)/gen                                                              \
        $(OUT)/pcm                                                              \
-       $(OUT)/respec                                                           \
        $(OUT)/ssim
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
@@ -100,13 +96,7 @@ $(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
 $(OUT)/ciede: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/ciede.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
-$(OUT)/gen: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/gen.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
-
 $(OUT)/pcm: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/pcm.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
-
-$(OUT)/respec: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/respec.o
 	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/ssim: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/ssim.o
@@ -128,9 +118,7 @@ clean:
     $(OUT)/build_laba_table{,.o}                                               \
     $(OUT)/ciede{,.o}                                                          \
     $(OUT)/codon_table.{cc,h,o}                                                \
-    $(OUT)/gen{,.o}                                                            \
     $(OUT)/pcm{,.o}                                                            \
     $(OUT)/ssim{,.o}                                                           \
-    $(OUT)/respec{,.o}                                                         \
     $(OUTTESTS)/run_unittests{,.o}
 

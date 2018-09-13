@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <random>
 
 #include "constants.h"
 #include "serialization.h"
