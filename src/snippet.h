@@ -1,6 +1,8 @@
 #ifndef SRC_SNIPPET_H_
 #define SRC_SNIPPET_H_
 
+#include <array>
+
 #include "types.h"
 
 namespace vcsmc {

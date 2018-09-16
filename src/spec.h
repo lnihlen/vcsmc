@@ -12,7 +12,7 @@
 namespace vcsmc {
 
 // A Spec defines a start time and a certain number of Codons (up to some max
-// limit kMaxSpecCodons) to be sequenced at that start time. This ensures that
+// limit kMaxSpecCodons) to be translated at that start time. This ensures that
 // the randomly generated Kernels can continue to be valid frame programs, as
 // well as allows individual frames to add audio or other interactive
 // programming bits to a class of Kernels, perhaps all representing the

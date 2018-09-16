@@ -15,7 +15,7 @@ LDPATH=/Developer/NVIDIA/CUDA-8.0/lib
 endif
 
 ifeq ($(UNAME), Linux)
-CFLAGS+=-I/opt/cuda/include
+CFLAGS+=-I/opt/cuda/include -I/usr/lib/cuda/include
 LDFLAGS+=-lpthread -lunwind -L/opt/cuda/lib64 -L/usr/lib/cuda/lib64
 endif
 
@@ -36,7 +36,6 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/cuda_utils.o                                                        \
     $(OUT)/genome.o                                                            \
     $(OUT)/mssim.o                                                             \
-    $(OUT)/range.o                                                             \
     $(OUT)/serialization.o                                                     \
     $(OUT)/sound_file.o                                                        \
     $(OUT)/state.o                                                             \
@@ -48,9 +47,7 @@ GEN_OBJ=$(OUT)/atari_ntsc_laba_color_table.o                                   \
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
          $(OUTTESTS)/ciede_2k_unittests.o                                      \
-         $(OUTTESTS)/kernel_unittests.o                                        \
          $(OUTTESTS)/mssim_unittests.o                                         \
-         $(OUTTESTS)/range_unittests.o                                         \
          $(OUTTESTS)/serialization_unittests.o                                 \
          $(OUTTESTS)/state_unittests.o
 

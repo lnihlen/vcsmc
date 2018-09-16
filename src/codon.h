@@ -48,7 +48,12 @@ enum Action : uint8 {
   kSetCOLUP1       = 29,
   kSetCOLUPF       = 30,
   kSetCOLUBK       = 31,
-  kWait            = 32
+  kWait            = 32,
+
+  // The following Codons aren't included in the generated table but can be
+  // Translated into bytecode, as they are useful for frame programming, bank
+  // generation, or audio modulation.
+  kSwitchBanks     = 33
 };
 
 // We compute the theoretical upper limit of load/store instructions the 6502
@@ -264,6 +269,12 @@ inline Codon MakeTIACodon(Action action, uint8 value) {
   }
 
   return PackCodon(action, tia, value, mask);
+}
+
+// Given a number of padding bytes construct a bank switch Codon with the
+// supplied amount of padding to round out the bank size to kBankSize.
+inline Codon MakeBankSwitchCodon(uint8 padding) {
+  return PackCodon(kSwitchBanks, padding, 0, 0);
 }
 
 }  // namespace vcsmtc

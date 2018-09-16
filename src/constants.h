@@ -38,7 +38,7 @@ const uint32 kScreenSizeCycles = kScreenSizeClocks / kColorClocksPerCPUCycle;
 const uint8 kColuUnpainted = 0xff;
 
 const uint32 kBankSize = 4096;
-// We leave 16 bytes at the bottom of each bank for the reset/load vectors.
+// We leave a few bytes at the bottom of each bank for the reset/load vectors.
 const uint32 kBankPadding = 16;
 
 const uint32 kMaxKernelSize = 8 * kBankSize;

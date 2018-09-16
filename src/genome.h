@@ -2,6 +2,7 @@
 #define SRC_GENOME_H_
 
 #include "codon.h"
+#include "snippet.h"
 #include "spec.h"
 #include "tls_prng.h"
 
@@ -11,9 +12,10 @@ class Genome {
  public:
   // Populate the entire Genome with randomly-selected Codons.
   void GenerateRandom(TlsPrngList::reference tls_prng);
-  // Given the supplied specs convert the Genome into a valid VCS program,
-  // saves the result into |bytecode_|.
-  const uint8* Sequence(const SpecList specs);
+
+  // Given the supplied SpecList convert the Genome into a valid VCS program,
+  // saving the result into |bytecode_|.
+  const uint8* Translate(const SpecList specs);
 
   const uint8* bytecode() { return bytecode_.data(); }
 

@@ -1,6 +1,8 @@
 #include "state.h"
 #include "gtest/gtest.h"
 
+#include <cstring>
+
 #include "codon.h"
 #include "constants.h"
 
@@ -53,20 +55,20 @@ void ExpectEmptyState(vcsmc::State& state) {
 
 namespace vcsmc {
 
-TEST(StateTest, SequenceWaitTwo) {
+TEST(StateTest, TranslateWaitTwo) {
   Codon wait_codon_two = MakeWaitCodon(2);
   State state;
-  Snippet snippet = state.Sequence(wait_codon_two);
+  Snippet snippet = state.Translate(wait_codon_two);
   ASSERT_EQ(1u, snippet.size);
   EXPECT_EQ(NOP_Implied, snippet.bytecode[0]);
   EXPECT_EQ(2u, snippet.duration);
   EXPECT_FALSE(snippet.should_advance_register_rotation);
 }
 
-TEST(StateTest, SequenceWaitThree) {
+TEST(StateTest, TranslateWaitThree) {
   Codon wait_codon_three = MakeWaitCodon(3);
   State state;
-  Snippet snippet = state.Sequence(wait_codon_three);
+  Snippet snippet = state.Translate(wait_codon_three);
   // Don't care about the zero page address BIT tests, but there does need to
   // be an address there, making the length 2 bytes.
   ASSERT_EQ(2u, snippet.size);
@@ -75,10 +77,10 @@ TEST(StateTest, SequenceWaitThree) {
   EXPECT_FALSE(snippet.should_advance_register_rotation);
 }
 
-TEST(StateTest, SequenceWaitManyEven) {
+TEST(StateTest, TranslateWaitManyEven) {
   Codon wait_codon_many = MakeWaitCodon(98);
   State state;
-  Snippet snippet = state.Sequence(wait_codon_many);
+  Snippet snippet = state.Translate(wait_codon_many);
   ASSERT_EQ(49u, snippet.size);
   for (auto i = 0; i < 49; ++i) {
     EXPECT_EQ(NOP_Implied, snippet.bytecode[i]);
@@ -87,10 +89,10 @@ TEST(StateTest, SequenceWaitManyEven) {
   EXPECT_FALSE(snippet.should_advance_register_rotation);
 }
 
-TEST(StateTest, SequenceWaitManyOdd) {
+TEST(StateTest, TranslateWaitManyOdd) {
   Codon wait_codon_many = MakeWaitCodon(111);
   State state;
-  Snippet snippet = state.Sequence(wait_codon_many);
+  Snippet snippet = state.Translate(wait_codon_many);
   ASSERT_EQ(56u, snippet.size);
   for (auto i = 0; i < 54; ++i) {
     EXPECT_EQ(NOP_Implied, snippet.bytecode[i]);
@@ -100,10 +102,10 @@ TEST(StateTest, SequenceWaitManyOdd) {
   EXPECT_FALSE(snippet.should_advance_register_rotation);
 }
 
-TEST(StateTest, SequenceWaitMax) {
+TEST(StateTest, TranslateWaitMax) {
   Codon wait_codon_max = MakeWaitCodon(255);
   State state;
-  Snippet snippet = state.Sequence(wait_codon_max);
+  Snippet snippet = state.Translate(wait_codon_max);
   ASSERT_EQ(128u, snippet.size);
   for (auto i = 0; i < 126; ++i) {
     EXPECT_EQ(NOP_Implied, snippet.bytecode[i]);
@@ -113,42 +115,42 @@ TEST(StateTest, SequenceWaitMax) {
   EXPECT_FALSE(snippet.should_advance_register_rotation);
 }
 
-TEST(StateTest, SequenceNoChangeNoMask) {
+TEST(StateTest, TranslateNoChangeNoMask) {
   State state;
   state.tia()[PF2] = 0xa2;
   Codon redundant_codon = MakeTIACodon(kSetPF2, 0xa2);
-  Snippet snippet = state.Sequence(redundant_codon);
+  Snippet snippet = state.Translate(redundant_codon);
   EXPECT_EQ(0u, snippet.size);
   EXPECT_EQ(0u, snippet.duration);
   EXPECT_FALSE(snippet.should_advance_register_rotation);
 }
 
-TEST(StateTest, SequenceNoChangeWithMask) {
+TEST(StateTest, TranslateNoChangeWithMask) {
   State state;
   state.tia()[ENAM1] = 0b11111101;
   Codon redundant_codon = MakeTIACodon(kSetENAM1, 0);
-  Snippet snippet = state.Sequence(redundant_codon);
+  Snippet snippet = state.Translate(redundant_codon);
   EXPECT_EQ(0u, snippet.size);
   EXPECT_EQ(0u, snippet.duration);
   EXPECT_FALSE(snippet.should_advance_register_rotation);
 }
 
-TEST(StateTest, SequenceSharedTIANoChange) {
+TEST(StateTest, TranslateSharedTIANoChange) {
   State state;
   state.tia()[NUSIZ1] = 0b00101011;
   Codon redundant_shared = MakeTIACodon(kSetNUSIZ1_M1, 0x20);
-  Snippet snippet = state.Sequence(redundant_shared);
+  Snippet snippet = state.Translate(redundant_shared);
   EXPECT_EQ(0u, snippet.size);
   EXPECT_EQ(0u, snippet.duration);
   EXPECT_FALSE(snippet.should_advance_register_rotation);
 }
 
-TEST(StateTest, SequenceSkipLoadExactMatch) {
+TEST(StateTest, TranslateSkipLoadExactMatch) {
   State state;
   state.registers()[X] = 0xa5;
   state.set_current_time(4321);
   Codon reuse_x_codon = MakeTIACodon(kSetGRP0, 0xa5);
-  Snippet snippet = state.Sequence(reuse_x_codon);
+  Snippet snippet = state.Translate(reuse_x_codon);
   ASSERT_EQ(2u, snippet.size);
   EXPECT_EQ(STX_ZeroPage, snippet.bytecode[0]);
   EXPECT_EQ(GRP0, snippet.bytecode[1]);
@@ -156,13 +158,13 @@ TEST(StateTest, SequenceSkipLoadExactMatch) {
   EXPECT_TRUE(snippet.should_advance_register_rotation);
 }
 
-TEST(StateTest, SequenceSkipLoadMaskMatch) {
+TEST(StateTest, TranslateSkipLoadMaskMatch) {
   State state;
   // REFP1 only cares about bit 3, which we set to 1 here.
   state.registers()[A] = 0b10101011;
   state.set_current_time(0xfeedfeed);
   Codon reuse_a_codon = MakeTIACodon(kSetREFP1, 0x08);
-  Snippet snippet = state.Sequence(reuse_a_codon);
+  Snippet snippet = state.Translate(reuse_a_codon);
   ASSERT_EQ(2u, snippet.size);
   EXPECT_EQ(STA_ZeroPage, snippet.bytecode[0]);
   EXPECT_EQ(REFP1, snippet.bytecode[1]);
@@ -170,7 +172,7 @@ TEST(StateTest, SequenceSkipLoadMaskMatch) {
   EXPECT_TRUE(snippet.should_advance_register_rotation);
 }
 
-TEST(StateTest, SequenceRegisterRotation) {
+TEST(StateTest, TranslateRegisterRotation) {
   State state;
   state.registers()[A] = 0x42;
   state.register_last_used()[A] = 23;
@@ -180,7 +182,7 @@ TEST(StateTest, SequenceRegisterRotation) {
   state.register_last_used()[Y] = 4;
   state.set_current_time(140);
   Codon register_rotate = MakeTIACodon(kSetGRP0, 0x02);
-  Snippet snippet = state.Sequence(register_rotate);
+  Snippet snippet = state.Translate(register_rotate);
   ASSERT_EQ(4u, snippet.size);
   EXPECT_EQ(LDY_Immediate, snippet.bytecode[0]);
   EXPECT_EQ(0x02u, snippet.bytecode[1]);
@@ -190,10 +192,10 @@ TEST(StateTest, SequenceRegisterRotation) {
   EXPECT_TRUE(snippet.should_advance_register_rotation);
 }
 
-TEST(StateTest, SequenceStrobeShouldNotAdvanceRotation) {
+TEST(StateTest, TranslateStrobeShouldNotAdvanceRotation) {
   State state;
   Codon strobe = MakeTIACodon(kStrobeRESP0, 0xff);
-  Snippet snippet = state.Sequence(strobe);
+  Snippet snippet = state.Translate(strobe);
   ASSERT_EQ(2u, snippet.size);
   EXPECT_TRUE(IsStore(snippet.bytecode[0]));
   EXPECT_EQ(RESP0, snippet.bytecode[1]);
@@ -204,11 +206,11 @@ TEST(StateTest, SequenceStrobeShouldNotAdvanceRotation) {
 // CTRLPF, NUSIZ0, and NUSIZ1 all pack more than one state value into a shared
 // register. We test that values not being modified in the same register are
 // preserved.
-TEST(StateTest, SequenceSharedTIAPreserveState) {
+TEST(StateTest, TranslateSharedTIAPreserveState) {
   State state;
   state.tia()[CTRLPF] = 0b00010101;
   Codon shared = MakeTIACodon(kSetCTRLPF_BALL, 0x20);
-  Snippet snippet = state.Sequence(shared);
+  Snippet snippet = state.Translate(shared);
   ASSERT_EQ(4u, snippet.size);
   EXPECT_TRUE(IsLoad(snippet.bytecode[0]));
   EXPECT_EQ(0b00100101u, snippet.bytecode[1]);
@@ -219,12 +221,12 @@ TEST(StateTest, SequenceSharedTIAPreserveState) {
   EXPECT_TRUE(snippet.should_advance_register_rotation);
 }
 
-TEST(StateTest, SequenceSharedTIAReuseRegister) {
+TEST(StateTest, TranslateSharedTIAReuseRegister) {
   State state;
   state.tia()[CTRLPF] = 0b10111010;
   state.registers()[X] = 0b01110000;
   Codon reuse_reg = MakeTIACodon(kSetCTRLPF_SCORE, 0);
-  Snippet snippet = state.Sequence(reuse_reg);
+  Snippet snippet = state.Translate(reuse_reg);
   ASSERT_EQ(2u, snippet.size);
   EXPECT_EQ(STX_ZeroPage, snippet.bytecode[0]);
   EXPECT_EQ(CTRLPF, snippet.bytecode[1]);
@@ -235,17 +237,21 @@ TEST(StateTest, SequenceSharedTIAReuseRegister) {
 TEST(StateTest, ApplyEmptySnippetOnEmptyState) {
   State state;
   Snippet snippet;
-  state.Apply(snippet);
+  state.Apply(snippet, nullptr);
   ExpectEmptyState(state);
   EXPECT_EQ(0u, state.current_time());
 }
 
 TEST(StateTest, ApplyWaits) {
   State state;
+  std::array<uint8, Snippet::kSnippetMaxLength> bytecode;
   size_t accum = 0;
   for (size_t i = 2; i < 256; ++i) {
-    Snippet snippet = state.Sequence(MakeWaitCodon(i));
-    state.Apply(snippet);
+    std::memset(bytecode.data(), 0, Snippet::kSnippetMaxLength);
+    Snippet snippet = state.Translate(MakeWaitCodon(i));
+    state.Apply(snippet, bytecode.data());
+    EXPECT_EQ(0, std::memcmp(
+        snippet.bytecode.data(), bytecode.data(), snippet.size));
     ExpectEmptyState(state);
     accum += i;
     EXPECT_EQ(accum, state.current_time());
@@ -254,19 +260,33 @@ TEST(StateTest, ApplyWaits) {
 
 TEST(StateTest, ApplyJMPs) {
   State state;
+  std::array<uint8, Snippet::kSnippetMaxLength> bytecode = { 0 };
   Snippet snippet;
   snippet.Insert(JMP_Absolute);
   snippet.Insert(0x0f);
   snippet.Insert(0x00);
+  // Insert some padding.
+  snippet.Insert(0x00);
+  snippet.Insert(0x00);
+  snippet.Insert(0x00);
+  // Insert both jump table addresses.
+  snippet.Insert(0x0f);
+  snippet.Insert(0x00);
+  snippet.Insert(0x0f);
+  snippet.Insert(0x00);
   snippet.duration = 3;
-  state.Apply(snippet);
+  state.Apply(snippet, bytecode.data());
   ExpectEmptyState(state);
+  EXPECT_EQ(0, std::memcmp(
+      snippet.bytecode.data(), bytecode.data(), snippet.size));
   EXPECT_EQ(3u, state.current_time());
 }
 
 TEST(StateTest, ApplyThreeLoadsShouldRotateRegisters) {
   State state;
-  state.Apply(state.Sequence(MakeTIACodon(kSetGRP0, 0xff)));
+  std::array<uint8, Snippet::kSnippetMaxLength> bytecode = { 0 };
+  Snippet grp0_snippet = state.Translate(MakeTIACodon(kSetGRP0, 0xff));
+  state.Apply(grp0_snippet, bytecode.data());
   EXPECT_EQ(5u, state.current_time());
   EXPECT_EQ(5u, state.register_last_used()[A]);
   EXPECT_EQ(0u, state.register_last_used()[X]);
@@ -275,8 +295,12 @@ TEST(StateTest, ApplyThreeLoadsShouldRotateRegisters) {
   EXPECT_EQ(0xffu, state.registers()[A]);
   EXPECT_EQ(0u, state.registers()[X]);
   EXPECT_EQ(0u, state.registers()[Y]);
+  EXPECT_EQ(0, std::memcmp(
+      grp0_snippet.bytecode.data(), bytecode.data(), grp0_snippet.size));
+  size_t bytecode_size = grp0_snippet.size;
 
-  state.Apply(state.Sequence(MakeTIACodon(kSetPF1, 0xaa)));
+  Snippet pf1_snippet = state.Translate(MakeTIACodon(kSetPF1, 0xaa));
+  state.Apply(pf1_snippet, bytecode.data() + bytecode_size);
   EXPECT_EQ(10u, state.current_time());
   EXPECT_EQ(5u, state.register_last_used()[A]);
   EXPECT_EQ(10u, state.register_last_used()[X]);
@@ -285,8 +309,13 @@ TEST(StateTest, ApplyThreeLoadsShouldRotateRegisters) {
   EXPECT_EQ(0xffu, state.registers()[A]);
   EXPECT_EQ(0xaau, state.registers()[X]);
   EXPECT_EQ(0u, state.registers()[Y]);
+  EXPECT_EQ(0, std::memcmp(pf1_snippet.bytecode.data(),
+                           bytecode.data() + bytecode_size,
+                           pf1_snippet.size));
+  bytecode_size += pf1_snippet.size;
 
-  state.Apply(state.Sequence(MakeTIACodon(kStrobeRESP1, 0x22)));
+  Snippet resp1_snippet = state.Translate(MakeTIACodon(kStrobeRESP1, 0x22));
+  state.Apply(resp1_snippet, bytecode.data() + bytecode_size);
   EXPECT_EQ(13u, state.current_time());
   EXPECT_EQ(5u, state.register_last_used()[A]);
   EXPECT_EQ(10u, state.register_last_used()[X]);
@@ -295,8 +324,13 @@ TEST(StateTest, ApplyThreeLoadsShouldRotateRegisters) {
   EXPECT_EQ(0xffu, state.registers()[A]);
   EXPECT_EQ(0xaau, state.registers()[X]);
   EXPECT_EQ(0u, state.registers()[Y]);
+  EXPECT_EQ(0, std::memcmp(resp1_snippet.bytecode.data(),
+                           bytecode.data() + bytecode_size,
+                           resp1_snippet.size));
+  bytecode_size += resp1_snippet.size;
 
-  state.Apply(state.Sequence(MakeTIACodon(kSetCOLUBK, 0x77)));
+  Snippet colubk_snippet = state.Translate(MakeTIACodon(kSetCOLUBK, 0x77));
+  state.Apply(colubk_snippet, bytecode.data() + bytecode_size);
   EXPECT_EQ(18u, state.current_time());
   EXPECT_EQ(5u, state.register_last_used()[A]);
   EXPECT_EQ(10u, state.register_last_used()[X]);
@@ -305,6 +339,9 @@ TEST(StateTest, ApplyThreeLoadsShouldRotateRegisters) {
   EXPECT_EQ(0xffu, state.registers()[A]);
   EXPECT_EQ(0xaau, state.registers()[X]);
   EXPECT_EQ(0x77u, state.registers()[Y]);
+  EXPECT_EQ(0, std::memcmp(colubk_snippet.bytecode.data(),
+                           bytecode.data() + bytecode_size,
+                           colubk_snippet.size));
 }
 
 }  // namespace vcsmc

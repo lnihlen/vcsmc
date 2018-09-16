@@ -6,6 +6,7 @@
 
 #include "codon.h"
 #include "constants.h"
+#include "snippet.h"
 #include "types.h"
 
 namespace vcsmc {
@@ -16,9 +17,13 @@ class State {
  public:
   State(uint32 current_time = 0);
 
-  Snippet Sequence(Codon codon) const;
-  // Update all internal state to reflect the simulated execution of |snippet|.
-  void Apply(const Snippet& snippet);
+  // Given an individual Codon, use the current State to most efficiently
+  // Translate the Codon into 6502 bytecode.
+  Snippet Translate(Codon codon) const;
+
+  // Update all internal state to reflect the simulated execution of |snippet|,
+  // while appending the bytecode in snippet to the |bytecode| array. 
+  void Apply(const Snippet& snippet, uint8* bytecode);
 
   uint8* tia() { return tia_.data(); }
   uint8* registers() { return registers_.data(); }

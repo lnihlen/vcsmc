@@ -1,6 +1,7 @@
 #include "state.h"
 
 #include <cassert>
+#include <cstring>
 
 namespace vcsmc {
 
@@ -10,7 +11,7 @@ State::State(uint32 current_time) : current_time_(current_time) {
   register_last_used_.fill(0);
 }
 
-Snippet State::Sequence(Codon codon) const {
+Snippet State::Translate(Codon codon) const {
   // Unpack Codon argument.
   Action action = CodonAction(codon);
   uint8 parameter = CodonActionParameter(codon);
@@ -37,6 +38,32 @@ Snippet State::Sequence(Codon codon) const {
 
     snippet.duration = parameter;
     snippet.should_advance_register_rotation = false;
+    return snippet;
+  } else if (action == kSwitchBanks) {
+    size_t padding = parameter;
+
+    // Need at least 4 bytes for the jump table and another 3 for the JMP
+    // instruction.
+    assert(padding >= 7u);
+    snippet.Insert(JMP_Absolute);
+
+    // Little-endian address follows, so 0xf000 is 0x00, 0xf0.
+    snippet.Insert(0x00);
+    snippet.Insert(0xf0);
+    padding -= 3;
+
+    // Now add padding until the two-address/4 byte jump table at the end.
+    while (padding > 4) {
+      snippet.Insert(0x00);
+      --padding;
+    }
+
+    // Final two uint16 jump table addresses.
+    snippet.Insert(0x00);
+    snippet.Insert(0xf0);
+    snippet.Insert(0x00);
+    snippet.Insert(0xf0);
+
     return snippet;
   }
 
@@ -184,39 +211,49 @@ Snippet State::Sequence(Codon codon) const {
   return snippet;
 }
 
-void State::Apply(const Snippet& snippet) {
+void State::Apply(const Snippet& snippet, uint8* bytecode) {
   size_t offset = 0;
   uint32 starting_time = current_time_;
 
   while (offset < snippet.size) {
     OpCode op = static_cast<OpCode>(snippet.bytecode[offset]);
+    bytecode[offset] = op;
     ++offset;
 
     switch (op) {
       case BIT_ZeroPage:
+        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 3;
         break;
 
       case JMP_Absolute:
-        offset += 2;
+        // It is assumed a JMP is the only opcode in a Snippet, to simplify the
+        // logic around copying and parsing of the bytecode.
+        assert(offset == 1);
+        std::memcpy(bytecode + 1, snippet.bytecode.data() + 1,
+            snippet.size - 1);
+        offset += snippet.size - 1;
         current_time_ += 3;
         break;
 
       case LDA_Immediate:
         registers_[A] = snippet.bytecode[offset];
+        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 2;
         break;
 
       case LDX_Immediate:
         registers_[X] = snippet.bytecode[offset];
+        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 2;
         break;
 
       case LDY_Immediate:
         registers_[Y] = snippet.bytecode[offset];
+        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 2;
         break;
@@ -227,6 +264,7 @@ void State::Apply(const Snippet& snippet) {
 
       case STA_ZeroPage:
         tia_[snippet.bytecode[offset]] = registers_[A];
+        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 3;
         if (snippet.should_advance_register_rotation) {
@@ -236,6 +274,7 @@ void State::Apply(const Snippet& snippet) {
 
       case STX_ZeroPage:
         tia_[snippet.bytecode[offset]] = registers_[X];
+        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 3;
         if (snippet.should_advance_register_rotation) {
@@ -245,6 +284,7 @@ void State::Apply(const Snippet& snippet) {
 
       case STY_ZeroPage:
         tia_[snippet.bytecode[offset]] = registers_[Y];
+        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 3;
         if (snippet.should_advance_register_rotation) {
