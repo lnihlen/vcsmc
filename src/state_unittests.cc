@@ -115,6 +115,24 @@ TEST(StateTest, TranslateWaitMax) {
   EXPECT_FALSE(snippet.should_advance_register_rotation);
 }
 
+TEST(StateTest, TranslateSwitchBanks) {
+  for (size_t pad_size = 8; pad_size < kBankPadding * 2; ++pad_size) {
+    State state;
+    Codon bank_switch = MakeBankSwitchCodon(pad_size);
+    Snippet snippet = state.Translate(bank_switch);
+    ASSERT_EQ(pad_size, snippet.size);
+    EXPECT_EQ(JMP_Absolute, snippet.bytecode[0]);
+    EXPECT_EQ(0x00u, snippet.bytecode[1]);
+    EXPECT_EQ(0xf0u, snippet.bytecode[2]);
+    EXPECT_EQ(0x00u, snippet.bytecode[pad_size - 4]);
+    EXPECT_EQ(0xf0u, snippet.bytecode[pad_size - 3]);
+    EXPECT_EQ(0x00u, snippet.bytecode[pad_size - 2]);
+    EXPECT_EQ(0xf0u, snippet.bytecode[pad_size - 1]);
+    EXPECT_EQ(3u, snippet.duration);
+    EXPECT_FALSE(snippet.should_advance_register_rotation);
+  }
+}
+
 TEST(StateTest, TranslateNoChangeNoMask) {
   State state;
   state.tia()[PF2] = 0xa2;

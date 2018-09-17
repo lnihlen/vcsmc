@@ -45,9 +45,9 @@ Snippet State::Translate(Codon codon) const {
     // Need at least 4 bytes for the jump table and another 3 for the JMP
     // instruction.
     assert(padding >= 7u);
-    snippet.Insert(JMP_Absolute);
 
     // Little-endian address follows, so 0xf000 is 0x00, 0xf0.
+    snippet.Insert(JMP_Absolute);
     snippet.Insert(0x00);
     snippet.Insert(0xf0);
     padding -= 3;
@@ -64,6 +64,8 @@ Snippet State::Translate(Codon codon) const {
     snippet.Insert(0x00);
     snippet.Insert(0xf0);
 
+    snippet.duration = 3;
+    snippet.should_advance_register_rotation = false;
     return snippet;
   }
 
