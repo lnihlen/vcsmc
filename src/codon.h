@@ -48,12 +48,28 @@ enum Action : uint8 {
   kSetCOLUP1       = 29,
   kSetCOLUPF       = 30,
   kSetCOLUBK       = 31,
-  kWait            = 32,
 
-  // The following Codons aren't included in the generated table but can be
-  // Translated into bytecode, as they are useful for frame programming, bank
-  // generation, or audio modulation.
-  kSwitchBanks     = 33
+  // TIA state change codons happen before kWait in the table, but the
+  // following aren't included in the generated table for programming, as they
+  // are used to control the cathode ray, for audio modulation, or other
+  // functions not material to random image generation.
+  kSetVBLANK       = 32,
+  kSetVSYNC        = 33,
+  kSetCTRLPF       = 34,  // allows setting entire register at one go
+  kSetNUSIZ0       = 35,  // allows setting entire register at one go
+  kSetNUSIZ1       = 36,  // allows setting entire register at one go
+  kSetAUDC0        = 37,
+  kSetAUDC1        = 38,
+  kSetAUDF0        = 39,
+  kSetAUDF1        = 40,
+  kSetAUDV0        = 41,
+  kSetAUDV1        = 42,
+
+  // kWait and below marks the boundary of non-TIA state change Actions.
+  kWait            = 43,
+
+  // Non TIA-state change codons also not used in random program generation.
+  kSwitchBanks     = 44
 };
 
 // We compute the theoretical upper limit of load/store instructions the 6502

@@ -31,12 +31,18 @@ class State {
   // Accessors mostly used for testing.
   uint32* register_last_used() { return register_last_used_.data(); }
   uint32 current_time() { return current_time_; }
+  bool* tia_known() { return tia_known_.data(); }
+  bool* register_known() { return register_known_.data(); }
   void set_current_time(uint32 time) { current_time_ = time; }
 
  private:
   std::array<uint8, TIA_COUNT> tia_;
+  std::array<bool, TIA_COUNT> tia_known_;
+
   std::array<uint8, REGISTER_COUNT> registers_;
   std::array<uint32, REGISTER_COUNT> register_last_used_;
+  std::array<bool, REGISTER_COUNT> register_known_;
+
   uint32 current_time_;
 };
 

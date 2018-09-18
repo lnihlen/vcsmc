@@ -1,0 +1,89 @@
+- start_time: 0           # first scan line, beginning
+  codons:
+    - action: SetVBLANK
+      target: 0
+    - action: SetVSYNC
+      target: 2
+- start_time: 38          # first scan line, halfway
+  codons:
+    - action: SetPF0
+      target: 0
+    - action: SetPF1
+      target: 0
+- start_time: 76          # second scan line, beginning
+  codons:
+    - action: StrobeRESP0
+    - action: SetPF2
+      target: 0
+- start_time: 114         # second scan line, halfway
+  codons:
+    - action: SetCTRLPF
+      target: 0
+    - action: SetNUSIZ0
+      target: 0
+- start_time: 152         # third scanline, beginning
+  codons:
+    - action: StrobeRESP1
+    - action: SetNUSIZ1
+      target: 0
+- start_time: 190         # third scanline, halfway
+  codons:
+    - action: SetRESMP0
+      target: 0
+    - action: SetRESMP1
+      target: 0
+- start_time: 228         # fourth scanline, beginning
+  codons:
+    - action: SetVSYNC
+      target: 0
+    - action: SetENAM0
+      target: 0
+- start_time: 266         # fourth scanline, halfway
+  codons:
+    - action: SetENAM1
+      target: 0
+    - action: SetENABL
+      target: 0
+- start_time: 304         # fifth scanline, beginning
+  codons:
+    - action: StrobeRESM0
+    - action: SetGRP0
+      target: 0
+- start_time: 342         # sixth scanline, halfway
+  codons:
+    - action: SetGRP1
+      target: 0
+    - action: SetREFP0
+      target: 0
+- start_time: 380         # seventh scanline, beginning
+  codons:
+    - action: StrobeRESM1
+    - action: SetREFP1
+      target: 0
+- start_time: 418         # seventh scanline, halfway
+  codons:
+    - action: SetVDELP0
+      target: 0
+    - action: SetVDELP1
+      target: 0
+- start_time: 456         # eighth scanline, beginning
+  codons:
+    - action: StrobeRESBL
+    - action: SetVDELBL
+      target: 0
+- start_time: 494         # eighth scanline, halfway
+  codons:
+    - action: SetCOLUP0
+      target: 0
+    - action: SetCOLUP1
+      target: 0
+- start_time: 532         # ninth scanline, beginning
+  codons:
+    - action: SetCOLUPF
+      target: 0
+    - action: SetCOLUBK
+      target: 0
+- start_time: 17632       # 232nd scanline, turn on VBLANK
+  codons:
+    - action: SetVBLANK
+      target: 66

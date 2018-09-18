@@ -7,8 +7,10 @@ namespace vcsmc {
 
 State::State(uint32 current_time) : current_time_(current_time) {
   tia_.fill(0);
+  tia_known_.fill(false);
   registers_.fill(0);
   register_last_used_.fill(0);
+  register_known_.fill(false);
 }
 
 Snippet State::Translate(Codon codon) const {
@@ -72,13 +74,14 @@ Snippet State::Translate(Codon codon) const {
   // From this point forward we assume that the CodonAction is some state
   // change on the TIA.
   assert(action < kWait);
+  assert(parameter < TIA_COUNT);
 
   // Codons for CTRLPF and NUSIZ pack two different state changes into one
   // register. We incorporate the value of the register from the current state
   // for the parts we aren't changing into the mask, to keep the state changes
   // hermetic. We also check the current value of tia register against the
   // target value (within mask) to see if any work at all needs to be done.
-  uint8 current_tia = parameter < TIA_COUNT ? tia_[parameter] : 0;
+  uint8 current_tia = tia_[parameter];
 
   // Strobes don't care about register values, only timing of the write, and
   // so can use any register for bit. However, they can't be optimized out.
@@ -90,10 +93,16 @@ Snippet State::Translate(Codon codon) const {
 
   // It could be that the current value is already set in the TIA, making this
   // Codon a no-op, in which case we return the current empty Snippet.
-  if (!is_strobe && ((tia_value & tia_mask) == (current_tia & tia_mask))) {
+  if (!is_strobe && tia_known_[parameter] &&
+      ((tia_value & tia_mask) == (current_tia & tia_mask))) {
     return snippet;
   }
 
+  // Note there's some possibility of current_tia state being unknown on
+  // actual hardware, resulting in zeros being applied here because the tia
+  // state array is initialized to zero. So the effect is determinisic, as
+  // zero will always be applied, but slightly greater than what is intended
+  // by these Actions.
   switch (action) {
     case kSetCTRLPF_REF:
       // Preserve current state of CTRLPF bits 1,2,4,5.
@@ -140,11 +149,12 @@ Snippet State::Translate(Codon codon) const {
   // Check registers for possible match that fits needed value within mask.
   Register store_register;
 
-  if (is_strobe || ((registers_[A] & tia_mask) == tia_value)) {
+  if (is_strobe ||
+      (register_known_[A] && ((registers_[A] & tia_mask) == tia_value))) {
     store_register = A;
-  } else if ((registers_[X] & tia_mask) == tia_value) {
+  } else if (register_known_[X] && ((registers_[X] & tia_mask) == tia_value)) {
     store_register = X;
-  } else if ((registers_[Y] & tia_mask) == tia_value) {
+  } else if (register_known_[Y] && ((registers_[Y] & tia_mask) == tia_value)) {
     store_register = Y;
   } else {
     // No matching re-usable register found, we will need to issue a load
@@ -157,7 +167,7 @@ Snippet State::Translate(Codon codon) const {
       store_register = X;
     }
     if (register_last_used_[Y] < oldest_use_time) {
-      oldest_use_time = register_last_used_[Y];
+      // No further need for oldest_use_time, skip update.
       store_register = Y;
     }
 
@@ -241,6 +251,7 @@ void State::Apply(const Snippet& snippet, uint8* bytecode) {
 
       case LDA_Immediate:
         registers_[A] = snippet.bytecode[offset];
+        register_known_[A] = true;
         bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 2;
@@ -248,6 +259,7 @@ void State::Apply(const Snippet& snippet, uint8* bytecode) {
 
       case LDX_Immediate:
         registers_[X] = snippet.bytecode[offset];
+        register_known_[X] = true;
         bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 2;
@@ -255,6 +267,7 @@ void State::Apply(const Snippet& snippet, uint8* bytecode) {
 
       case LDY_Immediate:
         registers_[Y] = snippet.bytecode[offset];
+        register_known_[Y] = true;
         bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 2;
@@ -266,6 +279,7 @@ void State::Apply(const Snippet& snippet, uint8* bytecode) {
 
       case STA_ZeroPage:
         tia_[snippet.bytecode[offset]] = registers_[A];
+        tia_known_[snippet.bytecode[offset]] = true;
         bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 3;
@@ -276,6 +290,7 @@ void State::Apply(const Snippet& snippet, uint8* bytecode) {
 
       case STX_ZeroPage:
         tia_[snippet.bytecode[offset]] = registers_[X];
+        tia_known_[snippet.bytecode[offset]] = true;
         bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 3;
@@ -286,6 +301,7 @@ void State::Apply(const Snippet& snippet, uint8* bytecode) {
 
       case STY_ZeroPage:
         tia_[snippet.bytecode[offset]] = registers_[Y];
+        tia_known_[snippet.bytecode[offset]] = true;
         bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 3;
