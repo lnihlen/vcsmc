@@ -279,6 +279,61 @@ inline Codon MakeTIACodon(Action action, uint8 value) {
       mask = 0xfe;
       break;
 
+    case kSetVBLANK:
+      tia = VBLANK;
+      mask = 0b11000010;
+      break;
+
+    case kSetVSYNC:
+      tia = VSYNC;
+      mask = 0b00000010;
+      break;
+
+    case kSetCTRLPF:
+      tia = CTRLPF;
+      mask = 0b00110111;
+      break;
+
+    case kSetNUSIZ0:
+      tia = NUSIZ0;
+      mask = 0b00110111;
+      break;
+
+    case kSetNUSIZ1:
+      tia = NUSIZ1;
+      mask = 0b00110111;
+      break;
+
+    case kSetAUDC0:
+      tia = AUDC0;
+      mask = 0b00001111;
+      break;
+
+    case kSetAUDC1:
+      tia = AUDC1;
+      mask = 0b00001111;
+      break;
+
+    case kSetAUDF0:
+      tia = AUDF0;
+      mask = 0b00011111;
+      break;
+
+    case kSetAUDF1:
+      tia = AUDF1;
+      mask = 0b00011111;
+      break;
+
+    case kSetAUDV0:
+      tia = AUDV0;
+      mask = 0b00001111;
+      break;
+
+    case kSetAUDV1:
+      tia = AUDV1;
+      mask = 0b00001111;
+      break;
+
     default:
       assert(false);
       break;

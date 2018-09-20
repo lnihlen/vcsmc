@@ -1,11 +1,28 @@
 #include "genome.h"
 
+#include <cstring>
+
 #include "codon_table.h"
 #include "snippet.h"
 #include "state.h"
 
-
 namespace vcsmc {
+
+Genome::Genome()
+  : bytecode_size_(0),
+    first_untranslated_codon_(0) {
+  condons_.fill(0);
+  bytecode_.fill(0);
+}
+
+Genome::Genome(const Genome & genome)
+  : bytecode_size_(0),
+    first_untranslated_codon_(genome.first_untranslated_codon_) {
+  std::memcpy(codons_.data(), genome.codons_.data(), sizeof(codons_));
+  // We avoid copying the bytecode, as we assume it will be re-generated
+  // after some mutation.
+  bytecode_.fill(0);
+}
 
 void Genome::GenerateRandom(TlsPrngList::reference tls_prng) {
   std::uniform_int_distribution<int> codon_distro(0, kCodonTableSize);
@@ -74,6 +91,9 @@ const uint8* Genome::Translate(const SpecList specs) {
     state.Apply(codon_snippet, bytecode_.data() + bytecode_size_);
     bytecode_size_ += codon_snippet.size;
   }
+
+  // We store the final
+  last_translated_codon_ = codon_index;
 
   return bytecode_.data();
 }

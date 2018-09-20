@@ -133,9 +133,26 @@ TEST(StateTest, TranslateSwitchBanks) {
   }
 }
 
+TEST(StateTest, TranslateUnknownStateAlwaysLoads) {
+  State state;
+  state.tia()[VSYNC] = 0;
+  state.tia_known()[VSYNC] = false;
+  Codon unknown_load = MakeTIACodon(kSetVSYNC, 0);
+  Snippet snippet = state.Translate(unknown_load);
+  EXPECT_EQ(4u, snippet.size);
+  EXPECT_TRUE(IsLoad(snippet.bytecode[0]));
+  EXPECT_EQ(0u, snippet.bytecode[1]);
+  EXPECT_TRUE(IsStore(snippet.bytecode[2]));
+  EXPECT_TRUE(IsLoadAndStorePair(snippet.bytecode[0], snippet.bytecode[2]));
+  EXPECT_EQ(VSYNC, snippet.bytecode[3]);
+  EXPECT_EQ(5u, snippet.duration);
+  EXPECT_TRUE(snippet.should_advance_register_rotation);
+}
+
 TEST(StateTest, TranslateNoChangeNoMask) {
   State state;
   state.tia()[PF2] = 0xa2;
+  state.tia_known()[PF2] = true;
   Codon redundant_codon = MakeTIACodon(kSetPF2, 0xa2);
   Snippet snippet = state.Translate(redundant_codon);
   EXPECT_EQ(0u, snippet.size);
@@ -146,6 +163,7 @@ TEST(StateTest, TranslateNoChangeNoMask) {
 TEST(StateTest, TranslateNoChangeWithMask) {
   State state;
   state.tia()[ENAM1] = 0b11111101;
+  state.tia_known()[ENAM1] = true;
   Codon redundant_codon = MakeTIACodon(kSetENAM1, 0);
   Snippet snippet = state.Translate(redundant_codon);
   EXPECT_EQ(0u, snippet.size);
@@ -156,6 +174,7 @@ TEST(StateTest, TranslateNoChangeWithMask) {
 TEST(StateTest, TranslateSharedTIANoChange) {
   State state;
   state.tia()[NUSIZ1] = 0b00101011;
+  state.tia_known()[NUSIZ1] = true;
   Codon redundant_shared = MakeTIACodon(kSetNUSIZ1_M1, 0x20);
   Snippet snippet = state.Translate(redundant_shared);
   EXPECT_EQ(0u, snippet.size);
@@ -166,6 +185,7 @@ TEST(StateTest, TranslateSharedTIANoChange) {
 TEST(StateTest, TranslateSkipLoadExactMatch) {
   State state;
   state.registers()[X] = 0xa5;
+  state.register_known()[X] = true;
   state.set_current_time(4321);
   Codon reuse_x_codon = MakeTIACodon(kSetGRP0, 0xa5);
   Snippet snippet = state.Translate(reuse_x_codon);
@@ -180,6 +200,7 @@ TEST(StateTest, TranslateSkipLoadMaskMatch) {
   State state;
   // REFP1 only cares about bit 3, which we set to 1 here.
   state.registers()[A] = 0b10101011;
+  state.register_known()[A] = true;
   state.set_current_time(0xfeedfeed);
   Codon reuse_a_codon = MakeTIACodon(kSetREFP1, 0x08);
   Snippet snippet = state.Translate(reuse_a_codon);
@@ -242,7 +263,9 @@ TEST(StateTest, TranslateSharedTIAPreserveState) {
 TEST(StateTest, TranslateSharedTIAReuseRegister) {
   State state;
   state.tia()[CTRLPF] = 0b10111010;
+  state.tia_known()[CTRLPF] = true;
   state.registers()[X] = 0b01110000;
+  state.register_known()[X] = true;
   Codon reuse_reg = MakeTIACodon(kSetCTRLPF_SCORE, 0);
   Snippet snippet = state.Translate(reuse_reg);
   ASSERT_EQ(2u, snippet.size);
