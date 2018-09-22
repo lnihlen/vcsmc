@@ -5,6 +5,7 @@
 
 #include "codon.h"
 #include "constants.h"
+#include "kernel.h"
 
 namespace {
 
@@ -278,21 +279,22 @@ TEST(StateTest, TranslateSharedTIAReuseRegister) {
 TEST(StateTest, ApplyEmptySnippetOnEmptyState) {
   State state;
   Snippet snippet;
-  state.Apply(snippet, nullptr);
+  Kernel kernel;
+  state.Apply(snippet, kernel);
   ExpectEmptyState(state);
   EXPECT_EQ(0u, state.current_time());
+  EXPECT_EQ(0u, kernel.size());
 }
 
 TEST(StateTest, ApplyWaits) {
   State state;
-  std::array<uint8, Snippet::kSnippetMaxLength> bytecode;
   size_t accum = 0;
   for (size_t i = 2; i < 256; ++i) {
-    std::memset(bytecode.data(), 0, Snippet::kSnippetMaxLength);
     Snippet snippet = state.Translate(MakeWaitCodon(i));
-    state.Apply(snippet, bytecode.data());
+    Kernel kernel;
+    state.Apply(snippet, kernel);
     EXPECT_EQ(0, std::memcmp(
-        snippet.bytecode.data(), bytecode.data(), snippet.size));
+        snippet.bytecode.data(), kernel.bytecode(), snippet.size));
     ExpectEmptyState(state);
     accum += i;
     EXPECT_EQ(accum, state.current_time());
@@ -301,7 +303,6 @@ TEST(StateTest, ApplyWaits) {
 
 TEST(StateTest, ApplyJMPs) {
   State state;
-  std::array<uint8, Snippet::kSnippetMaxLength> bytecode = { 0 };
   Snippet snippet;
   snippet.Insert(JMP_Absolute);
   snippet.Insert(0x0f);
@@ -316,18 +317,19 @@ TEST(StateTest, ApplyJMPs) {
   snippet.Insert(0x0f);
   snippet.Insert(0x00);
   snippet.duration = 3;
-  state.Apply(snippet, bytecode.data());
+  Kernel kernel;
+  state.Apply(snippet, kernel);
   ExpectEmptyState(state);
   EXPECT_EQ(0, std::memcmp(
-      snippet.bytecode.data(), bytecode.data(), snippet.size));
+      snippet.bytecode.data(), kernel.bytecode(), snippet.size));
   EXPECT_EQ(3u, state.current_time());
 }
 
 TEST(StateTest, ApplyThreeLoadsShouldRotateRegisters) {
   State state;
-  std::array<uint8, Snippet::kSnippetMaxLength> bytecode = { 0 };
   Snippet grp0_snippet = state.Translate(MakeTIACodon(kSetGRP0, 0xff));
-  state.Apply(grp0_snippet, bytecode.data());
+  Kernel kernel;
+  state.Apply(grp0_snippet, kernel);
   EXPECT_EQ(5u, state.current_time());
   EXPECT_EQ(5u, state.register_last_used()[A]);
   EXPECT_EQ(0u, state.register_last_used()[X]);
@@ -337,11 +339,11 @@ TEST(StateTest, ApplyThreeLoadsShouldRotateRegisters) {
   EXPECT_EQ(0u, state.registers()[X]);
   EXPECT_EQ(0u, state.registers()[Y]);
   EXPECT_EQ(0, std::memcmp(
-      grp0_snippet.bytecode.data(), bytecode.data(), grp0_snippet.size));
+      grp0_snippet.bytecode.data(), kernel.bytecode(), grp0_snippet.size));
   size_t bytecode_size = grp0_snippet.size;
 
   Snippet pf1_snippet = state.Translate(MakeTIACodon(kSetPF1, 0xaa));
-  state.Apply(pf1_snippet, bytecode.data() + bytecode_size);
+  state.Apply(pf1_snippet, kernel);
   EXPECT_EQ(10u, state.current_time());
   EXPECT_EQ(5u, state.register_last_used()[A]);
   EXPECT_EQ(10u, state.register_last_used()[X]);
@@ -351,12 +353,12 @@ TEST(StateTest, ApplyThreeLoadsShouldRotateRegisters) {
   EXPECT_EQ(0xaau, state.registers()[X]);
   EXPECT_EQ(0u, state.registers()[Y]);
   EXPECT_EQ(0, std::memcmp(pf1_snippet.bytecode.data(),
-                           bytecode.data() + bytecode_size,
+                           kernel.bytecode() + bytecode_size,
                            pf1_snippet.size));
   bytecode_size += pf1_snippet.size;
 
   Snippet resp1_snippet = state.Translate(MakeTIACodon(kStrobeRESP1, 0x22));
-  state.Apply(resp1_snippet, bytecode.data() + bytecode_size);
+  state.Apply(resp1_snippet, kernel);
   EXPECT_EQ(13u, state.current_time());
   EXPECT_EQ(5u, state.register_last_used()[A]);
   EXPECT_EQ(10u, state.register_last_used()[X]);
@@ -366,12 +368,12 @@ TEST(StateTest, ApplyThreeLoadsShouldRotateRegisters) {
   EXPECT_EQ(0xaau, state.registers()[X]);
   EXPECT_EQ(0u, state.registers()[Y]);
   EXPECT_EQ(0, std::memcmp(resp1_snippet.bytecode.data(),
-                           bytecode.data() + bytecode_size,
+                           kernel.bytecode() + bytecode_size,
                            resp1_snippet.size));
   bytecode_size += resp1_snippet.size;
 
   Snippet colubk_snippet = state.Translate(MakeTIACodon(kSetCOLUBK, 0x77));
-  state.Apply(colubk_snippet, bytecode.data() + bytecode_size);
+  state.Apply(colubk_snippet, kernel);
   EXPECT_EQ(18u, state.current_time());
   EXPECT_EQ(5u, state.register_last_used()[A]);
   EXPECT_EQ(10u, state.register_last_used()[X]);
@@ -381,7 +383,7 @@ TEST(StateTest, ApplyThreeLoadsShouldRotateRegisters) {
   EXPECT_EQ(0xaau, state.registers()[X]);
   EXPECT_EQ(0x77u, state.registers()[Y]);
   EXPECT_EQ(0, std::memcmp(colubk_snippet.bytecode.data(),
-                           bytecode.data() + bytecode_size,
+                           kernel.bytecode() + bytecode_size,
                            colubk_snippet.size));
 }
 

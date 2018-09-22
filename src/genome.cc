@@ -1,6 +1,7 @@
 #include "genome.h"
 
 #include <cstring>
+#include <xxhash.h>
 
 #include "codon_table.h"
 #include "snippet.h"
@@ -9,19 +10,13 @@
 namespace vcsmc {
 
 Genome::Genome()
-  : bytecode_size_(0),
-    first_untranslated_codon_(0) {
-  condons_.fill(0);
-  bytecode_.fill(0);
+  : fingerprint_(0) {
+  codons_.fill(0);
 }
 
 Genome::Genome(const Genome & genome)
-  : bytecode_size_(0),
-    first_untranslated_codon_(genome.first_untranslated_codon_) {
+  : fingerprint_(genome.fingerprint_) {
   std::memcpy(codons_.data(), genome.codons_.data(), sizeof(codons_));
-  // We avoid copying the bytecode, as we assume it will be re-generated
-  // after some mutation.
-  bytecode_.fill(0);
 }
 
 void Genome::GenerateRandom(TlsPrngList::reference tls_prng) {
@@ -31,12 +26,13 @@ void Genome::GenerateRandom(TlsPrngList::reference tls_prng) {
   for (size_t i = 0; i < kFrameSizeCodons; ++i) {
     codons_[i] = kCodonTable[codon_distro(tls_prng)];
   }
+
+  fingerprint_ = XXH64(codons_.data(), sizeof(codons_), 0);
 }
 
-const uint8* Genome::Translate(const SpecList specs) {
-  bytecode_size_ = 0;
-
+Kernel Genome::Translate(const SpecList specs) const {
   State state;
+  Kernel kernel;
   size_t codon_index = 0;
   SpecIterator next_spec = specs->cbegin();
   bool translating_spec = false;
@@ -79,23 +75,20 @@ const uint8* Genome::Translate(const SpecList specs) {
     Snippet codon_snippet = state.Translate(next_codon);
 
     // Check for if we need to insert a bank switching Codon first.
-    if (((bytecode_size_ + codon_snippet.size) % kBankSize) >
+    if (((kernel.size() + codon_snippet.size) % kBankSize) >
         (kBankSize - kBankPadding)) {
-      Codon jump_codon = MakeBankSwitchCodon(bytecode_size_ % kBankSize);
+      Codon jump_codon = MakeBankSwitchCodon(kernel.size() % kBankSize);
       Snippet bank_snippet = state.Translate(jump_codon);
-      state.Apply(bank_snippet, bytecode_.data() + bytecode_size_);
-      bytecode_size_ += bank_snippet.size;
-      // Note: it is assumed here that next_codon does not need re-translation.
+      state.Apply(bank_snippet, kernel);
+      // Note: it is assumed here that next_codon does not need re-translation,
+      // which is basically assuming the bank switching operation does not
+      // modify any registers or TIA state.
     }
 
-    state.Apply(codon_snippet, bytecode_.data() + bytecode_size_);
-    bytecode_size_ += codon_snippet.size;
+    state.Apply(codon_snippet, kernel);
   }
 
-  // We store the final
-  last_translated_codon_ = codon_index;
-
-  return bytecode_.data();
+  return kernel;
 }
 
 }  // namespace vcsmc

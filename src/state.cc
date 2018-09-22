@@ -1,7 +1,6 @@
 #include "state.h"
 
 #include <cassert>
-#include <cstring>
 
 namespace vcsmc {
 
@@ -223,18 +222,19 @@ Snippet State::Translate(Codon codon) const {
   return snippet;
 }
 
-void State::Apply(const Snippet& snippet, uint8* bytecode) {
+void State::Apply(const Snippet& snippet, Kernel& kernel) {
   size_t offset = 0;
   uint32 starting_time = current_time_;
+  size_t starting_size = kernel.size();
 
   while (offset < snippet.size) {
     OpCode op = static_cast<OpCode>(snippet.bytecode[offset]);
-    bytecode[offset] = op;
+    kernel.Append(op);
     ++offset;
 
     switch (op) {
       case BIT_ZeroPage:
-        bytecode[offset] = snippet.bytecode[offset];
+        kernel.Append(snippet.bytecode[offset]);
         ++offset;
         current_time_ += 3;
         break;
@@ -243,32 +243,33 @@ void State::Apply(const Snippet& snippet, uint8* bytecode) {
         // It is assumed a JMP is the only opcode in a Snippet, to simplify the
         // logic around copying and parsing of the bytecode.
         assert(offset == 1);
-        std::memcpy(bytecode + 1, snippet.bytecode.data() + 1,
-            snippet.size - 1);
-        offset += snippet.size - 1;
+        while (offset < snippet.size) {
+          kernel.Append(snippet.bytecode[offset]);
+          ++offset;
+        }
         current_time_ += 3;
         break;
 
       case LDA_Immediate:
         registers_[A] = snippet.bytecode[offset];
+        kernel.Append(snippet.bytecode[offset]);
         register_known_[A] = true;
-        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 2;
         break;
 
       case LDX_Immediate:
         registers_[X] = snippet.bytecode[offset];
+        kernel.Append(snippet.bytecode[offset]);
         register_known_[X] = true;
-        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 2;
         break;
 
       case LDY_Immediate:
         registers_[Y] = snippet.bytecode[offset];
+        kernel.Append(snippet.bytecode[offset]);
         register_known_[Y] = true;
-        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 2;
         break;
@@ -279,8 +280,8 @@ void State::Apply(const Snippet& snippet, uint8* bytecode) {
 
       case STA_ZeroPage:
         tia_[snippet.bytecode[offset]] = registers_[A];
+        kernel.Append(snippet.bytecode[offset]);
         tia_known_[snippet.bytecode[offset]] = true;
-        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 3;
         if (snippet.should_advance_register_rotation) {
@@ -290,8 +291,8 @@ void State::Apply(const Snippet& snippet, uint8* bytecode) {
 
       case STX_ZeroPage:
         tia_[snippet.bytecode[offset]] = registers_[X];
+        kernel.Append(snippet.bytecode[offset]);
         tia_known_[snippet.bytecode[offset]] = true;
-        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 3;
         if (snippet.should_advance_register_rotation) {
@@ -301,8 +302,8 @@ void State::Apply(const Snippet& snippet, uint8* bytecode) {
 
       case STY_ZeroPage:
         tia_[snippet.bytecode[offset]] = registers_[Y];
+        kernel.Append(snippet.bytecode[offset]);
         tia_known_[snippet.bytecode[offset]] = true;
-        bytecode[offset] = snippet.bytecode[offset];
         ++offset;
         current_time_ += 3;
         if (snippet.should_advance_register_rotation) {
@@ -317,6 +318,7 @@ void State::Apply(const Snippet& snippet, uint8* bytecode) {
   }
 
   assert(starting_time + snippet.duration == current_time_);
+  assert(kernel.size() - starting_size == snippet.size);
 }
 
 }  // namespace vcsmc
