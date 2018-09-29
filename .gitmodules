@@ -19,3 +19,6 @@
 [submodule "third_party/english-words"]
 	path = third_party/english-words
 	url = git@github.com:dwyl/english-words.git
+[submodule "third_party/Halide"]
+	path = third_party/Halide
+	url = git@github.com:halide/Halide.git
