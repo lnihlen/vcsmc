@@ -1,6 +1,7 @@
 # VCSMC main Makefile
 # assumes GNU make 3.80 or up
 export CC=clang
+export CXX=clang++
 # Note that right now all the third_party/ builds have hard-coded CFLAGS
 # of their own and don't follow this variable.
 export CFLAGS=-std=c++11 -march=native -Wall -Wextra -Werror -fPIC

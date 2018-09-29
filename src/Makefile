@@ -60,7 +60,7 @@ tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 all: vcsmc tests
 
 $(OUT)/%.o: %.cc $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES)
+	$(CXX) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES)
 
 $(OUT)/%.o: %.cu $(DEPS)
 	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -Xcompiler "$(OPT) $(CFLAGS)"
@@ -68,36 +68,36 @@ $(OUT)/%.o: %.cu $(DEPS)
 $(OUT)/atari_ntsc_laba_color_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
 $(OUT)/atari_ntsc_laba_color_table.o: $(OUT)/build_laba_table
 	$(OUT)/build_laba_table --output_directory=../out
-	$(CC) -c -o $@ $(OUT)/atari_ntsc_laba_color_table.cc $(CFLAGS) $(OPT)        \
+	$(CXX) -c -o $@ $(OUT)/atari_ntsc_laba_color_table.cc $(CFLAGS) $(OPT)        \
     $(INCLUDES)
 
 $(OUT)/codon_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
 $(OUT)/codon_table.o: $(OUT)/build_codon_table
 	$(OUT)/build_codon_table --output_directory=../out
-	$(CC) -c -o $@ $(OUT)/codon_table.cc $(CFLAGS) $(OPT) $(INCLUDES)
+	$(CXX) -c -o $@ $(OUT)/codon_table.cc $(CFLAGS) $(OPT) $(INCLUDES)
 
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
-	$(CC) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES) -I$(GTEST_INCLUDE)
+	$(CXX) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES) -I$(GTEST_INCLUDE)
 
 $(OUTTESTS)/%.o: %.cu $(DEPS)
 	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -I$(GTEST_INCLUDE)               \
     -Xcompiler "$(OPT)"
 
 $(OUT)/build_codon_table: $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/build_codon_table.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
+	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
                          $(OUT)/build_laba_table.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
+	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/ciede: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/ciede.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
+	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/pcm: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/pcm.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
+	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/ssim: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/ssim.o
-	$(CC) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
+	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
     $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) | $(OUTTESTS)/
