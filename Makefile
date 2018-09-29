@@ -3,7 +3,7 @@
 export CC=clang
 # Note that right now all the third_party/ builds have hard-coded CFLAGS
 # of their own and don't follow this variable.
-export CFLAGS=-std=c++11 -Wall -Wextra -Werror -fPIC
+export CFLAGS=-std=c++11 -march=native -Wall -Wextra -Werror -fPIC
 export LDFLAGS=
 export LIBS=-lstdc++
 export OUT=$(CURDIR)/out
@@ -33,7 +33,7 @@ export TBB_INCLUDE=$(CURDIR)/third_party/tbb/include
 export XXHASH_LIB=$(OUT)/xxHash/libxxhash.a
 export XXHASH_INCLUDE=$(CURDIR)/third_party/xxHash
 
-all: export OPT=-O2
+all: export OPT=-O3
 all: depends vcsmc tests
 
 debug: export OPT=-O0 -g
