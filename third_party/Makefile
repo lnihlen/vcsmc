@@ -70,10 +70,8 @@ tbb: | $(TBB_OUT) $(TBB_TARGET)
 
 $(TBB_TARGET): export tbb_build_dir=$(TBB_OUT)
 $(TBB_TARGET): export tbb_build_prefix=tbb
-$(TBB_TARGET): export CC=
-$(TBB_TARGET): export CXX=
 $(TBB_TARGET):
-	$(MAKE) -C tbb/
+	$(MAKE) -C tbb/ compiler=clang stdver=c++11 tbb
 	cp $(TBB_OUT)/tbb_release/*.$(DYLIB)* $(OUT)
 
 xxhash: $(XXHASH_OUT)/libxxhash.a | $(XXHASH_OUT)
@@ -116,6 +114,7 @@ clean:
 	rm -rf $(GPERF_OUT)
 	rm -rf $(GTEST_OUT)
 	rm -rf $(GFLAGS_OUT)
+	rm -rf $(HALIDE_OUT)
 	rm -rf $(LIBYAML_OUT)
 	rm -rf $(LIBZ26_OUT)
 	rm -rf $(TBB_OUT)
