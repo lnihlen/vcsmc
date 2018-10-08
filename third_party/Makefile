@@ -3,7 +3,6 @@ export GPERF_DIR=$(CURDIR)/gperftools
 export GTEST_OUT=$(OUT)/gtest
 export GFLAGS_OUT=$(OUT)/gflags
 export HALIDE_OUT=$(OUT)/halide
-export HALIDE_DIR=$(CURDIR)/Halide
 export LIBYAML_OUT=$(OUT)/libyaml
 export LIBZ26_OUT=$(OUT)/libz26
 export TBB_OUT=$(OUT)/tbb

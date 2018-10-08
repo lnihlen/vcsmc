@@ -6,7 +6,7 @@ export CXX=clang++
 # of their own and don't follow this variable.
 export CFLAGS=-std=c++11 -march=native -Wall -Wextra -Werror -fPIC
 export LDFLAGS=
-export LIBS=-lstdc++
+export LIBS=-lstdc++ -ldl
 export OUT=$(CURDIR)/out
 export UNAME:=$(shell uname)
 
@@ -26,6 +26,9 @@ export GTEST_INCLUDE=$(CURDIR)/third_party/googletest/googletest/include
 export GTEST_LIB=$(OUT)/gtest/libgtest.a
 export GFLAGS_INCLUDE=$(OUT)/gflags/include
 export GFLAGS_LIB=$(OUT)/gflags/lib/libgflags.a
+export HALIDE_DIR=$(CURDIR)/third_party/Halide
+export HALIDE_INCLUDE=$(OUT)/halide/include
+export HALIDE_LIB=$(OUT)/halide/lib
 export LIBYAML_INCLUDE=$(CURDIR)/third_party/libyaml/include
 export LIBYAML_LIB=$(OUT)/libyaml/libyaml_static.a
 export LIBZ26_INCLUDE=$(CURDIR)/third_party/libz26/include

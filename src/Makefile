@@ -1,10 +1,12 @@
 # VCSMC src/ Makefile.
 # Dependencies: libpng, clang, CUDA, Intel TBB
 # tools dependencies: python colormath, Wand, ImageMagick
+OUTGEN=$(OUT)/generators
 INCLUDES=-I. -I$(XXHASH_INCLUDE) -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)       \
-    -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE) -I$(TBB_INCLUDE) -I$(OUT)
+    -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE) -I$(TBB_INCLUDE) -I$(OUT)          \
+    -I$(HALIDE_INCLUDE) -I$(OUTGEN)
 LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(XXHASH_LIB) $(GPERF_LIB)        \
-    -L$(OUT) -ltbb -lcudart
+    -L$(OUT) -ltbb -lcudart -lHalide -L$(HALIDE_LIB)
 OUTTESTS=$(OUT)/tests
 
 # OS X-specific build flags
@@ -30,6 +32,10 @@ IMAGE_OBJ=$(OUT)/bit_map.o                                                     \
           $(OUT)/image_file.o                                                  \
           $(OUT)/value_map.o
 
+GENERATORS=$(OUTGEN)/rgb_to_lab_generator
+
+HALIDE_AOT=$(OUTGEN)/rgb_to_lab.o
+
 OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/ciede_2k.o                                                          \
     $(OUT)/codon_table.o                                                       \
@@ -48,6 +54,7 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
          $(OUTTESTS)/ciede_2k_unittests.o                                      \
          $(OUTTESTS)/mssim_unittests.o                                         \
+         $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
          $(OUTTESTS)/serialization_unittests.o                                 \
          $(OUTTESTS)/state_unittests.o
 
@@ -68,13 +75,20 @@ $(OUT)/%.o: %.cu $(DEPS)
 $(OUT)/atari_ntsc_laba_color_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
 $(OUT)/atari_ntsc_laba_color_table.o: $(OUT)/build_laba_table
 	$(OUT)/build_laba_table --output_directory=../out
-	$(CXX) -c -o $@ $(OUT)/atari_ntsc_laba_color_table.cc $(CFLAGS) $(OPT)        \
+	$(CXX) -c -o $@ $(OUT)/atari_ntsc_laba_color_table.cc $(CFLAGS) $(OPT)       \
     $(INCLUDES)
 
 $(OUT)/codon_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
 $(OUT)/codon_table.o: $(OUT)/build_codon_table
 	$(OUT)/build_codon_table --output_directory=../out
 	$(CXX) -c -o $@ $(OUT)/codon_table.cc $(CFLAGS) $(OPT) $(INCLUDES)
+
+$(OUTGEN)/%: %.cc | $(OUTGEN)/
+	$(CXX) -o $@ $^ $(HALIDE_DIR)/tools/GenGen.cpp -I$(HALIDE_INCLUDE) -lpthread \
+  -lHalide -ldl -std=c++11 -march=native -O3 -L$(HALIDE_LIB)
+
+$(OUTGEN)/rgb_to_lab.o: $(OUTGEN)/rgb_to_lab_generator | $(OUTGEN)/
+	$(OUTGEN)/rgb_to_lab_generator -g rgb_to_lab -o $(OUTGEN) -e o,h target=host
 
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CXX) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES) -I$(GTEST_INCLUDE)
@@ -90,7 +104,8 @@ $(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
                          $(OUT)/build_laba_table.o
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
-$(OUT)/ciede: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/ciede.o
+$(OUT)/ciede: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(HALIDE_AOT)        \
+  $(OUT)/ciede.o
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/pcm: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/pcm.o
@@ -100,12 +115,15 @@ $(OUT)/ssim: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/ssim.o
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
-    $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) | $(OUTTESTS)/
+    $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(HALIDE_AOT) | $(OUTTESTS)/
 	$(NVCC) -o $@ $^ $(LIBZ26_LIB) $(INCLUDES) $(LDFLAGS) $(LIBS)                \
     $(GTEST_LIB) -Xcompiler "$(OPT) $(CFLAGS)"
 
 $(OUTTESTS)/:
 	mkdir -p $(OUTTESTS)
+
+$(OUTGEN)/:
+	mkdir -p $(OUTGEN)
 
 .PHONY: clean
 clean:
