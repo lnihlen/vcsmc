@@ -9,13 +9,6 @@ LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(XXHASH_LIB) $(GPERF_LIB)        \
     -L$(OUT) -ltbb -lcudart -lHalide -L$(HALIDE_LIB)
 OUTTESTS=$(OUT)/tests
 
-# OS X-specific build flags
-ifeq ($(UNAME), Darwin)
-INCLUDES+=-I/usr/local/include -I/Developer/NVIDIA/CUDA-8.0/include
-LDFLAGS+=-L/usr/local/lib -Wl,-no_pie -L/Developer/NVIDIA/CUDA-8.0/lib
-LDPATH=/Developer/NVIDIA/CUDA-8.0/lib
-endif
-
 ifeq ($(UNAME), Linux)
 CFLAGS+=-I/opt/cuda/include -I/usr/lib/cuda/include
 LDFLAGS+=-lpthread -lunwind -L/opt/cuda/lib64 -L/usr/lib/cuda/lib64
@@ -72,13 +65,11 @@ $(OUT)/%.o: %.cc $(DEPS)
 $(OUT)/%.o: %.cu $(DEPS)
 	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -Xcompiler "$(OPT) $(CFLAGS)"
 
-$(OUT)/atari_ntsc_laba_color_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
 $(OUT)/atari_ntsc_laba_color_table.o: $(OUT)/build_laba_table
 	$(OUT)/build_laba_table --output_directory=../out
 	$(CXX) -c -o $@ $(OUT)/atari_ntsc_laba_color_table.cc $(CFLAGS) $(OPT)       \
     $(INCLUDES)
 
-$(OUT)/codon_table.o: export LD_LIBRARY_PATH=$(OUT):$(LDPATH)
 $(OUT)/codon_table.o: $(OUT)/build_codon_table
 	$(OUT)/build_codon_table --output_directory=../out
 	$(CXX) -c -o $@ $(OUT)/codon_table.cc $(CFLAGS) $(OPT) $(INCLUDES)
