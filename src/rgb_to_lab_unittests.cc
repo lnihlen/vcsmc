@@ -1,5 +1,5 @@
 #include "rgb_to_lab.h"
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 #include <cstring>
 #include <stdio.h>
@@ -29,7 +29,6 @@ TEST(RgbToLabTest, TestTable) {
   std::memcpy(rgb_input.begin(), kTestRGBImage, sizeof(kTestRGBImage));
 
   Halide::Runtime::Buffer<float, 3> lab_output(64, 64, 3);
-  std::memset(lab_output.begin(), 0, 64 * 64 * 3);
 
   rgb_to_lab(rgb_input, lab_output);
 

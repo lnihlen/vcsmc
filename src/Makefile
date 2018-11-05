@@ -25,12 +25,13 @@ IMAGE_OBJ=$(OUT)/bit_map.o                                                     \
           $(OUT)/image_file.o                                                  \
           $(OUT)/value_map.o
 
-GENERATORS=$(OUTGEN)/rgb_to_lab_generator
+GENERATORS=$(OUTGEN)/rgb_to_lab_generator                                      \
+           $(OUTGEN)/ciede_2k_generator
 
-HALIDE_AOT=$(OUTGEN)/rgb_to_lab.o
+HALIDE_AOT=$(OUTGEN)/rgb_to_lab.o                                              \
+           $(OUTGEN)/ciede_2k.o
 
 OBJ=$(OUT)/assembler.o                                                         \
-    $(OUT)/ciede_2k.o                                                          \
     $(OUT)/codon_table.o                                                       \
     $(OUT)/cuda_utils.o                                                        \
     $(OUT)/genome.o                                                            \
@@ -51,8 +52,7 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/serialization_unittests.o                                 \
          $(OUTTESTS)/state_unittests.o
 
-vcsmc: $(OUT)/ciede                                                            \
-       $(OUT)/pcm                                                              \
+vcsmc: $(OUT)/pcm                                                              \
        $(OUT)/ssim
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
@@ -80,6 +80,9 @@ $(OUTGEN)/%: %.cc | $(OUTGEN)/
 
 $(OUTGEN)/rgb_to_lab.o: $(OUTGEN)/rgb_to_lab_generator | $(OUTGEN)/
 	$(OUTGEN)/rgb_to_lab_generator -g rgb_to_lab -o $(OUTGEN) -e o,h target=host
+
+$(OUTGEN)/ciede_2k.o: $(OUTGEN)/ciede_2k_generator | $(OUTGEN)/
+	$(OUTGEN)/ciede_2k_generator -g ciede_2k -o $(OUTGEN) -e o,h target=host
 
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CXX) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES) -I$(GTEST_INCLUDE)
@@ -118,7 +121,8 @@ $(OUTGEN)/:
 
 .PHONY: clean
 clean:
-	rm -rf $(COLOR_OBJ) $(IMAGE_OBJ) $(OBJ) $(TEST_OBJ)                          \
+	rm -rf $(COLOR_OBJ) $(IMAGE_OBJ) $(OBJ) $(TEST_OBJ) $(GEN_OBJ)               \
+    $(HALIDE_AOT) $(GENERATORS)                                                \
     $(OUT)/atari_ntsc_laba_color_table.{cc,o}                                  \
     $(OUT)/build_codon_table{,.o}                                              \
     $(OUT)/build_laba_table{,.o}                                               \

@@ -43,7 +43,7 @@ const uint32 kBankPadding = 16;
 
 const uint32 kMaxKernelSize = 8 * kBankSize;
 
-const double kPi = 3.1415926535897932384626433832795028841971693993751;
+const float kPi = 3.1415926535897932384626433832795028841971693993751;
 
 // Number of uint32 words to generate/use for a random seed.
 const size_t kSeedSizeWords = 16;

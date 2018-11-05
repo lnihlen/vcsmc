@@ -1,6 +1,11 @@
 #include "ciede_2k.h"
-
 #include <gtest/gtest.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wmissing-field-initializers"
+#include "Halide.h"
+#pragma clang diagnostic pop
 
 #include "constants.h"
 
@@ -11,7 +16,7 @@ namespace vcsmc {
 // "The CIEDE2000 Color-Difference Formula: Implementation Notes, Supplementary
 // Test Data, and Mathematical Observations", G. Sharma, W. Wu, E. N. Dalal,
 // Color Research and Application, vol. 30. No. 1, February 2005
-TEST(ColorTest, Ciede2kSharmaWuBalalTestData) {
+TEST(Ciede2kTest, SharmaWuBalalTestData) {
   const size_t kSWBTestDataCount = 34;
 
   const float laba_a[kSWBTestDataCount * 4] = {
@@ -97,38 +102,41 @@ TEST(ColorTest, Ciede2kSharmaWuBalalTestData) {
      1.4441,   1.5381,   0.6377,   0.9082
   };
 
-  float4* laba_a_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&laba_a_device,
-      sizeof(float) * 4 * kSWBTestDataCount));
-  float4* laba_b_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&laba_b_device,
-      sizeof(float) * 4 * kSWBTestDataCount));
-  float* results_device;
-  ASSERT_EQ(cudaSuccess, cudaMalloc(&results_device,
-      sizeof(float) * kSWBTestDataCount));
+  // Make 2D buffers by spreading data across two lines, to verify the 2D
+  // behavior of the Generator.
+  Halide::Runtime::Buffer<float, 3> lab_input_1(kSWBTestDataCount / 2, 2, 3);
+  Halide::Runtime::Buffer<float, 3> lab_input_2(kSWBTestDataCount / 2, 2, 3);
 
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(laba_a_device, laba_a,
-      sizeof(float) * 4 * kSWBTestDataCount, cudaMemcpyHostToDevice));
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(laba_b_device, laba_b,
-      sizeof(float) * 4 * kSWBTestDataCount, cudaMemcpyHostToDevice));
-
-  dim3 dim_grid(1);
-  dim3 dim_block(kSWBTestDataCount);
-  vcsmc::Ciede2k<<<dim_grid, dim_block>>>(laba_a_device, laba_b_device,
-      results_device);
-
-  std::unique_ptr<float> results(new float[kSWBTestDataCount]);
-  ASSERT_EQ(cudaSuccess, cudaMemcpy(results.get(), results_device,
-      sizeof(float) * kSWBTestDataCount, cudaMemcpyDeviceToHost));
-
+  // De-interleave data from the arrays into planes in the Buffers.
   for (size_t i = 0; i < kSWBTestDataCount; ++i) {
-    EXPECT_NEAR(expected_results[i] / vcsmc::kMaxCiede2kDistance,
-                results.get()[i], 0.01f);
+    lab_input_1.begin()[i] =                           laba_a[i * 4];
+    lab_input_1.begin()[i + kSWBTestDataCount] =       laba_a[(i * 4) + 1];
+    lab_input_1.begin()[i + (2 * kSWBTestDataCount)] = laba_a[(i * 4) + 2];
+    lab_input_2.begin()[i] =                           laba_b[i * 4];
+    lab_input_2.begin()[i + kSWBTestDataCount] =       laba_b[(i * 4) + 1];
+    lab_input_2.begin()[i + (2 * kSWBTestDataCount)] = laba_b[(i * 4) + 2];
   }
 
-  ASSERT_EQ(cudaSuccess, cudaFree(results_device));
-  ASSERT_EQ(cudaSuccess, cudaFree(laba_b_device));
-  ASSERT_EQ(cudaSuccess, cudaFree(laba_a_device));
+  for (size_t i = 0; i < kSWBTestDataCount; ++i) {
+    ASSERT_EQ(laba_a[i * 4], lab_input_1.begin()[i]);
+    ASSERT_EQ(laba_a[(i * 4) + 1], lab_input_1.begin()[i + kSWBTestDataCount]);
+    ASSERT_EQ(laba_a[(i * 4) + 2],
+              lab_input_1.begin()[i + (2 * kSWBTestDataCount)]);
+    ASSERT_EQ(laba_b[i * 4], lab_input_2.begin()[i]);
+    ASSERT_EQ(laba_b[(i * 4) + 1], lab_input_2.begin()[i + kSWBTestDataCount]);
+    ASSERT_EQ(laba_b[(i * 4) + 2],
+              lab_input_2.begin()[i + (2 * kSWBTestDataCount)]);
+  }
+
+  Halide::Runtime::Buffer<float, 2> ciede2k_output(kSWBTestDataCount / 2, 2);
+
+  ciede_2k(lab_input_1, lab_input_2, ciede2k_output);
+
+  for (size_t i = 0; i < kSWBTestDataCount; ++i) {
+    printf("%lu\n", i);
+    EXPECT_NEAR(expected_results[i], ciede2k_output.begin()[i], 0.01f);
+  }
 }
 
-}
+}  // namespace vcsmc
+

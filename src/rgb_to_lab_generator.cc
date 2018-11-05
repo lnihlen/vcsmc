@@ -57,8 +57,8 @@ class RgbToLab : public Halide::Generator<RgbToLab> {
         200.0f * (lab(x, y)[1] - lab(x, y)[2]));
 
     lab_output(x, y, c) = Halide::select(c == 0, xyz_to_lab(x, y)[0],
-        Halide::select(c == 1, xyz_to_lab(x, y)[1],
-            xyz_to_lab(x, y)[2]));
+                                         c == 1, xyz_to_lab(x, y)[1],
+                                         xyz_to_lab(x, y)[2]);
   }
 };
 
