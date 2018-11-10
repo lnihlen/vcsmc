@@ -59,10 +59,10 @@ tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 
 all: vcsmc tests
 
-$(OUT)/%.o: %.cc $(DEPS)
+$(OUT)/%.o: %.cc $(DEPS) $(HALIDE_AOT)
 	$(CXX) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES)
 
-$(OUT)/%.o: %.cu $(DEPS)
+$(OUT)/%.o: %.cu $(DEPS) $(HALIDE_AOT)
 	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -Xcompiler "$(OPT) $(CFLAGS)"
 
 $(OUT)/atari_ntsc_laba_color_table.o: $(OUT)/build_laba_table
@@ -98,10 +98,6 @@ $(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
                          $(OUT)/build_laba_table.o
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
-$(OUT)/ciede: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(HALIDE_AOT)        \
-  $(OUT)/ciede.o
-	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
-
 $(OUT)/pcm: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/pcm.o
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
@@ -126,7 +122,6 @@ clean:
     $(OUT)/atari_ntsc_laba_color_table.{cc,o}                                  \
     $(OUT)/build_codon_table{,.o}                                              \
     $(OUT)/build_laba_table{,.o}                                               \
-    $(OUT)/ciede{,.o}                                                          \
     $(OUT)/codon_table.{cc,h,o}                                                \
     $(OUT)/pcm{,.o}                                                            \
     $(OUT)/ssim{,.o}                                                           \

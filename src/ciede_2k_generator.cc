@@ -61,14 +61,12 @@ class Ciede2k : public Halide::Generator<Ciede2k> {
                             atan2(b_star_2(x, y), a_2(x, y)));
     Halide::Func h_1("h_1");
     h_1(x, y) = select(h_1_atan(x, y) < 0.0f,
-                       (h_1_atan(x, y) + (2.0f * vcsmc::kPi)) *
-                            (180.0f / vcsmc::kPi),
-                       h_1_atan(x, y) * (180.0f / vcsmc::kPi));
+                       h_1_atan(x, y) + (2.0f * vcsmc::kPi),
+                       h_1_atan(x, y)) * (180.0f / vcsmc::kPi);
     Halide::Func h_2("h_2");
     h_2(x, y) = select(h_2_atan(x, y) < 0.0f,
-                       (h_2_atan(x, y) + (2.0f * vcsmc::kPi)) *
-                            (180.0f / vcsmc::kPi),
-                       h_2_atan(x, y) * (180.0f / vcsmc::kPi));
+                       h_2_atan(x, y) + (2.0f * vcsmc::kPi),
+                       h_2_atan(x, y)) * (180.0f / vcsmc::kPi);
 
     Halide::Func del_L("del_L");
     del_L(x, y) = L_star_2(x, y) - L_star_1(x, y);
@@ -92,7 +90,6 @@ class Ciede2k : public Halide::Generator<Ciede2k> {
     del_H(x, y) = 2.0f * sqrt(C_product(x, y)) *
         sin((del_h(x, y) * (vcsmc::kPi / 180.0f)) / 2.0f);
 
-
     Halide::Func L_mean("L_mean");
     L_mean(x, y) = (L_star_1(x, y) + L_star_2(x, y)) / 2.0f;
 
@@ -103,7 +100,7 @@ class Ciede2k : public Halide::Generator<Ciede2k> {
     h_sum(x, y) = h_1(x, y) + h_2(x, y);
 
     Halide::Func h_abs("h_abs");
-    h_abs(x, y) = abs(h_1(x, y) - h_2(x, y));
+    h_abs(x, y) = abs(h_diff(x, y));
 
     Halide::Func h_mean("h_mean");
     h_mean(x, y) = select(C_product(x, y) == 0.0f, h_sum(x, y),
@@ -121,9 +118,13 @@ class Ciede2k : public Halide::Generator<Ciede2k> {
                      (0.20f * cos(((4.0f * h_mean(x, y)) - 63.0f) *
                                   (vcsmc::kPi / 180.0f)));
 
+    // Intermediate term del_theta_inner not part of standard formulation.
+    Halide::Func del_theta_inner("del_theta_inner");
+    del_theta_inner(x, y) = (h_mean(x, y) - 275.0f) / 25.0f;
+
     Halide::Func del_theta("del_theta");
     del_theta(x, y) = 30.0f *
-        exp(-1.0f * pow((h_mean(x, y) - 275.0f) / 25.0f, 2.0f));
+        exp(-1.0f * del_theta_inner(x, y) * del_theta_inner(x, y));
 
     Halide::Func C_mean_pow("C_mean_pow");
     C_mean_pow(x, y) = pow(C_mean(x, y), 7.0f);
@@ -134,7 +135,7 @@ class Ciede2k : public Halide::Generator<Ciede2k> {
 
     // Intermediate term L_int not part of standard formulation.
     Halide::Func L_int("L_int");
-    L_int(x, y) = pow(L_mean(x, y) - 50.0f, 2.0f);
+    L_int(x, y) = (L_mean(x, y) - 50.0f) * (L_mean(x, y) - 50.0f);
 
     Halide::Func S_L("S_L");
     S_L(x, y) = 1.0f + ((0.015f * L_int(x, y)) / sqrt(20.0f + L_int(x, y)));
@@ -149,14 +150,23 @@ class Ciede2k : public Halide::Generator<Ciede2k> {
     R_T(x, y) = -1.0f *
         sin(2.0f * del_theta(x, y) * (vcsmc::kPi / 180.0f)) * R_c(x, y);
 
+    // Intermediate terms for the fractions.
+    Halide::Func L_frac("L_frac");
+    L_frac(x, y) = del_L(x, y) / S_L(x, y);
+    Halide::Func C_frac("C_frac");
+    C_frac(x, y) = del_C(x, y) / S_C(x, y);
+    Halide::Func H_frac("H_frac");
+    H_frac(x, y) = del_H(x, y) / S_H(x, y);
+
     Halide::Func delta_e("delta_e");
-    delta_e(x, y) = sqrt(pow(del_L(x, y) / S_L(x, y), 2.0f) +
-                         pow(del_C(x, y) / S_C(x, y), 2.0f) +
-                         pow(del_H(x, y) / S_H(x, y), 2.0f) +
-                         (R_T(x, y) * (del_C(x, y) / S_C(x, y)) *
-                            (del_H(x, y) / S_H(x, y))));
+    delta_e(x, y) =
+        sqrt((L_frac(x, y) * L_frac(x, y)) +
+             (C_frac(x, y) * C_frac(x, y)) +
+             (H_frac(x, y) * H_frac(x, y)) +
+             (R_T(x, y) * C_frac(x, y) * H_frac(x, y)));
 
     ciede_output(x, y) = delta_e(x, y);
+
   }
 };
 
