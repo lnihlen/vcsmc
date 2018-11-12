@@ -25,17 +25,24 @@ IMAGE_OBJ=$(OUT)/bit_map.o                                                     \
           $(OUT)/image_file.o                                                  \
           $(OUT)/value_map.o
 
-GENERATORS=$(OUTGEN)/rgb_to_lab_generator                                      \
-           $(OUTGEN)/ciede_2k_generator
+GENERATORS=$(OUTGEN)/ciede_2k_generator                                        \
+           $(OUTGEN)/covariance_generator                                      \
+           $(OUTGEN)/mean_generator                                            \
+           $(OUTGEN)/ssim_generator                                            \
+           $(OUTGEN)/rgb_to_lab_generator                                      \
+           $(OUTGEN)/variance_generator
 
-HALIDE_AOT=$(OUTGEN)/rgb_to_lab.o                                              \
-           $(OUTGEN)/ciede_2k.o
+HALIDE_AOT=$(OUTGEN)/ciede_2k.o                                                \
+           $(OUTGEN)/covariance.o                                              \
+           $(OUTGEN)/mean.o                                                    \
+           $(OUTGEN)/rgb_to_lab.o                                              \
+           $(OUTGEN)/ssim.o                                                    \
+           $(OUTGEN)/variance.o
 
 OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/codon_table.o                                                       \
     $(OUT)/cuda_utils.o                                                        \
     $(OUT)/genome.o                                                            \
-    $(OUT)/mssim.o                                                             \
     $(OUT)/serialization.o                                                     \
     $(OUT)/sound_file.o                                                        \
     $(OUT)/state.o                                                             \
@@ -78,11 +85,23 @@ $(OUTGEN)/%: %.cc | $(OUTGEN)/
 	$(CXX) -o $@ $^ $(HALIDE_DIR)/tools/GenGen.cpp -I$(HALIDE_INCLUDE) -lpthread \
   -lHalide -ldl -std=c++11 -march=native -O3 -L$(HALIDE_LIB)
 
+$(OUTGEN)/ciede_2k.o: $(OUTGEN)/ciede_2k_generator | $(OUTGEN)/
+	$(OUTGEN)/ciede_2k_generator -g ciede_2k -o $(OUTGEN) -e o,h target=host
+
+$(OUTGEN)/covariance.o: $(OUTGEN)/covariance_generator | $(OUTGEN)/
+	$(OUTGEN)/covariance_generator -g covariance -o $(OUTGEN) -e o,h target=host
+
+$(OUTGEN)/mean.o: $(OUTGEN)/mean_generator | $(OUTGEN)/
+	$(OUTGEN)/mean_generator -g mean -o $(OUTGEN) -e o,h target=host
+
 $(OUTGEN)/rgb_to_lab.o: $(OUTGEN)/rgb_to_lab_generator | $(OUTGEN)/
 	$(OUTGEN)/rgb_to_lab_generator -g rgb_to_lab -o $(OUTGEN) -e o,h target=host
 
-$(OUTGEN)/ciede_2k.o: $(OUTGEN)/ciede_2k_generator | $(OUTGEN)/
-	$(OUTGEN)/ciede_2k_generator -g ciede_2k -o $(OUTGEN) -e o,h target=host
+$(OUTGEN)/ssim.o: $(OUTGEN)/ssim_generator | $(OUTGEN)/
+	$(OUTGEN)/ssim_generator -g ssim -o $(OUTGEN) -e o,h target=host
+
+$(OUTGEN)/variance.o: $(OUTGEN)/variance_generator | $(OUTGEN)/
+	$(OUTGEN)/variance_generator -g variance -o $(OUTGEN) -e o,h target=host
 
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CXX) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES) -I$(GTEST_INCLUDE)
