@@ -44,10 +44,10 @@ halide: $(HALIDE_OUT)/lib/libHalide.so | $(HALIDE_OUT)
 $(HALIDE_OUT)/lib/libHalide.so: export CC=
 $(HALIDE_OUT)/lib/libHalide.so: export CFLAGS=
 $(HALIDE_OUT)/lib/libHalide.so:
-	cd $(HALIDE_OUT);                                                            \
+	cd $(HALIDE_OUT) &&                                                          \
   cmake -DBUILD_AOT_TUTORIAL:BOOL="0" -DHALIDE_SHARED_LIBRARY:BOOL="1"         \
   -DWITH_APPS:BOOL="0" -DWITH_TESTS:BOOL="0" -DWITH_TUTORIALS:BOOL="0"         \
-  $(HALIDE_DIR);                                                               \
+  $(HALIDE_DIR) &&                                                             \
   make
 
 libyaml: $(LIBYAML_OUT)/libyaml_static.a | $(LIBYAML_OUT)
