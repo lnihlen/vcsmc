@@ -41,11 +41,11 @@ $(GFLAGS_OUT)/lib/libgflags.a:
 
 halide: $(HALIDE_OUT)/lib/libHalide.so | $(HALIDE_OUT)
 
-$(HALIDE_OUT)/lib/libHalide.so: export CC=
+$(HALIDE_OUT)/lib/libHalide.so: export CC=clang
 $(HALIDE_OUT)/lib/libHalide.so: export CFLAGS=
 $(HALIDE_OUT)/lib/libHalide.so:
 	cd $(HALIDE_OUT) &&                                                          \
-  cmake -DBUILD_AOT_TUTORIAL:BOOL="0" -DHALIDE_SHARED_LIBRARY:BOOL="1"         \
+  cmake -DCMAKE_VERBOSE_MAKEFILE:BOOL="1" -DHALIDE_SHARED_LIBRARY:BOOL="1"     \
   -DWITH_APPS:BOOL="0" -DWITH_TESTS:BOOL="0" -DWITH_TUTORIALS:BOOL="0"         \
   $(HALIDE_DIR) &&                                                             \
   make
