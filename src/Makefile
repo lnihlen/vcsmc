@@ -100,10 +100,6 @@ $(OUTGEN)/variance.o: $(OUTGEN)/variance_generator | $(OUTGEN)/
 $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 	$(CXX) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES) -I$(GTEST_INCLUDE)
 
-$(OUTTESTS)/%.o: %.cu $(DEPS)
-	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -I$(GTEST_INCLUDE)               \
-    -Xcompiler "$(OPT)"
-
 $(OUT)/build_codon_table: $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/build_codon_table.o
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
@@ -117,8 +113,7 @@ $(OUT)/epfg: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(HALIDE_AOT)         \
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
     $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(HALIDE_AOT) | $(OUTTESTS)/
-	$(NVCC) -o $@ $^ $(LIBZ26_LIB) $(INCLUDES) $(LDFLAGS) $(LIBS)                \
-    $(GTEST_LIB) -Xcompiler "$(OPT) $(CFLAGS)"
+	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS) $(GTEST_LIB)
 
 $(OUTTESTS)/:
 	mkdir -p $(OUTTESTS)

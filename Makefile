@@ -12,7 +12,6 @@ export UNAME:=$(shell uname)
 
 ifeq ($(UNAME), Darwin)
 export DYLIB=dylib
-export NVCC=/Developer/NVIDIA/CUDA-8.0/bin/nvcc -Wno-deprecated-gpu-targets
 endif
 
 ifeq ($(UNAME), Linux)

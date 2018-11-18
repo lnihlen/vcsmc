@@ -4,8 +4,6 @@ extern "C" {
 
 #include "gtest/gtest.h"
 
-#include "cuda_utils.h"
-
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
