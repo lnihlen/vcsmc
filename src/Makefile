@@ -6,12 +6,11 @@ INCLUDES=-I. -I$(XXHASH_INCLUDE) -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)       \
     -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE) -I$(TBB_INCLUDE) -I$(OUT)          \
     -I$(HALIDE_INCLUDE) -I$(OUTGEN)
 LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(XXHASH_LIB) $(GPERF_LIB)        \
-    -L$(OUT) -ltbb -lcudart -lHalide -L$(HALIDE_LIB)
+    -L$(OUT) -ltbb -lHalide -L$(HALIDE_LIB)
 OUTTESTS=$(OUT)/tests
 
 ifeq ($(UNAME), Linux)
-CFLAGS+=-I/opt/cuda/include -I/usr/lib/cuda/include
-LDFLAGS+=-lpthread -lunwind -L/opt/cuda/lib64 -L/usr/lib/cuda/lib64
+LDFLAGS+=-lpthread -lunwind
 endif
 
 DEPS=constants.h image_file.h types.h
@@ -41,7 +40,6 @@ HALIDE_AOT=$(OUTGEN)/ciede_2k.o                                                \
 
 OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/codon_table.o                                                       \
-    $(OUT)/cuda_utils.o                                                        \
     $(OUT)/genome.o                                                            \
     $(OUT)/serialization.o                                                     \
     $(OUT)/sound_file.o                                                        \
@@ -65,11 +63,8 @@ tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 
 all: vcsmc tests
 
-$(OUT)/%.o: %.cc $(DEPS) $(HALIDE_AOT)
+$(OUT)/%.o: %.cc $(DEPS)
 	$(CXX) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES)
-
-$(OUT)/%.o: %.cu $(DEPS) $(HALIDE_AOT)
-	$(NVCC) -c -o $@ $< --std=c++11 $(INCLUDES) -Xcompiler "$(OPT) $(CFLAGS)"
 
 $(OUT)/atari_ntsc_laba_color_table.o: $(OUT)/build_laba_table
 	$(OUT)/build_laba_table --output_directory=../out
@@ -116,14 +111,8 @@ $(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
                          $(OUT)/build_laba_table.o
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
-$(OUT)/epfg: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/epfg.o         \
-    $(OUT)/epfg_options.o
-	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
-
-$(OUT)/pcm: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/pcm.o
-	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
-
-$(OUT)/ssim: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/ssim.o
+$(OUT)/epfg: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(HALIDE_AOT)         \
+    $(OUT)/epfg.o $(OUT)/epfg_options.o
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
@@ -145,7 +134,6 @@ clean:
     $(OUT)/build_codon_table{,.o}                                              \
     $(OUT)/build_laba_table{,.o}                                               \
     $(OUT)/codon_table.{cc,h,o}                                                \
-    $(OUT)/pcm{,.o}                                                            \
-    $(OUT)/ssim{,.o}                                                           \
+    $(OUT)/epfg{,.o}                                                           \
     $(OUTTESTS)/run_unittests{,.o}
 
