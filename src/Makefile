@@ -54,13 +54,12 @@ GEN_OBJ=$(OUT)/atari_ntsc_laba_color_table.o                                   \
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
          $(OUTTESTS)/ciede_2k_unittests.o                                      \
-         $(OUTTESTS)/mssim_unittests.o                                         \
+         $(OUTTESTS)/mean_unittests.o                                          \
          $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
          $(OUTTESTS)/serialization_unittests.o                                 \
          $(OUTTESTS)/state_unittests.o
 
-vcsmc: $(OUT)/pcm                                                              \
-       $(OUT)/ssim
+vcsmc: $(OUT)/epfg
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 
@@ -116,6 +115,10 @@ $(OUT)/build_codon_table: $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/build_codon_table.o
 $(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
                          $(OUT)/build_laba_table.o
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
+
+$(OUT)/epfg: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/epfg.o         \
+    $(OUT)/epfg_options.o
+	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/pcm: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(OUT)/pcm.o
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)

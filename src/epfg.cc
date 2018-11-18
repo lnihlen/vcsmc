@@ -5,3 +5,10 @@
 #include <tbb/tbb.h>
 
 #include "epfg_options.h"
+
+int main(int argc, char* argv[]) {
+  vcsmc::EpfgOptions epfg_options;
+  epfg_options.ParseCommandLineFlags(&argc, &argv);
+
+  return 0;
+}
