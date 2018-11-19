@@ -40,6 +40,7 @@ HALIDE_AOT=$(OUTGEN)/ciede_2k.o                                                \
 
 OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/codon_table.o                                                       \
+    $(OUT)/gaussian_kernel.o                                                   \
     $(OUT)/genome.o                                                            \
     $(OUT)/serialization.o                                                     \
     $(OUT)/sound_file.o                                                        \
@@ -52,9 +53,9 @@ GEN_OBJ=$(OUT)/atari_ntsc_laba_color_table.o                                   \
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/bit_map_unittests.o                                       \
          $(OUTTESTS)/ciede_2k_unittests.o                                      \
-         $(OUTTESTS)/mean_unittests.o                                          \
          $(OUTTESTS)/rgb_to_lab_unittests.o                                    \
          $(OUTTESTS)/serialization_unittests.o                                 \
+         $(OUTTESTS)/ssim_unittests.o                                          \
          $(OUTTESTS)/state_unittests.o
 
 vcsmc: $(OUT)/epfg
