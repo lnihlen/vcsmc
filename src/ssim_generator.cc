@@ -1,5 +1,7 @@
 #include "Halide.h"
 
+#include "constants.h"
+
 class Ssim : public Halide::Generator<Ssim> {
  public:
   Input<Halide::Buffer<float>> mean_in_1{"mean_in_1", 2};
@@ -12,16 +14,13 @@ class Ssim : public Halide::Generator<Ssim> {
 
   void generate() {
     Halide::Var x{"x"}, y{"y"};
-    static const float C_1 = 0.1;
-    static const float C_2 = 0.1;
 
     ssim_out(x, y) =
-        (((2.0f * mean_in_1(x, y) * mean_in_2(x, y)) + C_1) *
-         ((2.0f * covariance_in(x, y)) + C_2)) /
+        (((2.0f * mean_in_1(x, y) * mean_in_2(x, y)) + vcsmc::kSSIMC1) *
+         ((2.0f * covariance_in(x, y)) + vcsmc::kSSIMC2)) /
         (((mean_in_1(x, y) * mean_in_1(x, y)) +
-          (mean_in_2(x, y) * mean_in_2(x, y)) + C_1) *
-         ((variance_in_1(x, y) * variance_in_1(x, y)) +
-          (variance_in_2(x, y) * variance_in_2(x, y)) + C_2));
+          (mean_in_2(x, y) * mean_in_2(x, y)) + vcsmc::kSSIMC1) *
+         (variance_in_1(x, y) + variance_in_2(x, y) + vcsmc::kSSIMC2));
   }
 };
 

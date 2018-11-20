@@ -1,4 +1,6 @@
 #include "mean.h"
+#include "covariance.h"
+#include "ssim.h"
 #include "variance.h"
 #include <gtest/gtest.h>
 
@@ -81,6 +83,24 @@ float ComputeWeightedVariance(Clamped in, Clamped mean, float* kernel,
     }
   }
   return variance;
+}
+
+float ComputeWeightedCovariance(Clamped in_1, Clamped mean_1,
+                                Clamped in_2, Clamped mean_2,
+                                float* kernel, int x, int y) {
+  float covariance = 0.0;
+  size_t kernel_offset = 0;
+  int kx = x - 7;
+  int ky = y - 7;
+  for (int i = 0; i < 15; ++i) {
+    for (int j = 0; j < 15; ++j) {
+      covariance += kernel[kernel_offset] *
+                    (in_1.at(kx + j, ky + i) - mean_1.at(kx + j, ky + i)) *
+                    (in_2.at(kx + j, ky + i) - mean_2.at(kx + j, ky + i));
+      ++kernel_offset;
+    }
+  }
+  return covariance;
 }
 
 }  // namespace
@@ -211,25 +231,188 @@ TEST(MeanTest, CompareMeanToComputedMean) {
 
 TEST(VarianceTest, CompareVarianceToComputedVariance) {
   Halide::Runtime::Buffer<float, 3> lab_in(15, 15, 3);
-  ComputeTestCentroid(lab_in.begin(), 15, 15, 9, 5);
-
   Halide::Runtime::Buffer<float, 2> mean_in(15, 15);
-  mean(lab_in, mean_in);
-
   Halide::Runtime::Buffer<float, 2> kernel = MakeGaussianKernel();
   Halide::Runtime::Buffer<float, 2> variance_out(15, 15);
-  variance(lab_in, mean_in, kernel, variance_out);
 
   Clamped in(lab_in.begin(), 15, 15);
-  Clamped mean(mean_in.begin(), 15, 15);
+  Clamped cmean(mean_in.begin(), 15, 15);
 
   for (int i = 0; i < 15; ++i) {
     for (int j = 0; j < 15; ++j) {
-      EXPECT_NEAR(
-          ComputeWeightedVariance(in, mean, kernel.begin(), j, i),
-          variance_out.begin()[(i * 15) + j], 0.01);
+      ComputeTestCentroid(lab_in.begin(), 15, 15, j, i);
+      mean(lab_in, mean_in);
+      variance(lab_in, mean_in, kernel, variance_out);
+
+      for (int k = 0; k < 15; ++k) {
+        for (int l = 0; l < 15; ++l) {
+          EXPECT_NEAR(
+              ComputeWeightedVariance(in, cmean, kernel.begin(), l, k),
+              variance_out.begin()[(k * 15) + l], 0.01);
+        }
+      }
     }
   }
+}
+
+TEST(CovarianceTest, CompareCovarianceToComputedCovariance) {
+  Halide::Runtime::Buffer<float, 3> lab_in_1(15, 15, 3);
+  Halide::Runtime::Buffer<float, 2> mean_in_1(15, 15);
+  Halide::Runtime::Buffer<float, 3> lab_in_2(15, 15, 3);
+  Halide::Runtime::Buffer<float, 2> mean_in_2(15, 15);
+  Halide::Runtime::Buffer<float, 2> kernel = MakeGaussianKernel();
+  Halide::Runtime::Buffer<float, 2> covariance_out(15, 15);
+
+  Clamped in_1(lab_in_1.begin(), 15, 15);
+  Clamped mean_1(mean_in_1.begin(), 15, 15);
+  Clamped in_2(lab_in_2.begin(), 15, 15);
+  Clamped mean_2(mean_in_2.begin(), 15, 15);
+
+  for (int i = 0; i < 15; ++i) {
+    for (int j = 0; j < 15; ++j) {
+      ComputeTestCentroid(lab_in_1.begin(), 15, 15, j, i);
+      ComputeTestCentroid(lab_in_2.begin(), 15, 15, i, j);
+      mean(lab_in_1, mean_in_1);
+      mean(lab_in_2, mean_in_2);
+      covariance(lab_in_1, mean_in_1, lab_in_2, mean_in_2, kernel,
+          covariance_out);
+
+      for (int k = 0; k < 15; ++k) {
+        for (int l = 0; l < 15; ++l) {
+          EXPECT_NEAR(
+              ComputeWeightedCovariance(in_1, mean_1, in_2, mean_2,
+                  kernel.begin(), l, k),
+              covariance_out.begin()[(k * 15) + l], 0.01);
+        }
+      }
+    }
+  }
+}
+
+TEST(SsimTest, ChangingStructureShouldIncreaseSsim) {
+  Halide::Runtime::Buffer<float, 3> ref_lab(15, 15, 3);
+  Halide::Runtime::Buffer<float, 2> ref_mean(15, 15);
+  Halide::Runtime::Buffer<float, 2> ref_variance(15, 15);
+  Halide::Runtime::Buffer<float, 3> test_lab(15, 15, 3);
+  Halide::Runtime::Buffer<float, 2> test_mean(15, 15);
+  Halide::Runtime::Buffer<float, 2> test_variance(15, 15);
+  Halide::Runtime::Buffer<float, 2> test_covariance(15, 15);
+  Halide::Runtime::Buffer<float, 2> kernel = MakeGaussianKernel();
+  Halide::Runtime::Buffer<float, 2> test_ssim(15, 15);
+
+  // We make the reference image with the centroid in the center. We then move
+  // the test centroid from the upper left corner towards the center, expecting
+  // the SSIM to increase each time.
+  ComputeTestCentroid(ref_lab.begin(), 15, 15, 7, 7);
+  mean(ref_lab, ref_mean);
+  variance(ref_lab, ref_mean, kernel, ref_variance);
+
+  float mssim = 0.0f;
+  for (int i = 0; i < 8; ++i) {
+    ComputeTestCentroid(test_lab.begin(), 15, 15, i, i);
+    mean(test_lab, test_mean);
+    variance(test_lab, test_mean, kernel, test_variance);
+    covariance(ref_lab, ref_mean, test_lab, test_mean, kernel, test_covariance);
+    ssim(ref_mean, ref_variance, test_mean, test_variance, test_covariance,
+        test_ssim);
+    float next_mssim = 0.0f;
+    for (int j = 0; j < 15 * 15; ++j) {
+      next_mssim += test_ssim.begin()[j];
+    }
+    next_mssim = next_mssim / (15.0f * 15.0f);
+    EXPECT_LT(mssim, next_mssim);
+    mssim = next_mssim;
+  }
+
+  EXPECT_EQ(1.0, mssim);
+}
+
+TEST(SsimTest, ChangingLuminanceShouldIncreaseSsim) {
+  Halide::Runtime::Buffer<float, 3> ref_lab(15, 15, 3);
+  Halide::Runtime::Buffer<float, 2> ref_mean(15, 15);
+  Halide::Runtime::Buffer<float, 2> ref_variance(15, 15);
+  Halide::Runtime::Buffer<float, 3> test_lab(15, 15, 3);
+  Halide::Runtime::Buffer<float, 2> test_mean(15, 15);
+  Halide::Runtime::Buffer<float, 2> test_variance(15, 15);
+  Halide::Runtime::Buffer<float, 2> test_covariance(15, 15);
+  Halide::Runtime::Buffer<float, 2> kernel = MakeGaussianKernel();
+  Halide::Runtime::Buffer<float, 2> test_ssim(15, 15);
+
+  // We make the reference image with the centroid in the center. We then move
+  // the test centroid from the upper left corner towards the center, expecting
+  // the SSIM to increase each time.
+  ComputeTestCentroid(ref_lab.begin(), 15, 15, 7, 7);
+  mean(ref_lab, ref_mean);
+  variance(ref_lab, ref_mean, kernel, ref_variance);
+
+  float mssim = 0.0f;
+  for (int i = 0; i < 8; ++i) {
+    ComputeTestCentroid(test_lab.begin(), 15, 15, 7, 7);
+    // Add some constant value to each value in the test image, to raise the
+    // luminance.
+    float luminance_add = static_cast<float>(7 - i) * 10.0f;
+    for (int j = 0; j < 15 * 15; ++j) {
+      test_lab.begin()[j] += luminance_add;
+    }
+    mean(test_lab, test_mean);
+    variance(test_lab, test_mean, kernel, test_variance);
+    covariance(ref_lab, ref_mean, test_lab, test_mean, kernel, test_covariance);
+    ssim(ref_mean, ref_variance, test_mean, test_variance, test_covariance,
+        test_ssim);
+    float next_mssim = 0.0f;
+    for (int j = 0; j < 15 * 15; ++j) {
+      next_mssim += test_ssim.begin()[j];
+    }
+    next_mssim = next_mssim / (15.0f * 15.0f);
+    EXPECT_LT(mssim, next_mssim);
+    mssim = next_mssim;
+  }
+
+  EXPECT_EQ(1.0, mssim);
+}
+
+TEST(SsimTest, ChangingContrastShouldIncreaseSsim) {
+  Halide::Runtime::Buffer<float, 3> ref_lab(15, 15, 3);
+  Halide::Runtime::Buffer<float, 2> ref_mean(15, 15);
+  Halide::Runtime::Buffer<float, 2> ref_variance(15, 15);
+  Halide::Runtime::Buffer<float, 3> test_lab(15, 15, 3);
+  Halide::Runtime::Buffer<float, 2> test_mean(15, 15);
+  Halide::Runtime::Buffer<float, 2> test_variance(15, 15);
+  Halide::Runtime::Buffer<float, 2> test_covariance(15, 15);
+  Halide::Runtime::Buffer<float, 2> kernel = MakeGaussianKernel();
+  Halide::Runtime::Buffer<float, 2> test_ssim(15, 15);
+
+  // We make the reference image with the centroid in the center. We then move
+  // the test centroid from the upper left corner towards the center, expecting
+  // the SSIM to increase each time.
+  ComputeTestCentroid(ref_lab.begin(), 15, 15, 7, 7);
+  mean(ref_lab, ref_mean);
+  variance(ref_lab, ref_mean, kernel, ref_variance);
+
+  float mssim = 0.0f;
+  for (int i = 0; i < 8; ++i) {
+    ComputeTestCentroid(test_lab.begin(), 15, 15, 7, 7);
+    // Multiply some constant value by the luminance, to simulate changing the
+    // contrast of the image.
+    float luminance_mul = 1.0f / static_cast<float>(8 - i);
+    for (int j = 0; j < 15 * 15; ++j) {
+      test_lab.begin()[j] *= luminance_mul;
+    }
+    mean(test_lab, test_mean);
+    variance(test_lab, test_mean, kernel, test_variance);
+    covariance(ref_lab, ref_mean, test_lab, test_mean, kernel, test_covariance);
+    ssim(ref_mean, ref_variance, test_mean, test_variance, test_covariance,
+        test_ssim);
+    float next_mssim = 0.0f;
+    for (int j = 0; j < 15 * 15; ++j) {
+      next_mssim += test_ssim.begin()[j];
+    }
+    next_mssim = next_mssim / (15.0f * 15.0f);
+    EXPECT_LT(mssim, next_mssim);
+    mssim = next_mssim;
+  }
+
+  EXPECT_EQ(1.0, mssim);
 }
 
 }  // namespace vcsmc

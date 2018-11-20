@@ -50,6 +50,11 @@ const size_t kSeedSizeWords = 16;
 
 const size_t kAudioSampleRate = 31440;
 
+// Constants used in SSIM implementation, here so they are consistent with
+// values used in testing.
+const float kSSIMC1 = 0.0001;
+const float kSSIMC2 = 0.0009;
+
 // Defines the address and name of every register on the TIA. The ones marked
 // as (strobe) are write-only and writing to them will cause new changes in
 // state.
