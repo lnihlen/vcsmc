@@ -105,12 +105,11 @@ class VideoDecoder::VideoDecoderImpl {
             1000 * 1000) /
         format_context_->streams[video_stream_index_]->time_base.den;
 
-    return true;
+    return DecodeNextFrame();
   }
 
-  std::unique_ptr<VideoFrame> GetNextFrame() {
-    std::unique_ptr<VideoFrame> frame_image(nullptr);
-
+  // Decode a frame, enqueue in the |frames_| deque.
+  bool DecodeNextFrame() {
     AVPacket packet;
     av_init_packet(&packet);
     AVFrame* frame = av_frame_alloc();
@@ -125,7 +124,7 @@ class VideoDecoder::VideoDecoderImpl {
         int response = avcodec_send_packet(video_codec_context_, &packet);
         if (response < 0) {
           av_packet_unref(&packet);
-          return frame_image;
+          return false;
         }
 
         response = avcodec_receive_frame(video_codec_context_, frame);
@@ -135,7 +134,7 @@ class VideoDecoder::VideoDecoderImpl {
           fprintf(stderr, "Error decoding packet.\n");
           av_frame_free(&frame);
           av_packet_unref(&packet);
-          return frame_image;
+          return false;
         }
 
         Halide::Runtime::Buffer<uint8_t, 3> frame_rgb(
@@ -161,15 +160,16 @@ class VideoDecoder::VideoDecoderImpl {
           fprintf(stderr, "Error scaling frame image.\n");
           av_frame_free(&frame);
           av_packet_unref(&packet);
-          return frame_image;
+          return false;
         }
 
         frame_read = true;
-        frame_image.reset(new VideoFrame());
+        std::shared_ptr<VideoFrame> frame_image(new VideoFrame());
         frame_image->frame_data = frame_rgb;
         frame_image->is_keyframe = (frame->key_frame == 1);
         frame_image->frame_number = video_codec_context_->frame_number;
         frame_image->frame_time_us = frame->pts * video_frame_time_base_us_;
+        frames_.push_back(frame_image);
 
         av_frame_free(&frame);
       }
@@ -180,13 +180,24 @@ class VideoDecoder::VideoDecoderImpl {
     if (response == AVERROR_EOF) {
       at_end_of_file_ = true;
       av_packet_unref(&packet);
+      return false;
     }
 
-    return frame_image;
+    return true;
+  }
+
+  std::shared_ptr<VideoFrame> GetNextFrame() {
+    DecodeNextFrame();
+    if (frames_.size()) {
+      std::shared_ptr<VideoFrame> oldest = frames_.front();
+      frames_.pop_front();
+      return oldest;
+    }
+    return std::shared_ptr<VideoFrame>(nullptr);
   }
 
   bool AtEndOfFile() const {
-    return at_end_of_file_;
+    return at_end_of_file_ && frames_.size() == 0;
   }
 
   void CloseFile() {
@@ -208,6 +219,7 @@ class VideoDecoder::VideoDecoderImpl {
   SwsContext* resize_context_;
   int64 video_frame_time_base_us_;
   bool at_end_of_file_;
+  std::deque<std::shared_ptr<VideoFrame>> frames_;
 };
 
 // static
@@ -231,7 +243,7 @@ void VideoDecoder::CloseFile() {
   return p_->CloseFile();
 }
 
-std::unique_ptr<VideoFrame> VideoDecoder::GetNextFrame() {
+std::shared_ptr<VideoFrame> VideoDecoder::GetNextFrame() {
   return p_->GetNextFrame();
 }
 

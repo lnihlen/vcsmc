@@ -31,9 +31,9 @@ int main(int argc, char* argv[]) {
   }
 
   while (!decoder.AtEndOfFile()) {
-    std::unique_ptr<vcsmc::VideoFrame> frame = decoder.GetNextFrame();
+    std::shared_ptr<vcsmc::VideoFrame> frame = decoder.GetNextFrame();
     if (!frame) {
-      if (!decoder.AtEndOfFile()) fprintf(stderr, "Error decoding frame.\n");
+      fprintf(stderr, "Error decoding frame.\n");
       break;
     }
     printf("frame: %d, key: %d, time: %ld\n",

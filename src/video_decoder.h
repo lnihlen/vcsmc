@@ -29,7 +29,7 @@ class VideoDecoder {
   ~VideoDecoder();
 
   bool OpenFile(const std::string& file_name);
-  std::unique_ptr<VideoFrame> GetNextFrame();
+  std::shared_ptr<VideoFrame> GetNextFrame();
   bool AtEndOfFile() const;
   void CloseFile();
 
