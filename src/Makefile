@@ -6,7 +6,8 @@ INCLUDES=-I. -I$(XXHASH_INCLUDE) -I$(GFLAGS_INCLUDE) -I$(LIBZ26_INCLUDE)       \
     -I$(LIBYAML_INCLUDE) -I$(GPERF_INCLUDE) -I$(TBB_INCLUDE) -I$(OUT)          \
     -I$(HALIDE_INCLUDE) -I$(OUTGEN)
 LIBS+=-lm -lpng $(LIBYAML_LIB) $(GFLAGS_LIB) $(XXHASH_LIB) $(GPERF_LIB)        \
-    -L$(OUT) -ltbb -lHalide -L$(HALIDE_LIB)
+    -L$(OUT) -ltbb -lHalide -L$(HALIDE_LIB) -lavcodec -lavformat -lavutil      \
+    -lswscale
 OUTTESTS=$(OUT)/tests
 
 ifeq ($(UNAME), Linux)
@@ -15,12 +16,10 @@ endif
 
 DEPS=constants.h image_file.h types.h
 
-COLOR_OBJ=$(OUT)/atari_ntsc_abgr_color_table.o                                 \
-          $(OUT)/color.o
+COLOR_OBJ=$(OUT)/atari_ntsc_rgb_color_table.o                                  \
 
 IMAGE_OBJ=$(OUT)/bit_map.o                                                     \
           $(OUT)/gray_map.o                                                    \
-          $(OUT)/image.o                                                       \
           $(OUT)/image_file.o                                                  \
           $(OUT)/value_map.o
 
@@ -45,9 +44,10 @@ OBJ=$(OUT)/assembler.o                                                         \
     $(OUT)/serialization.o                                                     \
     $(OUT)/sound_file.o                                                        \
     $(OUT)/state.o                                                             \
-    $(OUT)/tls_prng.o
+    $(OUT)/tls_prng.o                                                          \
+    $(OUT)/video_decoder.o
 
-GEN_OBJ=$(OUT)/atari_ntsc_laba_color_table.o                                   \
+GEN_OBJ=$(OUT)/atari_ntsc_lab_color_table.o                                    \
         $(OUT)/codon_table.o
 
 TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
@@ -58,7 +58,8 @@ TEST_OBJ=$(OUTTESTS)/assembler_unittests.o                                     \
          $(OUTTESTS)/ssim_unittests.o                                          \
          $(OUTTESTS)/state_unittests.o
 
-vcsmc: $(OUT)/epfg
+vcsmc: $(OUT)/epfg                                                             \
+       $(OUT)/split
 
 tests: $(OUTTESTS)/run_unittests | $(OUTTESTS)/
 
@@ -67,9 +68,9 @@ all: vcsmc tests
 $(OUT)/%.o: %.cc $(DEPS)
 	$(CXX) -c -o $@ $< $(CFLAGS) $(OPT) $(INCLUDES)
 
-$(OUT)/atari_ntsc_laba_color_table.o: $(OUT)/build_laba_table
-	$(OUT)/build_laba_table --output_directory=../out
-	$(CXX) -c -o $@ $(OUT)/atari_ntsc_laba_color_table.cc $(CFLAGS) $(OPT)       \
+$(OUT)/atari_ntsc_lab_color_table.o: $(OUT)/build_lab_table
+	$(OUT)/build_lab_table --output_directory=../out
+	$(CXX) -c -o $@ $(OUT)/atari_ntsc_lab_color_table.cc $(CFLAGS) $(OPT)        \
     $(INCLUDES)
 
 $(OUT)/codon_table.o: $(OUT)/build_codon_table
@@ -104,12 +105,15 @@ $(OUTTESTS)/%.o: %.cc $(DEPS) | $(OUTTESTS)/
 $(OUT)/build_codon_table: $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/build_codon_table.o
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
-$(OUT)/build_laba_table: $(IMAGE_OBJ) $(COLOR_OBJ)                             \
-                         $(OUT)/build_laba_table.o
+$(OUT)/build_lab_table: $(IMAGE_OBJ) $(COLOR_OBJ) $(OUT)/build_lab_table.o $(HALIDE_AOT)
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(GFLAGS_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUT)/epfg: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(HALIDE_AOT)         \
     $(OUT)/epfg.o $(OUT)/epfg_options.o
+	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
+
+$(OUT)/split: $(OBJ) $(IMAGE_OBJ) $(COLOR_OBJ) $(GEN_OBJ) $(HALIDE_AOT)        \
+    $(OUT)/split.o
 	$(CXX) -o $@ $^ $(LIBZ26_LIB) $(CFLAGS) $(OPT) $(LDFLAGS) $(LIBS)
 
 $(OUTTESTS)/run_unittests: $(OBJ) $(TEST_OBJ) $(OUTTESTS)/run_unittests.o      \
@@ -126,10 +130,11 @@ $(OUTGEN)/:
 clean:
 	rm -rf $(COLOR_OBJ) $(IMAGE_OBJ) $(OBJ) $(TEST_OBJ) $(GEN_OBJ)               \
     $(HALIDE_AOT) $(GENERATORS)                                                \
-    $(OUT)/atari_ntsc_laba_color_table.{cc,o}                                  \
+    $(OUT)/atari_ntsc_lab_color_table.{cc,o}                                   \
     $(OUT)/build_codon_table{,.o}                                              \
-    $(OUT)/build_laba_table{,.o}                                               \
+    $(OUT)/build_lab_table{,.o}                                                \
     $(OUT)/codon_table.{cc,h,o}                                                \
     $(OUT)/epfg{,.o}                                                           \
+    $(OUT)/epfg_options.o                                                      \
     $(OUTTESTS)/run_unittests{,.o}
 
