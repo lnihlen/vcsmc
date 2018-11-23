@@ -133,14 +133,14 @@ class VideoDecoder::VideoDecoderImpl {
           continue;
         } else if (response < 0) {
           fprintf(stderr, "Error decoding packet.\n");
+          av_frame_free(&frame);
           av_packet_unref(&packet);
           return frame_image;
         }
 
         Halide::Runtime::Buffer<uint8_t, 3> frame_rgb(
             kTargetFrameWidthPixels, kFrameHeightPixels, 3);
-        // Note reverse order of plane pointers, in order to get proper RGB
-        // plane alignment.
+        // Note order of plane pointers for proper RGB plane alignment.
         uint8* plane_pointers[3] = {
           frame_rgb.begin() + kFrameSizeBytes,
           frame_rgb.begin() + (kFrameSizeBytes * 2),
@@ -179,6 +179,7 @@ class VideoDecoder::VideoDecoderImpl {
 
     if (response == AVERROR_EOF) {
       at_end_of_file_ = true;
+      av_packet_unref(&packet);
     }
 
     return frame_image;
@@ -189,13 +190,13 @@ class VideoDecoder::VideoDecoderImpl {
   }
 
   void CloseFile() {
+    sws_freeContext(resize_context_);
+    resize_context_ = nullptr;
     avformat_close_input(&format_context_);
     avformat_free_context(format_context_);
     format_context_ = nullptr;
     avcodec_free_context(&video_codec_context_);
     video_codec_context_ = nullptr;
-    sws_freeContext(resize_context_);
-    resize_context_ = nullptr;
   }
 
  private:
