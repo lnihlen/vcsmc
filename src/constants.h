@@ -38,15 +38,22 @@ const uint32 kScreenSizeCycles = kScreenSizeClocks / kColorClocksPerCPUCycle;
 const uint8 kColuUnpainted = 0xff;
 
 const uint32 kBankSize = 4096;
-// We leave 16 bytes at the bottom of each bank for the reset/load vectors.
+// We leave a few bytes at the bottom of each bank for the reset/load vectors.
 const uint32 kBankPadding = 16;
 
-const double kPi = 3.1415926535897932384626433832795028841971693993751;
+const uint32 kMaxKernelSize = 8 * kBankSize;
+
+const float kPi = 3.1415926535897932384626433832795028841971693993751;
 
 // Number of uint32 words to generate/use for a random seed.
 const size_t kSeedSizeWords = 16;
 
 const size_t kAudioSampleRate = 31440;
+
+// Constants used in SSIM implementation, here so they are consistent with
+// values used in testing.
+const float kSSIMC1 = 0.0001;
+const float kSSIMC2 = 0.0009;
 
 // Defines the address and name of every register on the TIA. The ones marked
 // as (strobe) are write-only and writing to them will cause new changes in
@@ -100,7 +107,15 @@ enum TIA : uint8 {
   TIA_COUNT  = 0x2d
 };
 
+enum Register {
+  A = 0,
+  X = 1,
+  Y = 2,
+  REGISTER_COUNT = 3
+};
+
 enum OpCode : uint8 {
+  BIT_ZeroPage = 0x24,
   JMP_Absolute = 0x4c,
   LDA_Immediate = 0xa9,
   LDX_Immediate = 0xa2,

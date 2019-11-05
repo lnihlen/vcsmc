@@ -50,14 +50,17 @@ TEST(AssemblerTest, AssembleMultiLine) {
       "; single-line store\n"
       "stx AUDC0  ; update AUDC0\n"
       "nop\n"
+      "bit COLUP0 ; wait for 3 cycles\n"
+      "\n"
       "lda #$ef\n"
       "jmp $f00a");
   ASSERT_NE(ops, nullptr);
-  ASSERT_EQ(4U, ops->size());
+  ASSERT_EQ(5U, ops->size());
   EXPECT_EQ(0x00001586u, ops->at(0) & 0x0000ffff);
   EXPECT_EQ(0x000000eau, ops->at(1) & 0x000000ff);
-  EXPECT_EQ(0x0000efa9u, ops->at(2) & 0x0000ffff);
-  EXPECT_EQ(0x00f00a4cu, ops->at(3) & 0x00ffffff);
+  EXPECT_EQ(0x00000624u, ops->at(2) & 0x0000ffff);
+  EXPECT_EQ(0x0000efa9u, ops->at(3) & 0x0000ffff);
+  EXPECT_EQ(0x00f00a4cu, ops->at(4) & 0x00ffffff);
 }
 
 }  // namespace vcsmc

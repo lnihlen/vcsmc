@@ -4,12 +4,13 @@
 #include <memory>
 #include <string>
 
+#include "types.h"
+
 namespace vcsmc {
 
-class Image;
-
-std::unique_ptr<Image> LoadImage(const std::string& file_name);
-bool SaveImage(const Image* image, const std::string& file_name);
+bool LoadImage(const std::string& file_name, uint8* planes);
+bool SaveImage(const uint8* planes, size_t width, size_t height,
+               const std::string& file_name);
 
 }  // namespace vcsmc
 

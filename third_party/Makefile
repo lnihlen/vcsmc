@@ -1,21 +1,16 @@
-export FARMHASH_OUT=$(OUT)/farmhash
-export FARMHASH_DIR=$(CURDIR)/farmhash
 export GPERF_OUT=$(OUT)/gperftools
 export GPERF_DIR=$(CURDIR)/gperftools
 export GTEST_OUT=$(OUT)/gtest
 export GFLAGS_OUT=$(OUT)/gflags
+export HALIDE_OUT=$(OUT)/Halide
+export HALIDE_DIR=$(CURDIR)/Halide
 export LIBYAML_OUT=$(OUT)/libyaml
 export LIBZ26_OUT=$(OUT)/libz26
 export TBB_OUT=$(OUT)/tbb
+export XXHASH_OUT=$(OUT)/xxHash
+export XXHASH_DIR=$(CURDIR)/xxHash
 
-all: farmhash gperftools gtest gflags libyaml libz26 tbb
-
-farmhash: $(FARMHASH_OUT)/lib/libfarmhash.a | $(FARMHASH_OUT)
-
-$(FARMHASH_OUT)/lib/libfarmhash.a: export CFLAGS=-Wall -fPIC $(OPT)
-$(FARMHASH_OUT)/lib/libfarmhash.a: | $(FARMHASH_OUT)
-	cd $(FARMHASH_OUT); $(FARMHASH_DIR)/configure --prefix=$(FARMHASH_OUT)
-	$(MAKE) -C $(FARMHASH_OUT) install
+all: gperftools gtest gflags halide libyaml libz26 tbb xxhash
 
 gperftools: $(GPERF_DIR)/configure $(GPERF_OUT)/lib/libprofiler.a | $(GPERF_OUT)
 
@@ -44,11 +39,22 @@ $(GFLAGS_OUT)/lib/libgflags.a:
 	cmake -B$(GFLAGS_OUT) -Hgflags -G"Unix Makefiles"
 	$(MAKE) -C $(GFLAGS_OUT)
 
-libyaml: $(LIBYAML_OUT)/libyaml.a | $(LIBYAML_OUT)
+halide: $(HALIDE_OUT)/lib/libHalide.so | $(HALIDE_OUT)
 
-$(LIBYAML_OUT)/libyaml.a: export CFLAGS=-Wall -fPIC $(OPT)
-$(LIBYAML_OUT)/libyaml.a: export CXX=$(CC)
-$(LIBYAML_OUT)/libyaml.a:
+$(HALIDE_OUT)/lib/libHalide.so: export CC=clang
+$(HALIDE_OUT)/lib/libHalide.so: export CFLAGS=
+$(HALIDE_OUT)/lib/libHalide.so:
+	cd $(HALIDE_OUT) &&                                                          \
+  cmake -DCMAKE_VERBOSE_MAKEFILE:BOOL="1" -DHALIDE_SHARED_LIBRARY:BOOL="1"     \
+  -DWITH_APPS:BOOL="0" -DWITH_TESTS:BOOL="0" -DWITH_TUTORIALS:BOOL="0"         \
+  $(HALIDE_DIR) &&                                                             \
+  make
+
+libyaml: $(LIBYAML_OUT)/libyaml_static.a | $(LIBYAML_OUT)
+
+$(LIBYAML_OUT)/libyaml_static.a: export CFLAGS=-Wall -fPIC $(OPT)
+$(LIBYAML_OUT)/libyaml_static.a: export CXX=$(CC)
+$(LIBYAML_OUT)/libyaml_static.a:
 	cmake -B$(LIBYAML_OUT) -Hlibyaml -G"Unix Makefiles"
 	$(MAKE) -C $(LIBYAML_OUT)
 
@@ -65,11 +71,17 @@ tbb: | $(TBB_OUT) $(TBB_TARGET)
 $(TBB_TARGET): export tbb_build_dir=$(TBB_OUT)
 $(TBB_TARGET): export tbb_build_prefix=tbb
 $(TBB_TARGET):
-	$(MAKE) -C tbb/
+	$(MAKE) -C tbb/ compiler=clang stdver=c++11 tbb
 	cp $(TBB_OUT)/tbb_release/*.$(DYLIB)* $(OUT)
 
-$(FARMHASH_OUT):
-	mkdir -p $(FARMHASH_OUT)
+xxhash: $(XXHASH_OUT)/libxxhash.a | $(XXHASH_OUT)
+
+$(XXHASH_OUT)/libxxhash.a: export CFLAGS=-Wall -fPIC $(OPT)
+$(XXHASH_OUT)/libxxhash.a: | $(XXHASH_OUT)
+	cd $(XXHASH_DIR); make libxxhash.a; mv libxxhash.a $(XXHASH_OUT); rm *.o
+
+$(XXHASH_OUT):
+	mkdir -p $(XXHASH_OUT)
 
 $(GPERF_OUT):
 	mkdir -p $(GPERF_OUT)
@@ -79,6 +91,9 @@ $(GTEST_OUT):
 
 $(GFLAGS_OUT):
 	mkdir -p $(GFLAGS_OUT)
+
+$(HALIDE_OUT):
+	mkdir -p $(HALIDE_OUT)
 
 $(LIBYAML_OUT):
 	mkdir -p $(LIBYAML_OUT)
@@ -99,7 +114,9 @@ clean:
 	rm -rf $(GPERF_OUT)
 	rm -rf $(GTEST_OUT)
 	rm -rf $(GFLAGS_OUT)
+	rm -rf $(HALIDE_OUT)
 	rm -rf $(LIBYAML_OUT)
 	rm -rf $(LIBZ26_OUT)
 	rm -rf $(TBB_OUT)
+	rm -rf $(XXHASH_OUT)
 	rm -f $(OUT)/libtbb*

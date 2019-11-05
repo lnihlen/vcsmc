@@ -4,27 +4,9 @@
 #include <memory>
 #include <vector>
 
-#include "kernel.h"
 #include "spec.h"
 
 namespace vcsmc {
-
-Generation ParseGenerationFile(const std::string& file_name);
-Generation ParseGenerationString(const std::string& gen_string);
-bool SaveGenerationFile(Generation gen, const std::string& file_name);
-bool SaveKernelToString(std::shared_ptr<Kernel> kernel,
-    std::string& string_out);
-bool SaveKernelToFile(std::shared_ptr<Kernel> kernel,
-    const std::string& file_name);
-bool AppendKernelBinary(std::shared_ptr<Kernel> kernel,
-    const std::string& file_name);
-
-// Returns a list of Specs parsed from the indicated YAML file, or nullptr on
-// error.
-SpecList ParseSpecListFile(const std::string& file_name);
-// Convenience method mostly for testing, calls same underlying implementation
-// as on file parser.
-SpecList ParseSpecListString(const std::string& spec_string);
 
 // Encodes the provided bytes into a longer Base64 string with line breaks on
 // 80 characters and indented with spaces to |indent|, if |indent| is nonzero,
