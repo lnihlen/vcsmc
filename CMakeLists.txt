@@ -1,3 +1,6 @@
+# Allow specifying project version.
+cmake_policy(SET CMP0048 NEW)
+
 project(vcsmc
         VERSION 0.0.1)
 
