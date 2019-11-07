@@ -40,7 +40,7 @@ add_library(vcsmc_common_lib
 )
 
 target_link_libraries(vcsmc_common_lib
-    vcsmc_halide_lib
+    ${vcsmc_halide_libs}
 )
 
 add_executable(epfg

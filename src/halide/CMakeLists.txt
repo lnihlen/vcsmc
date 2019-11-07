@@ -1,8 +1,8 @@
-## see https://github.com/halide/Halide/blob/master/README_cmake.md
-## need to set(HALIDE_DISTRIB_DIR) in some smart way
-include("${HALIDE_DISTRIB_DIR}/halide.cmake")
-
-add_library(vcsmc_halide_lib)
+if(DEFINED HALIDE_DISTRIB_DIR)
+    include("${HALIDE_DISTRIB_DIR}/halide.cmake")
+else()
+    message(FATAL_ERROR "HALIDE_DISTRIB_DIR variable not defined. See BUILDING.md")
+endif()
 
 set(vcsmc_halide_generators
     ciede_2k_generator.cc
@@ -16,6 +16,6 @@ set(vcsmc_halide_generators
 foreach(GEN_SRC ${vcsmc_halide_generators})
     string(REPLACE "_generator.cc" "" GEN_NAME ${GEN_SRC})
     halide_library("${GEN_NAME}" SRCS ${GEN_SRC})
-    target_link_libraries(vcsmc_halide_lib PUBLIC "${GEN_NAME}")
+    list(APPEND vcsmc_halide_libs "${GEN_NAME}")
 endforeach()
 
