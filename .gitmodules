@@ -4,15 +4,6 @@
 [submodule "third_party/gflags"]
 	path = third_party/gflags
 	url = https://github.com/gflags/gflags.git
-[submodule "third_party/libyaml"]
-	path = third_party/libyaml
-	url = https://github.com/yaml/libyaml
-[submodule "third_party/gperftools"]
-	path = third_party/gperftools
-	url = https://github.com/gperftools/gperftools.git
-[submodule "third_party/tbb"]
-	path = third_party/tbb
-	url = https://github.com/01org/tbb.git
 [submodule "third_party/xxHash"]
 	path = third_party/xxHash
 	url = git@github.com:Cyan4973/xxHash.git
