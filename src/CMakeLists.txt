@@ -41,6 +41,13 @@ add_library(vcsmc_common_lib
 
 target_link_libraries(vcsmc_common_lib
     ${vcsmc_halide_libs}
+    gflags::gflags
+    xxhash
+)
+
+target_include_directories(vcsmc_common_lib PRIVATE
+    "${HALIDE_INCLUDE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
 add_executable(epfg
@@ -49,7 +56,7 @@ add_executable(epfg
     epfg_options.h
 )
 
-target_link_libraries(epfg
+target_link_libraries(epfg PUBLIC
     vcsmc_common_lib
 )
 
