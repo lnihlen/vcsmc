@@ -13,7 +13,6 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/codon_table.h"
     DEPENDS build_codon_table
 )
 
-add_subdirectory(halide)
 
 set(vcsmc_common_src_files
     assembler.cc
@@ -55,13 +54,29 @@ add_library(vcsmc_common_lib STATIC
     "${CMAKE_CURRENT_BINARY_DIR}/codon_table.h"
 )
 
-target_link_libraries(vcsmc_common_lib
+set(vcsmc_halide_generators
+    ciede_2k_generator.cc
+    covariance_generator.cc
+    mean_generator.cc
+    rgb_to_lab_generator.cc
+    ssim_generator.cc
+    variance_generator.cc
+)
+
+foreach(GEN_SRC ${vcsmc_halide_generators})
+    string(REPLACE "_generator.cc" "" GEN_NAME ${GEN_SRC})
+    halide_library("${GEN_NAME}" SRCS ${GEN_SRC})
+    #    list(APPEND vcsmc_halide_libs "${GEN_NAME}")
+    target_link_libraries(vcsmc_common_lib PUBLIC "${GEN_NAME}")
+endforeach()
+
+target_link_libraries(vcsmc_common_lib PUBLIC
     ${vcsmc_halide_libs}
     gflags::gflags
     xxhash
 )
 
-target_include_directories(vcsmc_common_lib PRIVATE
+target_include_directories(vcsmc_common_lib PUBLIC
     "${HALIDE_INCLUDE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_BINARY_DIR}"
@@ -75,5 +90,25 @@ add_executable(epfg
 
 target_link_libraries(epfg PUBLIC
     vcsmc_common_lib
+)
+
+set(vcsmc_unittests
+    assembler_unittests.cc
+    bit_map_unittests.cc
+    ciede_2k_unittests.cc
+    rgb_to_lab_unittests.cc
+    serialization_unittests.cc
+    ssim_unittests.cc
+    state_unittests.cc
+)
+
+add_executable(run_unittests
+    run_unittests.cc
+    ${vcsmc_unittests}
+)
+
+target_link_libraries(run_unittests
+    vcsmc_common_lib
+    gtest
 )
 
