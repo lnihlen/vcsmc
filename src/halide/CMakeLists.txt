@@ -1,9 +1,3 @@
-if(DEFINED HALIDE_DISTRIB_DIR)
-    include("${HALIDE_DISTRIB_DIR}/halide.cmake")
-else()
-    message(FATAL_ERROR "HALIDE_DISTRIB_DIR variable not defined. See BUILDING.md")
-endif()
-
 set(vcsmc_halide_generators
     ciede_2k_generator.cc
     covariance_generator.cc

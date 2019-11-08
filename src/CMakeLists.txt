@@ -1,3 +1,5 @@
+include("${HALIDE_DISTRIB_DIR}/halide.cmake")
+
 add_subdirectory(halide)
 
 set(vcsmc_common_src_files
