@@ -12,7 +12,7 @@ add_subdirectory(gflags)
 
 ###
 # libz26
-#patched version, build manually
+add_subdirectory(libz26)
 
 ###
 # xxHash

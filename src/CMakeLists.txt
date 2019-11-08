@@ -13,7 +13,6 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/codon_table.h"
     DEPENDS build_codon_table
 )
 
-
 set(vcsmc_common_src_files
     assembler.cc
     assembler.h
@@ -66,13 +65,12 @@ set(vcsmc_halide_generators
 foreach(GEN_SRC ${vcsmc_halide_generators})
     string(REPLACE "_generator.cc" "" GEN_NAME ${GEN_SRC})
     halide_library("${GEN_NAME}" SRCS ${GEN_SRC})
-    #    list(APPEND vcsmc_halide_libs "${GEN_NAME}")
     target_link_libraries(vcsmc_common_lib PUBLIC "${GEN_NAME}")
 endforeach()
 
 target_link_libraries(vcsmc_common_lib PUBLIC
-    ${vcsmc_halide_libs}
     gflags::gflags
+    libz26
     xxhash
 )
 
