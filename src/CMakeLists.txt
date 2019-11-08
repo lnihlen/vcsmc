@@ -1,5 +1,18 @@
 include("${HALIDE_DISTRIB_DIR}/halide.cmake")
 
+add_executable(build_codon_table
+    build_codon_table.cc
+)
+
+target_link_libraries(build_codon_table
+    gflags
+)
+
+add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/codon_table.h"
+    COMMAND "${CMAKE_CURRENT_BINARY_DIR}/build_codon_table" "--output_directory=${CMAKE_CURRENT_BINARY_DIR}"
+    DEPENDS build_codon_table
+)
+
 add_subdirectory(halide)
 
 set(vcsmc_common_src_files
@@ -37,8 +50,9 @@ set(vcsmc_common_src_files
     video_decoder.h
 )
 
-add_library(vcsmc_common_lib
+add_library(vcsmc_common_lib STATIC
     ${vcsmc_common_src_files}
+    "${CMAKE_CURRENT_BINARY_DIR}/codon_table.h"
 )
 
 target_link_libraries(vcsmc_common_lib
@@ -50,6 +64,7 @@ target_link_libraries(vcsmc_common_lib
 target_include_directories(vcsmc_common_lib PRIVATE
     "${HALIDE_INCLUDE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
 add_executable(epfg

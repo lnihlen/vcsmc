@@ -2,8 +2,6 @@
 
 #include <chrono>
 
-#include "tbb/tbb_thread.h"
-
 namespace vcsmc {
 
 TlsPrng::TlsPrng() {

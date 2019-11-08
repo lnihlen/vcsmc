@@ -2,8 +2,7 @@
 #define SRC_TLS_PRNG_H_
 
 #include <random>
-
-#include "tbb/tbb.h"
+#include <vector>
 
 #include "types.h"
 
@@ -26,7 +25,8 @@ class TlsPrng {
   std::default_random_engine engine_;
 };
 
-typedef tbb::enumerable_thread_specific<TlsPrng> TlsPrngList;
+// TODO: swap with OpenMP TLS threadprivate directive.
+typedef std::vector<TlsPrng> TlsPrngList;
 
 }  // namespace vcsmc
 
