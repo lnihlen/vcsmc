@@ -69,8 +69,13 @@ foreach(GEN_SRC ${vcsmc_halide_generators})
 endforeach()
 
 target_link_libraries(vcsmc_common_lib PUBLIC
+    avcodec
+    avformat
+    avutil
     gflags::gflags
     libz26
+    png
+    swscale
     xxhash
 )
 
