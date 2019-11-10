@@ -1,13 +1,13 @@
-add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/catchuppixels.c"
-    COMMAND "m4"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/src/z26/catchuppixels.m4" > "${CMAKE_CURRENT_BINARY_DIR}/catchuppixels.c"
-    VERBATIM  # prevent cmake from helpfully escaping the stdio redirection >
+add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/m4/catchuppixels.c" "${CMAKE_CURRENT_BINARY_DIR}/m4/cpu.c"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/m4"
+    COMMAND m4 "${CMAKE_CURRENT_SOURCE_DIR}/src/z26/catchuppixels.m4" > "${CMAKE_CURRENT_BINARY_DIR}/m4/catchuppixels.c"
+    COMMAND m4 "${CMAKE_CURRENT_SOURCE_DIR}/src/z26/cpu.m4" > "${CMAKE_CURRENT_BINARY_DIR}/m4/cpu.c"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/z26/catchuppixels.m4" "${CMAKE_CURRENT_SOURCE_DIR}/src/z26/cpu.m4"
+    VERBATIM
 )
 
-add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/cpu.c"
-    COMMAND "m4"
-    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/src/z26/cpu.m4" > "${CMAKE_CURRENT_BINARY_DIR}/cpu.c"
-    VERBATIM
+add_custom_target(libz26_m4
+    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/m4/catchuppixels.c" "${CMAKE_CURRENT_BINARY_DIR}/m4/cpu.c"
 )
 
 add_library(libz26 STATIC
@@ -16,8 +16,7 @@ add_library(libz26 STATIC
 )
 
 add_dependencies(libz26
-    "${CMAKE_CURRENT_BINARY_DIR}/catchuppixels.c"
-    "${CMAKE_CURRENT_BINARY_DIR}/cpu.c"
+    libz26_m4
 )
 
 target_include_directories(libz26 PUBLIC
