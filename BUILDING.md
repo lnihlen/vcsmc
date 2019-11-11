@@ -22,6 +22,8 @@ feels like it would be prudent to match the version of llvm downloaded to the sy
 and clang, according to the directions provided on the Halide README.md, and provide the path to the llvm-config tool
 as the LLVM_CONFIG argument for the Halide make distrib command.
 
+CC=<path-to-built-clang> CXX=<path-to-built-clang++> LLVM_CONFIG=<path-to-built-llvm-config> WITH_INTROSPECTION= make distrib
+
 ### CMake Metabuild
 
 If using an LLVM build from source, you will also want to provide the same -DLLVM_CONFIG path to the cmake command line

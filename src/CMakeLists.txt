@@ -13,6 +13,8 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/codon_table.h"
     DEPENDS build_codon_table
 )
 
+link_directories("${HALIDE_DISTRIB_DIR}/lib")
+
 set(vcsmc_common_src_files
     assembler.cc
     assembler.h
@@ -73,6 +75,7 @@ target_link_libraries(vcsmc_common_lib PUBLIC
     avformat
     avutil
     gflags::gflags
+    Halide
     libz26
     png
     swscale
