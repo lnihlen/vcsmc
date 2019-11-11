@@ -9,7 +9,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <yaml.h>
 
 #include "assembler.h"
 #include "constants.h"

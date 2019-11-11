@@ -1,6 +1,6 @@
 #include "Halide.h"
 
-#include "constants.h"
+const float kPi = 3.1415926535897932384626433832795028841971693993751;
 
 class Ciede2k : public Halide::Generator<Ciede2k> {
  public:
@@ -61,12 +61,12 @@ class Ciede2k : public Halide::Generator<Ciede2k> {
                             atan2(b_star_2(x, y), a_2(x, y)));
     Halide::Func h_1("h_1");
     h_1(x, y) = select(h_1_atan(x, y) < 0.0f,
-                       h_1_atan(x, y) + (2.0f * vcsmc::kPi),
-                       h_1_atan(x, y)) * (180.0f / vcsmc::kPi);
+                       h_1_atan(x, y) + (2.0f * kPi),
+                       h_1_atan(x, y)) * (180.0f / kPi);
     Halide::Func h_2("h_2");
     h_2(x, y) = select(h_2_atan(x, y) < 0.0f,
-                       h_2_atan(x, y) + (2.0f * vcsmc::kPi),
-                       h_2_atan(x, y)) * (180.0f / vcsmc::kPi);
+                       h_2_atan(x, y) + (2.0f * kPi),
+                       h_2_atan(x, y)) * (180.0f / kPi);
 
     Halide::Func del_L("del_L");
     del_L(x, y) = L_star_2(x, y) - L_star_1(x, y);
@@ -88,7 +88,7 @@ class Ciede2k : public Halide::Generator<Ciede2k> {
 
     Halide::Func del_H("del_H");
     del_H(x, y) = 2.0f * sqrt(C_product(x, y)) *
-        sin((del_h(x, y) * (vcsmc::kPi / 180.0f)) / 2.0f);
+        sin((del_h(x, y) * (kPi / 180.0f)) / 2.0f);
 
     Halide::Func L_mean("L_mean");
     L_mean(x, y) = (L_star_1(x, y) + L_star_2(x, y)) / 2.0f;
@@ -110,13 +110,13 @@ class Ciede2k : public Halide::Generator<Ciede2k> {
 
     Halide::Func T("T");
     T(x, y) = 1.0f - (0.17f * cos((h_mean(x, y) - 30.0f) *
-                                  (vcsmc::kPi / 180.0f))) +
+                                  (kPi / 180.0f))) +
                      (0.24f * cos(2.0f * h_mean(x, y) *
-                                  (vcsmc::kPi / 180.0f))) +
+                                  (kPi / 180.0f))) +
                      (0.32f * cos(((3.0f * h_mean(x, y)) + 6.0f) *
-                                  (vcsmc::kPi / 180.0f))) -
+                                  (kPi / 180.0f))) -
                      (0.20f * cos(((4.0f * h_mean(x, y)) - 63.0f) *
-                                  (vcsmc::kPi / 180.0f)));
+                                  (kPi / 180.0f)));
 
     // Intermediate term del_theta_inner not part of standard formulation.
     Halide::Func del_theta_inner("del_theta_inner");
@@ -148,7 +148,7 @@ class Ciede2k : public Halide::Generator<Ciede2k> {
 
     Halide::Func R_T("R_T");
     R_T(x, y) = -1.0f *
-        sin(2.0f * del_theta(x, y) * (vcsmc::kPi / 180.0f)) * R_c(x, y);
+        sin(2.0f * del_theta(x, y) * (kPi / 180.0f)) * R_c(x, y);
 
     // Intermediate terms for the fractions.
     Halide::Func L_frac("L_frac");
