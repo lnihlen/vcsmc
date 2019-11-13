@@ -71,6 +71,22 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/codon_table.cc" "${CMAKE_
 )
 
 ####
+# flatbuffer schema files
+set(vcsmc_schema_files
+    schemas/LogEntry.fbs
+)
+
+build_flatbuffers(
+    "${vcsmc_schema_files}"
+    ""
+    "vcsmc_schemas"
+    ""
+    "${CMAKE_CURRENT_BINARY_DIR}/schemas"
+    ""
+    ""
+)
+
+####
 # vcsmc_core
 set(vcsmc_core_files
     assembler.cc
@@ -107,6 +123,8 @@ add_library(vcsmc_core STATIC
     "${CMAKE_CURRENT_BINARY_DIR}/codon_table.cc"
     "${CMAKE_CURRENT_BINARY_DIR}/codon_table.h"
 )
+
+add_dependencies(vcsmc_core vcsmc_schemas)
 
 target_link_libraries(vcsmc_core PUBLIC
     avcodec
