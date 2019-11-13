@@ -24,6 +24,14 @@ add_subdirectory(leveldb)
 add_subdirectory(libz26)
 
 ###
+#
+set(PISTACHE_BUILD_EXAMPLES OFF CACHE BOOL "build Pistache examples")
+set(PISTACHE_BUILD_TESTS OFF CACHE BOOL "build Pistache tests")
+set(PISTACHE_ENABLE_NETWORK_TESTS OFF CACHE BOOL "enable Pistache network tests")
+set(PISTACHE_USE_SSL OFF CACHE BOOL "enable ssl in Pistache")
+add_subdirectory(pistache)
+
+###
 # xxHash
 set(XXHASH_BUNDLED_MODE ON CACHE BOOL "build xxhash as part of another project")
 add_subdirectory(xxHash/cmake_unofficial)
