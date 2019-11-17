@@ -2,6 +2,8 @@ include("${HALIDE_DISTRIB_DIR}/halide.cmake")
 # For the Halide library dependency.
 link_directories("${HALIDE_DISTRIB_DIR}/lib")
 
+set(CMAKE_CXX_STANDARD 11)
+
 ####
 # Image Processing Library
 add_library(vcsmc_image_processing STATIC
@@ -73,7 +75,6 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/codon_table.cc" "${CMAKE_
 ####
 # flatbuffer schema files
 set(vcsmc_schema_files
-    schemas/LogEntry.fbs
 )
 
 build_flatbuffers(
@@ -99,9 +100,13 @@ set(vcsmc_core_files
     genome.h
     gray_map.cc
     gray_map.h
+    HttpEndpoint.cpp
+    HttpEndpoint.h
     image_file.cc
     image_file.h
     kernel.h
+    Logger.h
+    Logger.cpp
     serialization.cc
     serialization.h
     snippet.h
@@ -130,7 +135,10 @@ target_link_libraries(vcsmc_core PUBLIC
     avcodec
     avformat
     avutil
+    leveldb
     libz26
+    pistache
+    pistache_static
     png
     swscale
     xxhash
@@ -157,8 +165,6 @@ target_link_libraries(vcsmc_lib PUBLIC
 # epfg
 add_executable(epfg
     epfg.cc
-    epfg_options.cc
-    epfg_options.h
 )
 
 target_link_libraries(epfg
