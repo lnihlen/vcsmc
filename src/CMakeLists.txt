@@ -2,6 +2,7 @@ include("${HALIDE_DISTRIB_DIR}/halide.cmake")
 # For the Halide library dependency.
 link_directories("${HALIDE_DISTRIB_DIR}/lib")
 
+# All the Halide stuff needs CPP11 to link properly.
 set(CMAKE_CXX_STANDARD 11)
 
 ####
@@ -71,6 +72,9 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/codon_table.cc" "${CMAKE_
     COMMAND "${CMAKE_CURRENT_BINARY_DIR}/build_codon_table" "--output_directory=${CMAKE_CURRENT_BINARY_DIR}"
     DEPENDS build_codon_table
 )
+
+# Rest-of-project needs CPP17, particularly to use Pistache.
+set(CMAKE_CXX_STANDARD 17)
 
 ####
 # flatbuffer schema files

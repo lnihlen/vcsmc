@@ -6,6 +6,8 @@
 #include "pistache/endpoint.h"
 #include "pistache/router.h"
 
+#include <string>
+
 namespace vcsmc {
 
 class HttpEndpoint::HttpHandler {
@@ -21,6 +23,8 @@ public:
         auto opts = Pistache::Http::Endpoint::options().threads(m_numThreads);
         m_server->init(opts);
 
+        // The "from" should be a string with the number of microseconds from unix epoch in hex, or zero.
+        // Will return the first key with value >= from.
         Pistache::Rest::Routes::Get(m_router, "/log/:from", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::getLog, this));
     }
@@ -28,7 +32,7 @@ public:
     void startServerThread() {
         LOG_INFO("opening http port on %d with %d threads", m_listenPort, m_numThreads);
         m_server->setHandler(m_router.handler());
-        m_server->serve();
+        m_server->serveThreaded();
     }
 
     void shutdown() {
@@ -38,8 +42,18 @@ public:
 private:
     void getLog(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
         auto timeString = request.param(":from").as<std::string>();
-        LOG_INFO("got %", timeString.c_str());
-        response.send(Pistache::Http::Code::Ok);
+        std::string logKey = "log:";
+        if (timeString.size() == 16) {
+            logKey += timeString;
+        }
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        it->Seek(logKey);
+        if (it->Valid()) {
+            std::string logEntry = it->key().ToString() + " " + it->value().ToString();
+            response.send(Pistache::Http::Code::Ok, logEntry, MIME(Text, Plain));
+        } else {
+            response.send(Pistache::Http::Code::Not_Found);
+        }
     }
 
     int m_listenPort;

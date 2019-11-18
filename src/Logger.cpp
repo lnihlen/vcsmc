@@ -29,13 +29,9 @@ void Logger::Initialize(leveldb::DB* database, int32_t echoLogLevel) {
 void Logger::Log(Logger::Level level, const char* format, ...) {
     char buf[4096];
 
-    uint64_t epochMillis = std::chrono::duration_cast<std::chrono::milliseconds>(
+    uint64_t epochMicros = std::chrono::duration_cast<std::chrono::microseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    // There's a temptation to pad this epoch key out to a few more digits but this is ridiculous as it seems we won't
-    // need another digit in the milliseconds epoch count for the useful life of this code. But should humanity survive
-    // for however long that is and somehow this code is still relevant adding a most-significant digit to these numbers
-    // will break the sorting.
-    int keyLength = snprintf(buf, 4096, "log:%" PRIx64 ":%c", epochMillis, logLevels[level]);
+    int keyLength = snprintf(buf, 4096, "log:%016" PRIx64 ":%c", epochMicros, logLevels[level]);
 
     va_list args;
     va_start(args, format);
