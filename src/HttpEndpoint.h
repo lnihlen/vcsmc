@@ -11,7 +11,7 @@ namespace vcsmc {
 
 class HttpEndpoint {
 public:
-    HttpEndpoint(int listenPort, int numThreads, leveldb::DB* database);
+    HttpEndpoint(int listenPort, int numThreads, leveldb::DB* database, const std::string& htmlPath);
     ~HttpEndpoint();
 
     void startServerThread();
