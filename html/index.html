@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>vcsmc</title>
+        <script>
+"use strict";
+
+var lastLogEntryTime = 0;
+var logLineCount = 0;
+
+function updateLog() {
+    let moreData = true;
+    let xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            let logResponse = this.responseText.split("\n");
+            logResponse.forEach(logLine => {
+                if (logLine.length > 0) {
+                    let logSplit = logLine.split("\t");
+                    let statusSplit = logSplit[0].split(":");
+                    let logInt = parseInt(statusSplit[1], 16);
+                    lastLogEntryTime = logInt + 1;
+                    let logDate = new Date(logInt / 1000);
+                    let node = document.createElement("div");
+                    if (logLineCount % 2 == 0) {
+                        node.classList.add("logEven");
+                    } else {
+                        node.classList.add("logOdd");
+                    }
+                    logLineCount++;
+                    node.appendChild(document.createTextNode(
+                        logDate.toLocaleDateString() + " " + logDate.toLocaleTimeString() + ": " + logSplit[1]));
+                    document.getElementById("logStream").appendChild(node);
+                }
+            });
+        }
+    }
+    let timeStamp = lastLogEntryTime.toString(16);
+    while (timeStamp.length < 16) {
+        timeStamp = "0" + timeStamp;
+    }
+    xhttp.open("GET", window.location.origin + "/log/" + timeStamp);
+    xhttp.send();
+}
+
+window.onload = function() {
+    setInterval(updateLog, 1000);
+};
+        </script>
+        <style>
+// Overall style
+body {
+    font-family: Arial, Helvetica, sans-serif;
+}
+.column {
+    float: left;
+}
+
+.left, .right {
+    width: 25%;
+}
+
+.middle {
+    width: 50%;
+}
+
+// Logging
+.logEven {
+    background-color: #ccc;
+}
+.logOdd {
+    background-color: #ddd;
+}
+        </style>
+    </head>
+    <body>
+        <div class="row">
+            <div class="column" id="leftNav">
+                <p>Status</p>
+                <p>Frame Group</p>
+            </div>
+            <div class="column" id="content">
+            </div>
+            <div class="column" id="logStream">
+            </div>
+        </div>
+    </body>
+</html>
+
