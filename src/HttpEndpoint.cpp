@@ -21,7 +21,10 @@ public:
     void setupRoutes() {
         Pistache::Address address(Pistache::Ipv4::any(), Pistache::Port(m_listenPort));
         m_server.reset(new Pistache::Http::Endpoint(address));
-        auto opts = Pistache::Http::Endpoint::options().threads(m_numThreads);
+        auto opts = Pistache::Http::Endpoint::options()
+            .threads(m_numThreads)
+            .maxRequestSize(kMaxRequestSize)
+            .maxResponseSize(kMaxResponseSize);
         m_server->init(opts);
 
         // Static file serving.
@@ -47,9 +50,14 @@ public:
     }
 
 private:
+    static constexpr size_t kMaxRequestSize = 4096;
+    static constexpr size_t kMaxResponseSize = 4096;
+    // Pistache seems to throw an exception if we don't budget a bit of size for headers, etc in total response size.
+    static constexpr size_t kMaxResponseContentSize = kMaxResponseSize - 128;
+
     void serveFile(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
         std::string resource = m_htmlPath + (request.resource() == "/" ? "/index.html" : request.resource());
-        LOG_INFO("serving file %s", resource.c_str());
+        LOG_DEBUG("serving file %s", resource.c_str());
         Pistache::Http::serveFile(response, resource);
     }
 
@@ -60,12 +68,25 @@ private:
             logKey += timeString;
         }
         std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        auto isLogKey = [](auto& it) {
+            return it->Valid() && it->key().ToString().substr(0, 4) == "log:";
+        };
         it->Seek(logKey);
-        if (it->Valid()) {
-            std::string logEntry = it->key().ToString() + " " + it->value().ToString();
-            response.send(Pistache::Http::Code::Ok, logEntry, MIME(Text, Plain));
+        if (isLogKey(it)) {
+            std::string logResponse = it->key().ToString() + "\t" + it->value().ToString();
+            it->Next();
+            size_t count = 0;
+            while (isLogKey(it) && count < 10000) {
+                std::string nextLog = it->key().ToString() + "\t" + it->value().ToString();
+                if (logResponse.size() + nextLog.size() + 1 >= kMaxResponseContentSize) break;
+                logResponse += "\n" + nextLog;
+                it->Next();
+                ++count;
+            }
+            response.send(Pistache::Http::Code::Ok, logResponse, MIME(Text, Plain));
         } else {
-            response.send(Pistache::Http::Code::Not_Found);
+            // Send back empty response to indicate no new log entries.
+            response.send(Pistache::Http::Code::Ok);
         }
     }
 
