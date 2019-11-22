@@ -1,4 +1,4 @@
-#include "video_decoder.h"
+#include "VideoDecoder.h"
 
 #include <deque>
 
@@ -221,11 +221,6 @@ class VideoDecoder::VideoDecoderImpl {
   bool at_end_of_file_;
   std::deque<std::shared_ptr<VideoFrame>> frames_;
 };
-
-// static
-void VideoDecoder::InitDecoderLibrary() {
-  av_register_all();
-}
 
 VideoDecoder::VideoDecoder() : p_(new VideoDecoderImpl()) {}
 

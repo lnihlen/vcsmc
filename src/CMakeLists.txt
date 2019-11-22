@@ -13,8 +13,8 @@ add_library(vcsmc_image_processing STATIC
     atari_ntsc_lab_color_table.h
     gaussian_kernel.cc
     gaussian_kernel.h
-    video_decoder.cc
-    video_decoder.h
+    VideoDecoder.cc
+    VideoDecoder.h
 )
 
 set(vcsmc_halide_generators

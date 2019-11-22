@@ -1,0 +1,11 @@
+namespace vcsmc.Data;
+
+type TargetFrame {
+    frameNumber:int;
+    isKeyFrame:bool;
+    frameTime:ulong;
+    image:[ubyte];
+}
+
+root_type TargetFrame;
+

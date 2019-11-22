@@ -1,11 +1,7 @@
 #ifndef SRC_VIDEO_DECODER_H_
 #define SRC_VIDEO_DECODER_H_
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#pragma clang diagnostic ignored "-Wmissing-field-initializers"
 #include "Halide.h"
-#pragma clang diagnostic pop
 
 #include <string>
 #include <memory>
@@ -23,8 +19,6 @@ struct VideoFrame {
 
 class VideoDecoder {
  public:
-  // Call me once at start of program execution.
-  static void InitDecoderLibrary();
   VideoDecoder();
   ~VideoDecoder();
 

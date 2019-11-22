@@ -1,0 +1,6 @@
+namespace vcsmc.Data;
+
+type FrameGroup {
+    firstFrame:int;
+    lastFrame:int;
+}
