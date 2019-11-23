@@ -125,6 +125,8 @@ set(vcsmc_core_files
     types.h
     value_map.cc
     value_map.h
+    Workflow.cpp
+    Workflow.h
 )
 
 add_library(vcsmc_core STATIC

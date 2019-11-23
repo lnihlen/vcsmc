@@ -29,9 +29,8 @@ void Logger::Initialize(leveldb::DB* database, int32_t echoLogLevel) {
 void Logger::Log(Logger::Level level, const char* format, ...) {
     char buf[4096];
 
-    uint64_t epochMicros = std::chrono::duration_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    int keyLength = snprintf(buf, 4096, "log:%016" PRIx64 ":%c", epochMicros, logLevels[level]);
+    std::string timeStamp = Logger::Timestamp();
+    int keyLength = snprintf(buf, 4096, "log:%s:%c", timeStamp.c_str(), logLevels[level]);
 
     va_list args;
     va_start(args, format);
@@ -51,6 +50,15 @@ void Logger::Log(Logger::Level level, const char* format, ...) {
     if (level <= minEchoLevel) {
         printf("%s %s\n", buf, buf + keyLength + 1);
     }
+}
+
+// static
+std::string Logger::Timestamp() {
+    char buf[32];
+    uint64_t epochMicros = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    snprintf(buf, 32, "%016" PRIx64, epochMicros);
+    return std::string(buf);
 }
 
 // static
