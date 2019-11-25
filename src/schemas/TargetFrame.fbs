@@ -1,6 +1,6 @@
 namespace vcsmc.Data;
 
-type TargetFrame {
+table TargetFrame {
     frameNumber:int;
     isKeyFrame:bool;
     frameTime:ulong;

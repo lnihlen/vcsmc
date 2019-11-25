@@ -2,11 +2,7 @@
 
 #include <deque>
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#pragma clang diagnostic ignored "-Wmissing-field-initializers"
 #include "Halide.h"
-#pragma clang diagnostic pop
 
 extern "C" {
 #include <libavcodec/avcodec.h>

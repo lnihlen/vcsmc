@@ -63,35 +63,17 @@ int main(int argc, char* argv[]) {
 
     vcsmc::Logger::Initialize(db, FLAGS_echo_log_level);
 
+    // If there's a media path write it into the database.
+    if (FLAGS_movie_path != "") {
+        LOG_INFO("saving movie path %s into database", FLAGS_movie_path.c_str());
+        db->Put(leveldb::WriteOptions(), "FLAGS_movie_path", FLAGS_movie_path);
+    }
+
     vcsmc::HttpEndpoint httpEndpoint(FLAGS_http_listen_port, FLAGS_http_listen_threads, db, FLAGS_html_path);
     httpEndpoint.startServerThread();
 
     vcsmc::Workflow workflow(db);
     workflow.runThread();
-
-    // TODO - move to thread.
-
-    // Time to figure out what to do, by consulting the database for the most recent state (if any).
-    std::unique_ptr<leveldb::Iterator> it(db->NewIterator(leveldb::ReadOptions()));
-    constexpr std::string_view kStatePrefix = "state:";
-    it->Seek(kStatePrefix.data());
-    // State keys are structured as "state:<64-bit hex timestamp>:" with string value provided below, or there is no
-    // State key, which means that the database is new and should now be initialized.
-    if (!it->Valid() || it->key().ToString().substr(0, kStatePrefix.size()) != kStatePrefix) {
-        LOG_INFO("found empty state table, initializing");
-        db->Put(leveldb::WriteOptions(), kStatePrefix.data() + vcsmc::Logger::Timestamp(), "Initial Empty");
-        // Seek again, to find this key so that we can assume a valid key for rest of the state machine.
-        it->Seek(kStatePrefix.data());
-    }
-
-    LOG_INFO("starting epfg with state %s -> %s", it->key().ToString().data(), it->value().ToString().data());
-    if (it->value() == "Initial Empty") {
-    } else if (it->value() == "Movie Ingest") {
-    } else if (it->value() == "Encode") {
-    } else if (it->value() == "Idle") {
-    } else {
-        LOG_WARN("unknown state %s, idling", it->value().ToString().data());
-    }
 
     int signal = 0;
     // Block until termination signal sent.

@@ -27,7 +27,6 @@ class VideoDecoder {
   bool AtEndOfFile() const;
   void CloseFile();
 
-
  private:
   // Use pImpl pattern to shield rest of the project from the libav headers.
   class VideoDecoderImpl;

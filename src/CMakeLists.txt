@@ -79,6 +79,7 @@ set(CMAKE_CXX_STANDARD 17)
 ####
 # flatbuffer schema files
 set(vcsmc_schema_files
+    schemas/TargetFrame.fbs
 )
 
 build_flatbuffers(
@@ -125,8 +126,6 @@ set(vcsmc_core_files
     types.h
     value_map.cc
     value_map.h
-    Workflow.cpp
-    Workflow.h
 )
 
 add_library(vcsmc_core STATIC
@@ -141,6 +140,7 @@ target_link_libraries(vcsmc_core PUBLIC
     avcodec
     avformat
     avutil
+    Halide
     leveldb
     libz26
     pistache
@@ -153,6 +153,7 @@ target_link_libraries(vcsmc_core PUBLIC
 target_include_directories(vcsmc_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_BINARY_DIR}"
+    "${HALIDE_INCLUDE_DIR}"
 )
 
 ####
@@ -171,9 +172,12 @@ target_link_libraries(vcsmc_lib PUBLIC
 # epfg
 add_executable(epfg
     epfg.cc
+    Workflow.cpp
+    Workflow.h
 )
 
 target_link_libraries(epfg
+    flatbuffers
     gflags::gflags
     vcsmc_lib
 )

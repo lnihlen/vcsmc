@@ -1,6 +1,8 @@
 #ifndef SRC_WORKFLOW_H_
 #define SRC_WORKFLOW_H_
 
+#include <future>
+
 namespace leveldb {
 class DB;
 }
@@ -14,13 +16,15 @@ public:
     Workflow(leveldb::DB* database);
     ~Workflow();
 
-    void setup();
     void runThread();
+    void shutdown();
 
 private:
-    class Task;
+    void run();
 
     leveldb::DB* m_db;
+    bool m_quit;
+    std::future<void> m_future;
 };
 
 }  // namespace vcsmc
