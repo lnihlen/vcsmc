@@ -2,10 +2,16 @@
 
 #include "Logger.h"
 
+#include "SourceFrame_generated.h"
+#include "TargetFrame_generated.h"
+
 #include "leveldb/db.h"
 #include "pistache/endpoint.h"
 #include "pistache/router.h"
 
+#include <png.h>
+
+#include <inttypes.h>
 #include <string>
 
 namespace vcsmc {
@@ -28,15 +34,24 @@ public:
         m_server->init(opts);
 
         // Static file serving.
-        Pistache::Rest::Routes::Get(m_router,"/", Pistache::Rest::Routes::bind(
+        Pistache::Rest::Routes::Get(m_router, "/", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::serveFile, this));
         Pistache::Rest::Routes::Get(m_router, "/index.html", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::serveFile, this));
+
+        // Image serving.
+        // Number should be an 8 character hex string.
+        Pistache::Rest::Routes::Get(m_router, "/img/source/:number", Pistache::Rest::Routes::bind(
+            &HttpEndpoint::HttpHandler::getImageSource, this));
 
         // The "from" should be a string with the number of microseconds from unix epoch in hex, or zero.
         // Will return the first key with value >= from.
         Pistache::Rest::Routes::Get(m_router, "/log/:from", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::getLog, this));
+
+        // Returns some JSON with the source frame metadata contained. Number should be an 8 character hex string.
+        Pistache::Rest::Routes::Get(m_router, "/source/:number", Pistache::Rest::Routes::bind(
+            &HttpEndpoint::HttpHandler::getSource, this));
     }
 
     void startServerThread() {
@@ -57,8 +72,20 @@ private:
 
     void serveFile(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
         std::string resource = m_htmlPath + (request.resource() == "/" ? "/index.html" : request.resource());
-        LOG_DEBUG("serving file %s", resource.c_str());
+        LOG_INFO("serving file %s", resource.c_str());
         Pistache::Http::serveFile(response, resource);
+    }
+
+    void getImageSource(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+        auto frameNumber = request.param(":number").as<std::string>();
+        std::string frameKey = "sourceFrame:" + frameNumber;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        it->Seek(frameKey);
+        if (it->Valid() && it->key().ToString() == frameKey) {
+            
+        } else {
+            response.send(Pistache::Http::Code::Not_Found);
+        }
     }
 
     void getLog(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
@@ -87,6 +114,31 @@ private:
         } else {
             // Send back empty response to indicate no new log entries.
             response.send(Pistache::Http::Code::Ok);
+        }
+    }
+
+    void getSource(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+        auto frameNumber = request.param(":number").as<std::string>();
+        std::string frameKey = "sourceFrame:" + frameNumber;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        it->Seek(frameKey);
+        if (it->Valid() && it->key().ToString() == frameKey) {
+            const Data::SourceFrame* sourceFrame = Data::GetSourceFrame(it->value().data());
+            std::array<char, 32> buf;
+            std::string frameJSON = "{ \"frameNumber\":";
+            snprintf(buf.data(), sizeof(buf), "%d", sourceFrame->frameNumber());
+            frameJSON += buf.data() + std::string(", \"isKeyFrame\":");
+            if (sourceFrame->isKeyFrame()) {
+                frameJSON += "true";
+            } else {
+                frameJSON += "false";
+            }
+            frameJSON += ", \"frameTime\":";
+            snprintf(buf.data(), sizeof(buf), "%" PRId64, sourceFrame->frameTime());
+            frameJSON += buf.data() + std::string(" }");
+            response.send(Pistache::Http::Code::Ok, frameJSON, MIME(Application, Json));
+        } else {
+            response.send(Pistache::Http::Code::Not_Found);
         }
     }
 
