@@ -13,8 +13,6 @@ add_library(vcsmc_image_processing STATIC
     atari_ntsc_lab_color_table.h
     gaussian_kernel.cc
     gaussian_kernel.h
-    VideoDecoder.cc
-    VideoDecoder.h
 )
 
 set(vcsmc_halide_generators
@@ -79,6 +77,7 @@ set(CMAKE_CXX_STANDARD 17)
 ####
 # flatbuffer schema files
 set(vcsmc_schema_files
+    schemas/SourceFrame.fbs
     schemas/TargetFrame.fbs
 )
 
@@ -126,6 +125,8 @@ set(vcsmc_core_files
     types.h
     value_map.cc
     value_map.h
+    VideoDecoder.cc
+    VideoDecoder.h
 )
 
 add_library(vcsmc_core STATIC
@@ -140,6 +141,7 @@ target_link_libraries(vcsmc_core PUBLIC
     avcodec
     avformat
     avutil
+    flatbuffers
     Halide
     leveldb
     libz26

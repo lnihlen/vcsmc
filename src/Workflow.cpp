@@ -7,6 +7,7 @@
 #include "VideoDecoder.h"
 #include "rgb_to_lab.h"
 
+#include "SourceFrame_generated.h"
 #include "TargetFrame_generated.h"
 
 #include "Halide.h"
@@ -56,16 +57,18 @@ void Workflow::run() {
     std::string moviePath;
 
     // kDecodeFrame
-    std::shared_ptr<VideoFrame> videoFrame;
+    flatbuffers::DetachedBuffer sourceFrameBuffer;
+    const Data::SourceFrame* sourceFrame = nullptr;
 
     // kComputeTargetFrameLab
+    Halide::Runtime::Buffer<uint8_t, 3> frameRGB(kTargetFrameWidthPixels, kFrameHeightPixels, 3);
     Halide::Runtime::Buffer<float, 3> frameLab(kTargetFrameWidthPixels, kFrameHeightPixels, 3);
 
     // kFitTargetFrameColors
-    flatbuffers::FlatBufferBuilder builder((kTargetFrameWidthPixels * kFrameHeightPixels) + 1024);
+    flatbuffers::FlatBufferBuilder builder((kFrameSizeBytes) + 1024);
     uint8_t* minIndices;
     Halide::Runtime::Buffer<float, 3> colorDistances(kTargetFrameWidthPixels, kFrameHeightPixels);
-    std::array<float, kTargetFrameWidthPixels * kFrameHeightPixels> minDistances;
+    std::array<float, kFrameSizeBytes> minDistances;
 
     while (!m_quit) {
         switch (state) {
@@ -92,45 +95,66 @@ void Workflow::run() {
                 state = kDecodeFrame;
                 break;
 
-            // Decode a video frame from compressed file to scaled output.
+            // Decode a video frame from compressed file to scaled output and save in database.
             case kDecodeFrame:
-                LOG_INFO("extracting frame %d", videoFrame->frame_number);
+                LOG_INFO("decoding next frame from movie file.");
                 if (!decoderOpen) {
-                    LOG_FATAL("ExtractFrames called with open decoder.");
+                    LOG_FATAL("ExtractFrames called with closed decoder.");
                     m_quit = true;
                     break;
                 }
 
-                videoFrame = decoder.GetNextFrame();
-                if (!videoFrame) {
+                sourceFrameBuffer = decoder.GetNextFrame();
+                if (!sourceFrameBuffer.data()) {
                     LOG_INFO("eof encountered in media, closing");
                     state = kCloseMovie;
                     break;
                 }
 
+                // Parse back into a SourceFrame for reading in-place.
+                sourceFrame = Data::GetSourceFrame(sourceFrameBuffer.data());
+                if (!sourceFrame) {
+                    LOG_FATAL("error extracting SourceFrame from decoded video.");
+                    m_quit = true;
+                    break;
+                }
+
+                // Save the frame to the database.
+                LOG_INFO("serializing source frame %d into database.", sourceFrame->frameNumber());
+                snprintf(keyBuf.data(), sizeof(keyBuf), "sourceFrame:%08x", sourceFrame->frameNumber());
+                status = m_db->Put(leveldb::WriteOptions(), keyBuf.data(),
+                    leveldb::Slice(reinterpret_cast<const char*>(sourceFrameBuffer.data()), sourceFrameBuffer.size()));
+                if (!status.ok()) {
+                    LOG_FATAL("error saving source frame %d into database.", sourceFrame->frameNumber());
+                    m_quit = true;
+                    break;
+                }
                 state = kComputeTargetFrameLab;
                 break;
 
             // Convert decoded RGB target frame to L*a*b* color.
             case kComputeTargetFrameLab:
-                LOG_INFO("converting frame %d to L*a*b*", videoFrame->frame_number);
-                if (!videoFrame) {
+                LOG_INFO("converting frame %d to L*a*b*", sourceFrame->frameNumber());
+                if (!sourceFrame) {
                     LOG_FATAL("computing target lab color on empty video frame");
                     m_quit = true;
                     break;
                 }
-                rgb_to_lab(videoFrame->frame_data, frameLab);
+                // Copy color planes into Halide buffer.
+                std::memcpy(frameRGB.begin(), sourceFrame->imageR()->data(), sourceFrame->imageR()->size());
+                std::memcpy(frameRGB.begin() + kFrameSizeBytes, sourceFrame->imageG()->data(), kFrameSizeBytes);
+                std::memcpy(frameRGB.begin() + (2 * kFrameSizeBytes), sourceFrame->imageB()->data(), kFrameSizeBytes);
+                rgb_to_lab(frameRGB, frameLab);
                 state = kFitTargetFrameColors;
                 break;
 
             case kFitTargetFrameColors:
-                LOG_INFO("finding minimum error distance Atari colors for frame %d", videoFrame->frame_number);
+                LOG_INFO("finding minimum error distance Atari colors for frame %d", sourceFrame->frameNumber());
                 {
                     builder.Clear();
                     minIndices = nullptr;
-                    auto indices = builder.CreateUninitializedVector(kTargetFrameWidthPixels * kFrameHeightPixels,
-                        &minIndices);
-                    std::memset(minIndices, 0, kTargetFrameWidthPixels * kFrameHeightPixels);
+                    auto indices = builder.CreateUninitializedVector(kFrameSizeBytes, &minIndices);
+                    std::memset(minIndices, 0, kFrameSizeBytes);
                     // Do zero color first to initialize distances and mins.
                     ciede_2k(frameLab, kAtariNtscLabLColorTable[0], kAtariNtscLabAColorTable[0],
                         kAtariNtscLabBColorTable[0], colorDistances);
@@ -138,24 +162,24 @@ void Workflow::run() {
                     for (auto i = 1; i < 128; ++i) {
                         ciede_2k(frameLab, kAtariNtscLabLColorTable[i], kAtariNtscLabAColorTable[i],
                             kAtariNtscLabBColorTable[i], colorDistances);
-                        for (auto j = 0; j < kTargetFrameWidthPixels * kFrameHeightPixels; ++j) {
+                        for (auto j = 0; j < kFrameSizeBytes; ++j) {
                             if (colorDistances.begin()[j] < minDistances[j]) {
                                 minIndices[j] = i;
                             }
                         }
                     }
                     Data::TargetFrameBuilder frameBuilder(builder);
-                    frameBuilder.add_frameNumber(videoFrame->frame_number);
-                    frameBuilder.add_isKeyFrame(videoFrame->is_keyframe);
-                    frameBuilder.add_frameTime(videoFrame->frame_time_us);
+                    frameBuilder.add_frameNumber(sourceFrame->frameNumber());
+                    frameBuilder.add_isKeyFrame(sourceFrame->isKeyFrame());
+                    frameBuilder.add_frameTime(sourceFrame->frameTime());
                     frameBuilder.add_image(indices);
                     auto frameData = frameBuilder.Finish();
                     builder.Finish(frameData);
-                    snprintf(keyBuf.data(), sizeof(keyBuf), "targetFrame:%08x", videoFrame->frame_number);
+                    snprintf(keyBuf.data(), sizeof(keyBuf), "targetFrame:%08x", sourceFrame->frameNumber());
                     status = m_db->Put(leveldb::WriteOptions(), keyBuf.data(),
                         leveldb::Slice(reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetSize()));
                     if (!status.ok()) {
-                        LOG_FATAL("error writing targetFrame %d to database", videoFrame->frame_number);
+                        LOG_FATAL("error writing targetFrame %d to database", sourceFrame->frameNumber());
                         m_quit = true;
                         break;
                     }
