@@ -26,6 +26,7 @@ DEFINE_int32(echo_log_level, vcsmc::Logger::kWarning, "minimum log importance to
 DEFINE_int32(http_listen_port, 8001, "HTTP port to listen to for incoming web requests.");
 DEFINE_int32(http_listen_threads, 4, "Number of threads to listen to for HTTP requests.");
 DEFINE_string(html_path, "../html", "Path to the included HTML files to serve.");
+DEFINE_string(cache_path, "cache/", "Path to the directory to save files for serving in.");
 
 // Media options.
 DEFINE_string(movie_path, "", "Path to the movie file to ingest as target to encode against. If the database already "
@@ -69,7 +70,8 @@ int main(int argc, char* argv[]) {
         db->Put(leveldb::WriteOptions(), "FLAGS_movie_path", FLAGS_movie_path);
     }
 
-    vcsmc::HttpEndpoint httpEndpoint(FLAGS_http_listen_port, FLAGS_http_listen_threads, db, FLAGS_html_path);
+    vcsmc::HttpEndpoint httpEndpoint(FLAGS_http_listen_port, FLAGS_http_listen_threads, db, FLAGS_html_path,
+        FLAGS_cache_path);
     httpEndpoint.startServerThread();
 
     vcsmc::Workflow workflow(db);

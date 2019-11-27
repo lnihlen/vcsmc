@@ -4,9 +4,8 @@ table SourceFrame {
     frameNumber:int;
     isKeyFrame:bool;
     frameTime:ulong;
-    imageR:[ubyte];
-    imageG:[ubyte];
-    imageB:[ubyte];
+    imageHash:ulong;
+    imageRGB:[ubyte];
 }
 
 root_type SourceFrame;

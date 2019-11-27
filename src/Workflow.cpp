@@ -141,9 +141,7 @@ void Workflow::run() {
                     break;
                 }
                 // Copy color planes into Halide buffer.
-                std::memcpy(frameRGB.begin(), sourceFrame->imageR()->data(), sourceFrame->imageR()->size());
-                std::memcpy(frameRGB.begin() + kFrameSizeBytes, sourceFrame->imageG()->data(), kFrameSizeBytes);
-                std::memcpy(frameRGB.begin() + (2 * kFrameSizeBytes), sourceFrame->imageB()->data(), kFrameSizeBytes);
+                std::memcpy(frameRGB.begin(), sourceFrame->imageRGB()->data(), sourceFrame->imageRGB()->size());
                 rgb_to_lab(frameRGB, frameLab);
                 state = kFitTargetFrameColors;
                 break;

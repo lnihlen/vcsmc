@@ -10,6 +10,8 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 
+#include "xxhash.h"
+
 #include <deque>
 
 namespace vcsmc {
@@ -132,18 +134,14 @@ class VideoDecoder::VideoDecoderImpl {
             return false;
         }
 
-        uint8_t* redBytes;
-        uint8_t* greenBytes;
-        uint8_t* blueBytes;
-        auto imageR = builder.CreateUninitializedVector(kTargetFrameWidthPixels * kFrameHeightPixels, &redBytes);
-        auto imageG = builder.CreateUninitializedVector(kTargetFrameWidthPixels * kFrameHeightPixels, &greenBytes);
-        auto imageB = builder.CreateUninitializedVector(kTargetFrameWidthPixels * kFrameHeightPixels, &blueBytes);
+        uint8_t* planes;
+        auto imageRGB = builder.CreateUninitializedVector(kFrameSizeBytes * 3, &planes);
 
         // Note order of plane pointers for proper RGB plane alignment.
         uint8* plane_pointers[3] = {
-          greenBytes,  // frame_rgb.begin() + kFrameSizeBytes,
-          blueBytes,   // frame_rgb.begin() + (kFrameSizeBytes * 2),
-          redBytes,    // frame_rgb.begin()
+          planes + kFrameSizeBytes,
+          planes + (kFrameSizeBytes * 2),
+          planes
         };
         int plane_widths[3] = {
           kTargetFrameWidthPixels,
@@ -168,9 +166,8 @@ class VideoDecoder::VideoDecoderImpl {
         frameBuilder.add_frameNumber(video_codec_context_->frame_number);
         frameBuilder.add_isKeyFrame(frame->key_frame == 1);
         frameBuilder.add_frameTime(frame->pts * video_frame_time_base_us_);
-        frameBuilder.add_imageR(imageR);
-        frameBuilder.add_imageG(imageG);
-        frameBuilder.add_imageB(imageB);
+        frameBuilder.add_imageHash(XXH64(planes, kFrameSizeBytes * 3, 0));
+        frameBuilder.add_imageRGB(imageRGB);
         auto frameData = frameBuilder.Finish();
         builder.Finish(frameData);
         frames_.push_back(builder.Release());
