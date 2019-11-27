@@ -51,6 +51,8 @@ public:
         // hash supplied in the metadata. This is to avoid caching issues in browsers when fitting different videos.
         Pistache::Rest::Routes::Get(m_router, "/img/source/:number/:hash", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::getImageSource, this));
+        Pistache::Rest::Routes::Get(m_router, "/img/target/:number/:hash", Pistache::Rest::Routes::bind(
+            &HttpEndpoint::HttpHandler::getImageTarget, this));
 
         // The "from" should be a string with the number of microseconds from unix epoch in hex, or zero.
         // Will return the first key with value >= from.
@@ -123,6 +125,10 @@ private:
         } else {
             response.send(Pistache::Http::Code::Not_Found);
         }
+    }
+
+    void getImageTarget(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+        response.send(Pistache::Http::Code::Ok);
     }
 
     void getLog(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {

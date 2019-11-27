@@ -6,8 +6,8 @@
 namespace vcsmc {
 
 extern const uint8 kAtariNtscRedColorTable[];
-extern const uint8 kAtariNtscBlueColorTable[];
 extern const uint8 kAtariNtscGreenColorTable[];
+extern const uint8 kAtariNtscBlueColorTable[];
 
 }  // namespace vcsmc
 
