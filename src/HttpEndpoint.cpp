@@ -1,5 +1,6 @@
 #include "HttpEndpoint.h"
 
+#include "constants.h"
 #include "image_file.h"
 #include "Logger.h"
 
@@ -91,6 +92,32 @@ private:
         it->Seek(frameKey);
         if (it->Valid() && it->key().ToString() == frameKey) {
             // First look up image in database. Match hash to one provided.
+            const Data::SourceFrame* sourceFrame = Data::GetSourceFrame(it->value().data());
+            if (!sourceFrame) {
+                LOG_WARN("failed to retrieve source frame data for frame %s, hash %s", frameNumber.c_str(),
+                    hash.c_str());
+                response.send(Pistache::Http::Code::Internal_Server_Error);
+            } else {
+                uint64_t hashValue = strtoull(hash.c_str(), nullptr, 16);
+                if (sourceFrame->imageHash() != hashValue) {
+                    LOG_WARN("source frame %s requested hash %s doesn't match stored hash %016" PRIx64,
+                        frameNumber.c_str(), hash.c_str(), hashValue);
+                    response.send(Pistache::Http::Code::Not_Found);
+                } else {
+                    fs::path imageFilePath = m_cachePath + "sourceImage-" + frameNumber + "-" + hash + ".png";
+                    bool imageOK = fs::exists(imageFilePath);
+                    if (!imageOK) {
+                        imageOK = SaveImage(sourceFrame->imageRGB()->data(), kTargetFrameWidthPixels,
+                            kFrameHeightPixels, imageFilePath);
+                    }
+                    if (imageOK) {
+                        Pistache::Http::serveFile(response, imageFilePath);
+                    } else {
+                        LOG_WARN("error saving image file to %s", imageFilePath.c_str());
+                        response.send(Pistache::Http::Code::Internal_Server_Error);
+                    }
+                }
+            }
             // Next look up path in cache, to see if image already extracted, if so, serve it.
             // If not, save image then serve it.
         } else {
