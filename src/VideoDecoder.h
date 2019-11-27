@@ -5,15 +5,19 @@
 
 #include <string>
 
+namespace leveldb {
+    class DB;
+}
+
 namespace vcsmc {
 
 class VideoDecoder {
  public:
-  VideoDecoder();
+  VideoDecoder(leveldb::DB* db);
   ~VideoDecoder();
 
   bool OpenFile(const std::string& file_name);
-  flatbuffers::DetachedBuffer GetNextFrame();
+  bool SaveNextFrame();
   bool AtEndOfFile() const;
   void CloseFile();
 

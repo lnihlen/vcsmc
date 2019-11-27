@@ -35,14 +35,29 @@ void Workflow::shutdown() {
 }
 
 void Workflow::run() {
+    // More than one source frame can have the same sourceHash, the hash of the RGB bytes that describe the frame image.
+    // Because of quantization, more quantized frames are likely to have the same hash. Desired output when we start
+    // kernel fitting is frame groups and a list of quantized hash values that are within that frame group.
+
+    // There's a flatbuffer called movieStats which contains the final information about the movie. It includes # of
+    // frames, unique source frames, unique quantized frames, number of frame groups, total running time, movie path.
+    // Presence of that indicates that the entire thing has been decoded and all decode steps should be skipped.
+
+    // Decoding consists of extracting a frame from ffmpeg, hashing the RGB values, and saving the image bytes in the
+    // database under that hash. We also save the frame metadata in the SourceFrame flatbuffer.
+
+    // Quantization is the next phase. We iterate through all source images by hash, create quantized frames from those.
+    // The presence of map entry from source frame to quantized frame indicates this step has been completed. Fit frames
+    // are also saved in their own table.
+
     enum State {
         kInitial,                // First state, does nothing.
         kOpenMovie,              // Open the video file, skipped if all frames already extracted.
-        kDecodeFrame,            // Decode a new frame from the encoded movie file.
-        kComputeTargetFrameLab,  // Convert the decoded frame to L*a*b* color, for measuring distances.
-        kFitTargetFrameColors,   // Find closest average distance NTSC color numbers for each pair of input pixels in
-                                 // a target frame.
-        kCloseMovie,             // Close the input movie file, start decoding.
+        kDecodeFrames,           // Decode a new frame from the encoded movie file, hash the resulting RGB values and
+                                 // save image bytes in database under hash (if unique).
+        kCloseMovie,             // Close the input movie file, as we no longer need it.
+        kQuantizeFrames,         // Match input frame to best-fit Atari colors, save results.
+        kBuildFrameGroups,       // Save the frame group data structures.
         kFinished,
         kTerminal
     };
@@ -52,13 +67,9 @@ void Workflow::run() {
     leveldb::Status status;
 
     // kOpenMovie
-    VideoDecoder decoder;
+    VideoDecoder decoder(m_db);
     bool decoderOpen = false;
     std::string moviePath;
-
-    // kDecodeFrame
-    flatbuffers::DetachedBuffer sourceFrameBuffer;
-    const Data::SourceFrame* sourceFrame = nullptr;
 
     // kComputeTargetFrameLab
     Halide::Runtime::Buffer<uint8_t, 3> frameRGB(kTargetFrameWidthPixels, kFrameHeightPixels, 3);
@@ -66,14 +77,13 @@ void Workflow::run() {
 
     // kFitTargetFrameColors
     flatbuffers::FlatBufferBuilder builder((kFrameSizeBytes) + 1024);
-    uint8_t* minIndices;
     Halide::Runtime::Buffer<float, 3> colorDistances(kTargetFrameWidthPixels, kFrameHeightPixels);
     std::array<float, kFrameSizeBytes> minDistances;
 
     while (!m_quit) {
         switch (state) {
             case kInitial:
-                state = kOpenMovie;
+                state = kDecodeFrames;
                 break;
 
             case kOpenMovie:
@@ -92,11 +102,11 @@ void Workflow::run() {
                 }
 
                 decoderOpen = true;
-                state = kDecodeFrame;
+                state = kDecodeFrames;
                 break;
 
             // Decode a video frame from compressed file to scaled output and save in database.
-            case kDecodeFrame:
+            case kDecodeFrames:
                 LOG_INFO("decoding next frame from movie file.");
                 if (!decoderOpen) {
                     LOG_FATAL("ExtractFrames called with closed decoder.");
@@ -104,32 +114,19 @@ void Workflow::run() {
                     break;
                 }
 
-                sourceFrameBuffer = decoder.GetNextFrame();
-                if (!sourceFrameBuffer.data()) {
+                if (!decoder.SaveNextFrame())
                     LOG_INFO("eof encountered in media, closing");
                     state = kCloseMovie;
                     break;
                 }
+                break;
 
-                // Parse back into a SourceFrame for reading in-place.
-                sourceFrame = Data::GetSourceFrame(sourceFrameBuffer.data());
-                if (!sourceFrame) {
-                    LOG_FATAL("error extracting SourceFrame from decoded video.");
-                    m_quit = true;
-                    break;
+            case kCloseMovie:
+                if (decoderOpen) {
+                    decoder.CloseFile();
+                    decoderOpen = false;
                 }
-
-                // Save the frame to the database.
-                LOG_INFO("serializing source frame %d into database.", sourceFrame->frameNumber());
-                snprintf(keyBuf.data(), sizeof(keyBuf), "sourceFrame:%08x", sourceFrame->frameNumber());
-                status = m_db->Put(leveldb::WriteOptions(), keyBuf.data(),
-                    leveldb::Slice(reinterpret_cast<const char*>(sourceFrameBuffer.data()), sourceFrameBuffer.size()));
-                if (!status.ok()) {
-                    LOG_FATAL("error saving source frame %d into database.", sourceFrame->frameNumber());
-                    m_quit = true;
-                    break;
-                }
-                state = kComputeTargetFrameLab;
+                state = kFinished;
                 break;
 
             // Convert decoded RGB target frame to L*a*b* color.
@@ -149,9 +146,7 @@ void Workflow::run() {
             case kFitTargetFrameColors:
                 LOG_INFO("finding minimum error distance Atari colors for frame %d", sourceFrame->frameNumber());
                 {
-                    builder.Clear();
-                    minIndices = nullptr;
-                    auto indices = builder.CreateUninitializedVector(kFrameSizeBytes, &minIndices);
+                    std::unique_ptr<uint8_t[]> minIndices(new uint8_t[kFrameSizeBytes]);
                     std::memset(minIndices, 0, kFrameSizeBytes);
                     // Do zero color first to initialize distances and mins.
                     ciede_2k(frameLab, kAtariNtscLabLColorTable[0], kAtariNtscLabAColorTable[0],
@@ -166,11 +161,14 @@ void Workflow::run() {
                             }
                         }
                     }
+                    uint64_t frameHash = XXH64(minIndices, kFrameSizeBytes, 0);
+                    std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator());
+                    builder.Clear();
                     Data::TargetFrameBuilder frameBuilder(builder);
                     frameBuilder.add_frameNumber(sourceFrame->frameNumber());
                     frameBuilder.add_isKeyFrame(sourceFrame->isKeyFrame());
                     frameBuilder.add_frameTime(sourceFrame->frameTime());
-                    frameBuilder.add_image(indices);
+                    frameBuilder.add_frameHash(frameHash);
                     auto frameData = frameBuilder.Finish();
                     builder.Finish(frameData);
                     snprintf(keyBuf.data(), sizeof(keyBuf), "targetFrame:%08x", sourceFrame->frameNumber());
@@ -181,16 +179,8 @@ void Workflow::run() {
                         m_quit = true;
                         break;
                     }
-                    state = kDecodeFrame;
+                    state = kDecodeFrames;
                 }
-                break;
-
-            case kCloseMovie:
-                if (decoderOpen) {
-                    decoder.CloseFile();
-                    decoderOpen = false;
-                }
-                state = kFinished;
                 break;
 
             case kFinished:
