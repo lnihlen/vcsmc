@@ -122,7 +122,7 @@ bool SaveImage(const uint8* planes, size_t width, size_t height, const std::stri
 }
 
 bool SaveAtariPaletteImage(const uint8* indices, const std::string& fileName) {
-    FILE* pngFile = fopen(fileName.c_str(), "rb");
+    FILE* pngFile = fopen(fileName.c_str(), "wb");
     if (!pngFile) return false;
 
     png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
@@ -153,7 +153,7 @@ bool SaveAtariPaletteImage(const uint8* indices, const std::string& fileName) {
     std::unique_ptr<uint8[]> indexCopy(new uint8[kFrameSizeBytes]);
     std::memcpy(indexCopy.get(), indices, kFrameSizeBytes);
     for (auto i = 0; i < kFrameHeightPixels; ++i) {
-        rowPointers[i] = indexCopy.get() + (i * kFrameWidthPixels);
+        rowPointers[i] = indexCopy.get() + (i * kTargetFrameWidthPixels);
     }
 
     png_write_image(png, rowPointers);

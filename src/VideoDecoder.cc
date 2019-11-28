@@ -102,7 +102,7 @@ class VideoDecoder::VideoDecoderImpl {
     video_frame_time_base_us_ = (format_context_->streams[video_stream_index_]->time_base.num * 1000 * 1000) /
         format_context_->streams[video_stream_index_]->time_base.den;
 
-    return DecodeNextFrame();
+    return SaveNextFrame();
   }
 
   // Decode a frame, save in the database.
@@ -164,11 +164,12 @@ class VideoDecoder::VideoDecoderImpl {
         uint64_t frameHash = XXH64(planes.get(), kFrameSizeBytes * 3, 0);
         leveldb::Status status;
         std::array<char, 32> buf;
-        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator());
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
         snprintf(buf.data(), sizeof(buf), "sourceImage:%016" PRIx64, frameHash);
         if (!it->Valid() || it->key().ToString() != buf.data()) {
-            status = m_db->Put(buf.data(), leveldb::Slice(reinterpret_cast<char*>(planes.get()), kFrameSizeBytes * 3));
-            if (!status) {
+            status = m_db->Put(leveldb::WriteOptions(), buf.data(), leveldb::Slice(reinterpret_cast<char*>(
+                planes.get()), kFrameSizeBytes * 3));
+            if (!status.ok()) {
                 LOG_FATAL("error writing frame bytes into database");
                 av_frame_free(&frame);
                 return false;
@@ -184,8 +185,8 @@ class VideoDecoder::VideoDecoderImpl {
         auto frameData = frameBuilder.Finish();
         builder.Finish(frameData);
         snprintf(buf.data(), sizeof(buf), "sourceFrame:%08x", video_codec_context_->frame_number);
-        status = m_db->Put(leveldb::WriteOptions(), keyBuf.data(),
-            leveldb::Slice(reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetBufferSize()));
+        status = m_db->Put(leveldb::WriteOptions(), buf.data(),
+            leveldb::Slice(reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetSize()));
         av_frame_free(&frame);
 
         if (!status.ok()) {

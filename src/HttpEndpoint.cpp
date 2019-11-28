@@ -49,9 +49,9 @@ public:
         // Image serving.
         // Number should be an 8 character hex string. Hash should be a 16 character hex string and should match the
         // hash supplied in the metadata. This is to avoid caching issues in browsers when fitting different videos.
-        Pistache::Rest::Routes::Get(m_router, "/img/source/:number/:hash", Pistache::Rest::Routes::bind(
+        Pistache::Rest::Routes::Get(m_router, "/img/source/:hash", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::getImageSource, this));
-        Pistache::Rest::Routes::Get(m_router, "/img/target/:number/:hash", Pistache::Rest::Routes::bind(
+        Pistache::Rest::Routes::Get(m_router, "/img/quantized/:hash", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::getImageTarget, this));
 
         // The "from" should be a string with the number of microseconds from unix epoch in hex, or zero.
@@ -59,6 +59,9 @@ public:
         Pistache::Rest::Routes::Get(m_router, "/log/:from", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::getLog, this));
 
+        // Returns a 64-bit hash of the quantized image associated with the provided source image hash.
+        Pistache::Rest::Routes::Get(m_router, "/quantizeMap/:hash", Pistache::Rest::Routes::bind(
+            &HttpEndpoint::HttpHandler::getQuantizeMap, this));
         // Returns some JSON with the source frame metadata contained. Number should be an 8 character hex string.
         Pistache::Rest::Routes::Get(m_router, "/source/:number", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::getSource, this));
@@ -87,48 +90,50 @@ private:
     }
 
     void getImageSource(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
-        auto frameNumber = request.param(":number").as<std::string>();
         auto hash = request.param(":hash").as<std::string>();
-        std::string frameKey = "sourceFrame:" + frameNumber;
+        std::string frameKey = "sourceImage:" + hash;
         std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
         it->Seek(frameKey);
         if (it->Valid() && it->key().ToString() == frameKey) {
-            // First look up image in database. Match hash to one provided.
-            const Data::SourceFrame* sourceFrame = Data::GetSourceFrame(it->value().data());
-            if (!sourceFrame) {
-                LOG_WARN("failed to retrieve source frame data for frame %s, hash %s", frameNumber.c_str(),
-                    hash.c_str());
-                response.send(Pistache::Http::Code::Internal_Server_Error);
-            } else {
-                uint64_t hashValue = strtoull(hash.c_str(), nullptr, 16);
-                if (sourceFrame->imageHash() != hashValue) {
-                    LOG_WARN("source frame %s requested hash %s doesn't match stored hash %016" PRIx64,
-                        frameNumber.c_str(), hash.c_str(), hashValue);
-                    response.send(Pistache::Http::Code::Not_Found);
-                } else {
-                    fs::path imageFilePath = m_cachePath + "sourceImage-" + frameNumber + "-" + hash + ".png";
-                    bool imageOK = fs::exists(imageFilePath);
-                    if (!imageOK) {
-                        imageOK = SaveImage(sourceFrame->imageRGB()->data(), kTargetFrameWidthPixels,
-                            kFrameHeightPixels, imageFilePath);
-                    }
-                    if (imageOK) {
-                        Pistache::Http::serveFile(response, imageFilePath);
-                    } else {
-                        LOG_WARN("error saving image file to %s", imageFilePath.c_str());
-                        response.send(Pistache::Http::Code::Internal_Server_Error);
-                    }
-                }
+            fs::path imageFilePath = m_cachePath + "sourceImage-" + hash + ".png";
+            bool imageOK = fs::exists(imageFilePath);
+            if (!imageOK) {
+                imageOK = SaveImage(reinterpret_cast<const uint8_t*>(it->value().data()), kTargetFrameWidthPixels,
+                    kFrameHeightPixels, imageFilePath);
             }
-            // Next look up path in cache, to see if image already extracted, if so, serve it.
-            // If not, save image then serve it.
+            if (imageOK) {
+                Pistache::Http::serveFile(response, imageFilePath);
+            } else {
+                LOG_WARN("error saving image file to %s", imageFilePath.c_str());
+                response.send(Pistache::Http::Code::Internal_Server_Error);
+            }
         } else {
+            LOG_WARN("source image hash %s not found.", hash.c_str());
             response.send(Pistache::Http::Code::Not_Found);
         }
     }
 
     void getImageTarget(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
-        response.send(Pistache::Http::Code::Ok);
+        auto hash = request.param(":hash").as<std::string>();
+        std::string quantKey = "quantImage:" + hash;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        it->Seek(quantKey);
+        if (it->Valid() && it->key().ToString() == quantKey) {
+            fs::path imageFilePath = m_cachePath + "quantImage-" + hash + ".png";
+            bool imageOK = fs::exists(imageFilePath);
+            if (!imageOK) {
+                imageOK = SaveAtariPaletteImage(reinterpret_cast<const uint8_t*>(it->value().data()), imageFilePath);
+            }
+            if (imageOK) {
+                Pistache::Http::serveFile(response, imageFilePath);
+            } else {
+                LOG_WARN("error saving palette image file to %s", imageFilePath.c_str());
+                response.send(Pistache::Http::Code::Internal_Server_Error);
+            }
+        } else {
+            LOG_WARN("quantized imaged hash %s not found.", quantKey.c_str());
+            response.send(Pistache::Http::Code::Not_Found);
+        }
     }
 
     void getLog(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
@@ -160,6 +165,18 @@ private:
         }
     }
 
+    void getQuantizeMap(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+        auto sourceHash = request.param(":hash").as<std::string>();
+        std::string mapKey = "quantizeMap:" + sourceHash;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        it->Seek(mapKey);
+        if (it->Valid() && it->key().ToString() == mapKey) {
+            response.send(Pistache::Http::Code::Ok, it->value().ToString(), MIME(Text, Plain));
+        } else {
+            response.send(Pistache::Http::Code::Not_Found);
+        }
+    }
+
     void getSource(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
         auto frameNumber = request.param(":number").as<std::string>();
         std::string frameKey = "sourceFrame:" + frameNumber;
@@ -178,8 +195,8 @@ private:
             }
             frameJSON += ", \"frameTime\":";
             snprintf(buf.data(), sizeof(buf), "%" PRId64, sourceFrame->frameTime());
-            frameJSON += buf.data() + std::string(", \"imageHash\":");
-            snprintf(buf.data(), sizeof(buf), "%" PRIx64, sourceFrame->imageHash());
+            frameJSON += buf.data() + std::string(", \"sourceHash\":");
+            snprintf(buf.data(), sizeof(buf), "%" PRIx64, sourceFrame->sourceHash());
             frameJSON += buf.data() + std::string(" }");
             response.send(Pistache::Http::Code::Ok, frameJSON, MIME(Application, Json));
         } else {

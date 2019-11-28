@@ -12,8 +12,10 @@
 
 #include "Halide.h"
 #include "leveldb/db.h"
+#include "xxhash.h"
 
 #include <array>
+#include <inttypes.h>
 
 namespace vcsmc {
 
@@ -63,7 +65,7 @@ void Workflow::run() {
     };
 
     State state = kInitial;
-    std::array<char, 32> keyBuf;
+    std::array<char, 32> buf;
     leveldb::Status status;
 
     // kOpenMovie
@@ -71,19 +73,14 @@ void Workflow::run() {
     bool decoderOpen = false;
     std::string moviePath;
 
-    // kComputeTargetFrameLab
-    Halide::Runtime::Buffer<uint8_t, 3> frameRGB(kTargetFrameWidthPixels, kFrameHeightPixels, 3);
-    Halide::Runtime::Buffer<float, 3> frameLab(kTargetFrameWidthPixels, kFrameHeightPixels, 3);
+    // kQuantizeFrames
+    std::unique_ptr<leveldb::Iterator> it;
 
-    // kFitTargetFrameColors
-    flatbuffers::FlatBufferBuilder builder((kFrameSizeBytes) + 1024);
-    Halide::Runtime::Buffer<float, 3> colorDistances(kTargetFrameWidthPixels, kFrameHeightPixels);
-    std::array<float, kFrameSizeBytes> minDistances;
 
     while (!m_quit) {
         switch (state) {
             case kInitial:
-                state = kDecodeFrames;
+                state = kOpenMovie;
                 break;
 
             case kOpenMovie:
@@ -114,7 +111,7 @@ void Workflow::run() {
                     break;
                 }
 
-                if (!decoder.SaveNextFrame())
+                if (!decoder.SaveNextFrame()) {
                     LOG_INFO("eof encountered in media, closing");
                     state = kCloseMovie;
                     break;
@@ -126,61 +123,70 @@ void Workflow::run() {
                     decoder.CloseFile();
                     decoderOpen = false;
                 }
-                state = kFinished;
+                it.reset(m_db->NewIterator(leveldb::ReadOptions()));
+                it->Seek("sourceImage:0000000000000000");
+                state = kQuantizeFrames;
                 break;
 
-            // Convert decoded RGB target frame to L*a*b* color.
-            case kComputeTargetFrameLab:
-                LOG_INFO("converting frame %d to L*a*b*", sourceFrame->frameNumber());
-                if (!sourceFrame) {
-                    LOG_FATAL("computing target lab color on empty video frame");
-                    m_quit = true;
-                    break;
-                }
-                // Copy color planes into Halide buffer.
-                std::memcpy(frameRGB.begin(), sourceFrame->imageRGB()->data(), sourceFrame->imageRGB()->size());
-                rgb_to_lab(frameRGB, frameLab);
-                state = kFitTargetFrameColors;
-                break;
-
-            case kFitTargetFrameColors:
-                LOG_INFO("finding minimum error distance Atari colors for frame %d", sourceFrame->frameNumber());
-                {
-                    std::unique_ptr<uint8_t[]> minIndices(new uint8_t[kFrameSizeBytes]);
-                    std::memset(minIndices, 0, kFrameSizeBytes);
-                    // Do zero color first to initialize distances and mins.
-                    ciede_2k(frameLab, kAtariNtscLabLColorTable[0], kAtariNtscLabAColorTable[0],
-                        kAtariNtscLabBColorTable[0], colorDistances);
-                    std::memcpy(minDistances.data(), colorDistances.begin(), sizeof(minDistances));
-                    for (auto i = 1; i < 128; ++i) {
-                        ciede_2k(frameLab, kAtariNtscLabLColorTable[i], kAtariNtscLabAColorTable[i],
-                            kAtariNtscLabBColorTable[i], colorDistances);
-                        for (auto j = 0; j < kFrameSizeBytes; ++j) {
-                            if (colorDistances.begin()[j] < minDistances[j]) {
-                                minIndices[j] = i;
+            case kQuantizeFrames:
+                if (!it->Valid() || it->key().ToString().substr(0, 12) != "sourceImage:") {
+                    LOG_INFO("end of source frames for quantization.");
+                    state = kBuildFrameGroups;
+                } else {
+                    // Extract hash of SourceImage from key:
+                    std::string sourceHash = it->key().ToString().substr(12);
+                    LOG_INFO("starting quantization of frame sourceHash %s", sourceHash.c_str());
+                    // Check map for existing quantization entry, meaning we've already quantized this image.
+                    std::unique_ptr<leveldb::Iterator> quantIt(m_db->NewIterator(leveldb::ReadOptions()));
+                    std::string quantMapKey = "quantizeMap:" + sourceHash;
+                    quantIt->Seek(quantMapKey);
+                    if (quantIt->Valid() && quantIt->key().ToString() == quantMapKey) {
+                        LOG_INFO("found existing quantizeMap entry for sourceHash %s => %s", sourceHash.c_str(),
+                            quantIt->value().ToString().c_str());
+                    } else {
+                        // Load color planes into Halide input buffer for conversion to L*a*b* color.
+                        Halide::Runtime::Buffer<uint8_t, 3> frameRGB(kTargetFrameWidthPixels, kFrameHeightPixels, 3);
+                        std::memcpy(frameRGB.begin(), it->value().data(), kFrameSizeBytes * 3);
+                        Halide::Runtime::Buffer<float, 3> frameLab(kTargetFrameWidthPixels, kFrameHeightPixels, 3);
+                        rgb_to_lab(frameRGB, frameLab);
+                        // Now compute distances for all pixels from each atari reference color.
+                        Halide::Runtime::Buffer<float, 3> colorDistances(kTargetFrameWidthPixels, kFrameHeightPixels);
+                        std::array<float, kFrameSizeBytes> minDistances;
+                        std::array<uint8_t, kFrameSizeBytes> minIndices;
+                        std::memset(minIndices.data(), 0, kFrameSizeBytes);
+                        // Do zero color first to initialize distances and mins.
+                        ciede_2k(frameLab, kAtariNtscLabLColorTable[0], kAtariNtscLabAColorTable[0],
+                            kAtariNtscLabBColorTable[0], colorDistances);
+                        std::memcpy(minDistances.data(), colorDistances.begin(), sizeof(minDistances));
+                        for (auto i = 1; i < 128; ++i) {
+                            ciede_2k(frameLab, kAtariNtscLabLColorTable[i], kAtariNtscLabAColorTable[i],
+                                kAtariNtscLabBColorTable[i], colorDistances);
+                            for (auto j = 0; j < kFrameSizeBytes; ++j) {
+                                if (colorDistances.begin()[j] < minDistances[j]) {
+                                    minIndices[j] = i;
+                                }
                             }
                         }
+                        uint64_t quantHash = XXH64(minIndices.data(), kFrameSizeBytes, 0);
+                        // Save relationship between source and quantized hash in the map.
+                        snprintf(buf.data(), sizeof(buf), "%016" PRIx64, quantHash);
+                        LOG_INFO("computed new quantizeMap entry for sourceHash %s => %s", sourceHash.c_str(),
+                            buf.data());
+                        status = m_db->Put(leveldb::WriteOptions(), quantMapKey, buf.data());
+                        std::string quantKey = std::string("quantImage:") + buf.data();
+                        // Check for the quantized data already stored in database.
+                        quantIt->Seek(quantKey);
+                        if (!quantIt->Valid() || quantIt->key().ToString() != quantKey) {
+                            m_db->Put(leveldb::WriteOptions(), quantKey, leveldb::Slice(reinterpret_cast<const char*>(
+                                minIndices.data()), kFrameSizeBytes));
+                        }
                     }
-                    uint64_t frameHash = XXH64(minIndices, kFrameSizeBytes, 0);
-                    std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator());
-                    builder.Clear();
-                    Data::TargetFrameBuilder frameBuilder(builder);
-                    frameBuilder.add_frameNumber(sourceFrame->frameNumber());
-                    frameBuilder.add_isKeyFrame(sourceFrame->isKeyFrame());
-                    frameBuilder.add_frameTime(sourceFrame->frameTime());
-                    frameBuilder.add_frameHash(frameHash);
-                    auto frameData = frameBuilder.Finish();
-                    builder.Finish(frameData);
-                    snprintf(keyBuf.data(), sizeof(keyBuf), "targetFrame:%08x", sourceFrame->frameNumber());
-                    status = m_db->Put(leveldb::WriteOptions(), keyBuf.data(),
-                        leveldb::Slice(reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetSize()));
-                    if (!status.ok()) {
-                        LOG_FATAL("error writing targetFrame %d to database", sourceFrame->frameNumber());
-                        m_quit = true;
-                        break;
-                    }
-                    state = kDecodeFrames;
+                    it->Next();
                 }
+                break;
+
+            case kBuildFrameGroups:
+                state = kFinished;
                 break;
 
             case kFinished:
