@@ -7,8 +7,8 @@
 #include "VideoDecoder.h"
 #include "rgb_to_lab.h"
 
+#include "FrameGroup_generated.h"
 #include "SourceFrame_generated.h"
-#include "TargetFrame_generated.h"
 
 #include "Halide.h"
 #include "leveldb/db.h"
@@ -37,21 +37,6 @@ void Workflow::shutdown() {
 }
 
 void Workflow::run() {
-    // More than one source frame can have the same sourceHash, the hash of the RGB bytes that describe the frame image.
-    // Because of quantization, more quantized frames are likely to have the same hash. Desired output when we start
-    // kernel fitting is frame groups and a list of quantized hash values that are within that frame group.
-
-    // There's a flatbuffer called movieStats which contains the final information about the movie. It includes # of
-    // frames, unique source frames, unique quantized frames, number of frame groups, total running time, movie path.
-    // Presence of that indicates that the entire thing has been decoded and all decode steps should be skipped.
-
-    // Decoding consists of extracting a frame from ffmpeg, hashing the RGB values, and saving the image bytes in the
-    // database under that hash. We also save the frame metadata in the SourceFrame flatbuffer.
-
-    // Quantization is the next phase. We iterate through all source images by hash, create quantized frames from those.
-    // The presence of map entry from source frame to quantized frame indicates this step has been completed. Fit frames
-    // are also saved in their own table.
-
     enum State {
         kInitial,                // First state, does nothing.
         kOpenMovie,              // Open the video file, skipped if all frames already extracted.
@@ -59,7 +44,7 @@ void Workflow::run() {
                                  // save image bytes in database under hash (if unique).
         kCloseMovie,             // Close the input movie file, as we no longer need it.
         kQuantizeFrames,         // Match input frame to best-fit Atari colors, save results.
-        kBuildFrameGroups,       // Save the frame group data structures.
+        kGroupFrames,            // Save the frame group data structures.
         kFinished,
         kTerminal
     };
@@ -76,6 +61,11 @@ void Workflow::run() {
     // kQuantizeFrames
     std::unique_ptr<leveldb::Iterator> it;
 
+    // kGroupFrames
+    std::unordered_set<uint64_t> groupImages;
+    int groupStartFrame = 1;
+    int groupNumber = 0;
+    int lastFrameNumber = 0;
 
     while (!m_quit) {
         switch (state) {
@@ -130,8 +120,12 @@ void Workflow::run() {
 
             case kQuantizeFrames:
                 if (!it->Valid() || it->key().ToString().substr(0, 12) != "sourceImage:") {
-                    LOG_INFO("end of source frames for quantization.");
-                    state = kBuildFrameGroups;
+                    LOG_INFO("end of source images for quantization.");
+                    it->Seek("sourceFrame:00000000");
+                    groupImages.clear();
+                    groupStartFrame = 0;
+                    groupNumber = 0;
+                    state = kGroupFrames;
                 } else {
                     // Extract hash of SourceImage from key:
                     std::string sourceHash = it->key().ToString().substr(12);
@@ -185,8 +179,50 @@ void Workflow::run() {
                 }
                 break;
 
-            case kBuildFrameGroups:
-                state = kFinished;
+            case kGroupFrames:
+                if (!it->Valid() || it->key().ToString().substr(0, 12) != "sourceFrame:") {
+                    // Save final frame group.
+                    ++groupNumber;
+                    saveFrameGroup(groupImages, groupStartFrame, lastFrameNumber, groupNumber);
+                    LOG_INFO("wrote final group %d to database with %d unique frames", groupNumber, groupImages.size());
+                    groupImages.clear();
+                    it.reset(nullptr);
+                    state = kFinished;
+                } else {
+                    const Data::SourceFrame* sourceFrame = Data::GetSourceFrame(it->value().data());
+                    if (!sourceFrame) {
+                        LOG_FATAL("error deserializing sourceFrame from database.");
+                        state = kTerminal;
+                        break;
+                    }
+                    if (sourceFrame->isKeyFrame() && lastFrameNumber > 0) {
+                        ++groupNumber;
+                        saveFrameGroup(groupImages, groupStartFrame, lastFrameNumber, groupNumber);
+                        LOG_INFO("wrote group %d to database with %d unique frames.", groupNumber, groupImages.size());
+                        // Reset for next frame group.
+                        groupImages.clear();
+                        groupStartFrame = sourceFrame->frameNumber();
+                    }
+                    // Look up quantized image based on source image hash.
+                    snprintf(buf.data(), sizeof(buf), "quantizeMap:%016" PRIx64, sourceFrame->sourceHash());
+                    std::string mapKey(buf.data());
+                    std::unique_ptr<leveldb::Iterator> mapIt(m_db->NewIterator(leveldb::ReadOptions()));
+                    mapIt->Seek(mapKey);
+                    if (!mapIt->Valid() || mapIt->key().ToString() != mapKey) {
+                        LOG_FATAL("error looking up quantized image map value for source hash key %s", mapKey.c_str());
+                        state = kTerminal;
+                        break;
+                    }
+                    uint64_t quantHash = strtoull(mapIt->value().data(), nullptr, 16);
+                    if (quantHash == 0) {
+                        LOG_FATAL("error parsing quant key %s to uint64_t", mapIt->value());
+                        state = kTerminal;
+                        break;
+                    }
+                    groupImages.insert(quantHash);
+                    lastFrameNumber = sourceFrame->frameNumber();
+                    it->Next();
+                }
                 break;
 
             case kFinished:
@@ -207,6 +243,28 @@ void Workflow::run() {
     }
 }
 
-
+bool Workflow::saveFrameGroup(const std::unordered_set<uint64_t>& groupImages, int groupStartFrame, int lastFrameNumber,
+        int groupNumber) {
+    // Save current group in database.
+    flatbuffers::FlatBufferBuilder builder(1024);
+    uint64_t* buildGroupImages = nullptr;
+    auto hashes = builder.CreateUninitializedVector(groupImages.size(), &buildGroupImages);
+    for (uint64_t image : groupImages) {
+        *buildGroupImages = image;
+        ++buildGroupImages;
+    }
+    Data::FrameGroupBuilder groupBuilder(builder);
+    groupBuilder.add_firstFrame(groupStartFrame);
+    groupBuilder.add_lastFrame(lastFrameNumber);
+    groupBuilder.add_imageHashes(hashes);
+    auto group = groupBuilder.Finish();
+    builder.Finish(group);
+    std::array<char, 32> buf;
+    snprintf(buf.data(), sizeof(buf), "frameGroup:%08x", groupNumber);
+    std::string groupKey(buf.data());
+    leveldb::Status status = m_db->Put(leveldb::WriteOptions(), groupKey, leveldb::Slice(reinterpret_cast<const char*>(
+        builder.GetBufferPointer()), builder.GetSize()));
+    return status.ok();
+}
 
 }  // namespace vcsmc

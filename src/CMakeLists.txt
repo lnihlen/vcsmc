@@ -77,6 +77,7 @@ set(CMAKE_CXX_STANDARD 17)
 ####
 # flatbuffer schema files
 set(vcsmc_schema_files
+    schemas/FrameGroup.fbs
     schemas/SourceFrame.fbs
 )
 

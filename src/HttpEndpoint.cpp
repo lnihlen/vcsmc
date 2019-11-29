@@ -4,8 +4,8 @@
 #include "image_file.h"
 #include "Logger.h"
 
+#include "FrameGroup_generated.h"
 #include "SourceFrame_generated.h"
-#include "TargetFrame_generated.h"
 
 #include "leveldb/db.h"
 #include "pistache/endpoint.h"
@@ -45,6 +45,10 @@ public:
             &HttpEndpoint::HttpHandler::serveFile, this));
         Pistache::Rest::Routes::Get(m_router, "/index.html", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::serveFile, this));
+
+        // Returns some JSON with the frame group data. Number should be an 8 character hex string.
+        Pistache::Rest::Routes::Get(m_router, "/group/:number", Pistache::Rest::Routes::bind(
+            &HttpEndpoint::HttpHandler::getGroup, this));
 
         // Image serving.
         // Number should be an 8 character hex string. Hash should be a 16 character hex string and should match the
@@ -87,6 +91,31 @@ private:
         std::string resource = m_htmlPath + (request.resource() == "/" ? "/index.html" : request.resource());
         LOG_INFO("serving file %s", resource.c_str());
         Pistache::Http::serveFile(response, resource);
+    }
+
+    void getGroup(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+        auto number = request.param(":number").as<std::string>();
+        std::string groupKey = "frameGroup:" + number;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        it->Seek(groupKey);
+        if ( it->Valid() && it->key().ToString() == groupKey) {
+            const Data::FrameGroup* frameGroup = Data::GetFrameGroup(it->value().data());
+            std::array<char, 32> buf;
+            std::string json = "{ \"firstFrame\":";
+            snprintf(buf.data(), sizeof(buf), "%d", frameGroup->firstFrame());
+            json += buf.data() + std::string(", \"lastFrame\":");
+            snprintf(buf.data(), sizeof(buf), "%d", frameGroup->lastFrame());
+            json += buf.data() + std::string(", \"imageHashes\":[");
+            auto& hashes = *frameGroup->imageHashes();
+            for (auto hash : hashes) {
+                snprintf(buf.data(), sizeof(buf), "\"%016" PRIx64 "\"", hash);
+                json += buf.data() + std::string(", ");
+            }
+            json += "] }";
+            response.send(Pistache::Http::Code::Ok, json, MIME(Application, Json));
+        } else {
+            response.send(Pistache::Http::Code::Not_Found);
+        }
     }
 
     void getImageSource(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
