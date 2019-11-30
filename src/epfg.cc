@@ -4,26 +4,33 @@
 
 #include "HttpEndpoint.h"
 #include "Logger.h"
+#include "Workflow.h"
 
 #include "gflags/gflags.h"
 #include "leveldb/cache.h"
 #include "leveldb/db.h"
 
+#include <memory>
 #include <pthread.h>
 #include <semaphore.h>
 #include <signal.h>
 
+// Database options.
 DEFINE_string(db_path, "data/", "Path to file database directory.");
-DEFINE_bool(new_db, false, "Create a new database at the provided db_path. Will clobber an existing database if it "
-        "already exists at that path.");
 DEFINE_int32(db_cache_mb, 512, "Size of database cache in megabytes.");
 
+// Logging options.
 DEFINE_int32(echo_log_level, vcsmc::Logger::kWarning, "minimum log importance to echo to terminal");
 
+// Http Server options.
 DEFINE_int32(http_listen_port, 8001, "HTTP port to listen to for incoming web requests.");
 DEFINE_int32(http_listen_threads, 4, "Number of threads to listen to for HTTP requests.");
-
 DEFINE_string(html_path, "../html", "Path to the included HTML files to serve.");
+DEFINE_string(cache_path, "cache/", "Path to the directory to save files for serving in.");
+
+// Media options.
+DEFINE_string(movie_path, "", "Path to the movie file to ingest as target to encode against. If the database already "
+        "contains a media file this is ignored.");
 
 int main(int argc, char* argv[]) {
     gflags::ParseCommandLineFlags(&argc, &argv, false);
@@ -42,23 +49,33 @@ int main(int argc, char* argv[]) {
 
     // Initialize Database
     leveldb::Options dbOptions;
-    dbOptions.create_if_missing = FLAGS_new_db;
+    dbOptions.create_if_missing = true;
     dbOptions.error_if_exists = false;
     if (FLAGS_db_cache_mb > 0) {
         dbOptions.block_cache = leveldb::NewLRUCache(FLAGS_db_cache_mb * 1024 * 1024);
     }
 
-    leveldb::DB* database = nullptr;
-    leveldb::Status dbStatus = leveldb::DB::Open(dbOptions, FLAGS_db_path, &database);
+    leveldb::DB* db = nullptr;
+    leveldb::Status dbStatus = leveldb::DB::Open(dbOptions, FLAGS_db_path, &db);
     if (!dbStatus.ok()) {
         fprintf(stderr, "error opening database at %s\n", FLAGS_db_path.c_str());
         return -1;
     }
 
-    vcsmc::Logger::Initialize(database, FLAGS_echo_log_level);
+    vcsmc::Logger::Initialize(db, FLAGS_echo_log_level);
 
-    vcsmc::HttpEndpoint httpEndpoint(FLAGS_http_listen_port, FLAGS_http_listen_threads, database, FLAGS_html_path);
+    // If there's a media path write it into the database.
+    if (FLAGS_movie_path != "") {
+        LOG_INFO("saving movie path %s into database", FLAGS_movie_path.c_str());
+        db->Put(leveldb::WriteOptions(), "FLAGS_movie_path", FLAGS_movie_path);
+    }
+
+    vcsmc::HttpEndpoint httpEndpoint(FLAGS_http_listen_port, FLAGS_http_listen_threads, db, FLAGS_html_path,
+        FLAGS_cache_path);
     httpEndpoint.startServerThread();
+
+    vcsmc::Workflow workflow(db);
+    workflow.runThread();
 
     int signal = 0;
     // Block until termination signal sent.
@@ -69,12 +86,11 @@ int main(int argc, char* argv[]) {
         LOG_ERROR("got error from sigwait %d", status);
     }
 
+    workflow.shutdown();
     httpEndpoint.shutdown();
-
     vcsmc::Logger::Teardown();
-
-    delete database;
-    database = nullptr;
+    delete db;
+    db = nullptr;
 
     return 0;
 }

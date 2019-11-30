@@ -1,12 +1,8 @@
-#include "video_decoder.h"
+#include "VideoDecoder.h"
 
-#include <deque>
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#pragma clang diagnostic ignored "-Wmissing-field-initializers"
-#include "Halide.h"
-#pragma clang diagnostic pop
+#include "constants.h"
+#include "Logger.h"
+#include "SourceFrame_generated.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -14,26 +10,29 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 
-#include "constants.h"
+#include "xxhash.h"
+#include "leveldb/db.h"
+
+#include <deque>
 
 namespace vcsmc {
 
 class VideoDecoder::VideoDecoderImpl {
  public:
-  VideoDecoderImpl()
+  VideoDecoderImpl(leveldb::DB* db)
       : format_context_(nullptr),
         video_codec_(nullptr),
         video_stream_index_(-1),
         video_codec_context_(nullptr),
         video_frame_time_base_us_(-1),
-        at_end_of_file_(false) {}
+        at_end_of_file_(false),
+        m_db(db) {}
 
   ~VideoDecoderImpl() {}
 
   bool OpenFile(const std::string& file_name) {
     format_context_ = avformat_alloc_context();
-    if (avformat_open_input(&format_context_, file_name.c_str(),
-          nullptr, nullptr) != 0) {
+    if (avformat_open_input(&format_context_, file_name.c_str(), nullptr, nullptr) != 0) {
       fprintf(stderr, "avformat_open_input failed.\n");
       return false;
     }
@@ -100,16 +99,14 @@ class VideoDecoder::VideoDecoderImpl {
                                      nullptr,
                                      nullptr);
 
-    video_frame_time_base_us_ =
-        (format_context_->streams[video_stream_index_]->time_base.num *
-            1000 * 1000) /
+    video_frame_time_base_us_ = (format_context_->streams[video_stream_index_]->time_base.num * 1000 * 1000) /
         format_context_->streams[video_stream_index_]->time_base.den;
 
-    return DecodeNextFrame();
+    return SaveNextFrame();
   }
 
-  // Decode a frame, enqueue in the |frames_| deque.
-  bool DecodeNextFrame() {
+  // Decode a frame, save in the database.
+  bool SaveNextFrame() {
     AVPacket packet;
     av_init_packet(&packet);
     AVFrame* frame = av_frame_alloc();
@@ -129,21 +126,21 @@ class VideoDecoder::VideoDecoderImpl {
 
         response = avcodec_receive_frame(video_codec_context_, frame);
         if (response == AVERROR(EAGAIN)) {
-          continue;
+            continue;
         } else if (response < 0) {
-          fprintf(stderr, "Error decoding packet.\n");
-          av_frame_free(&frame);
-          av_packet_unref(&packet);
-          return false;
+            LOG_FATAL("error decoding packet");
+            av_frame_free(&frame);
+            av_packet_unref(&packet);
+            return false;
         }
 
-        Halide::Runtime::Buffer<uint8_t, 3> frame_rgb(
-            kTargetFrameWidthPixels, kFrameHeightPixels, 3);
+        std::unique_ptr<uint8_t[]> planes(new uint8_t[kFrameSizeBytes * 3]);
+
         // Note order of plane pointers for proper RGB plane alignment.
         uint8* plane_pointers[3] = {
-          frame_rgb.begin() + kFrameSizeBytes,
-          frame_rgb.begin() + (kFrameSizeBytes * 2),
-          frame_rgb.begin()
+          planes.get() + kFrameSizeBytes,
+          planes.get() + (kFrameSizeBytes * 2),
+          planes.get()
         };
         int plane_widths[3] = {
           kTargetFrameWidthPixels,
@@ -157,21 +154,46 @@ class VideoDecoder::VideoDecoderImpl {
                       video_codec_context_->height,
                       plane_pointers,
                       plane_widths) <= 0) {
-          fprintf(stderr, "Error scaling frame image.\n");
-          av_frame_free(&frame);
-          av_packet_unref(&packet);
-          return false;
+            LOG_FATAL("error scaling frame image");
+            av_frame_free(&frame);
+            av_packet_unref(&packet);
+            return false;
         }
 
         frame_read = true;
-        std::shared_ptr<VideoFrame> frame_image(new VideoFrame());
-        frame_image->frame_data = frame_rgb;
-        frame_image->is_keyframe = (frame->key_frame == 1);
-        frame_image->frame_number = video_codec_context_->frame_number;
-        frame_image->frame_time_us = frame->pts * video_frame_time_base_us_;
-        frames_.push_back(frame_image);
+        uint64_t frameHash = XXH64(planes.get(), kFrameSizeBytes * 3, 0);
+        leveldb::Status status;
+        std::array<char, 32> buf;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        snprintf(buf.data(), sizeof(buf), "sourceImage:%016" PRIx64, frameHash);
+        if (!it->Valid() || it->key().ToString() != buf.data()) {
+            status = m_db->Put(leveldb::WriteOptions(), buf.data(), leveldb::Slice(reinterpret_cast<char*>(
+                planes.get()), kFrameSizeBytes * 3));
+            if (!status.ok()) {
+                LOG_FATAL("error writing frame bytes into database");
+                av_frame_free(&frame);
+                return false;
+            }
+        }
 
+        flatbuffers::FlatBufferBuilder builder(1024);
+        Data::SourceFrameBuilder frameBuilder(builder);
+        frameBuilder.add_frameNumber(video_codec_context_->frame_number);
+        frameBuilder.add_isKeyFrame(frame->key_frame == 1);
+        frameBuilder.add_frameTime(frame->pts * video_frame_time_base_us_);
+        frameBuilder.add_sourceHash(frameHash);
+        auto frameData = frameBuilder.Finish();
+        builder.Finish(frameData);
+        snprintf(buf.data(), sizeof(buf), "sourceFrame:%08x", video_codec_context_->frame_number);
+        status = m_db->Put(leveldb::WriteOptions(), buf.data(),
+            leveldb::Slice(reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetSize()));
         av_frame_free(&frame);
+
+        if (!status.ok()) {
+            LOG_FATAL("error saving source frame %d into database.", video_codec_context_->frame_number);
+            return false;
+        }
+
       }
 
       av_packet_unref(&packet);
@@ -186,18 +208,8 @@ class VideoDecoder::VideoDecoderImpl {
     return true;
   }
 
-  std::shared_ptr<VideoFrame> GetNextFrame() {
-    DecodeNextFrame();
-    if (frames_.size()) {
-      std::shared_ptr<VideoFrame> oldest = frames_.front();
-      frames_.pop_front();
-      return oldest;
-    }
-    return std::shared_ptr<VideoFrame>(nullptr);
-  }
-
   bool AtEndOfFile() const {
-    return at_end_of_file_ && frames_.size() == 0;
+    return at_end_of_file_;
   }
 
   void CloseFile() {
@@ -219,15 +231,10 @@ class VideoDecoder::VideoDecoderImpl {
   SwsContext* resize_context_;
   int64 video_frame_time_base_us_;
   bool at_end_of_file_;
-  std::deque<std::shared_ptr<VideoFrame>> frames_;
+    leveldb::DB* m_db;
 };
 
-// static
-void VideoDecoder::InitDecoderLibrary() {
-  av_register_all();
-}
-
-VideoDecoder::VideoDecoder() : p_(new VideoDecoderImpl()) {}
+VideoDecoder::VideoDecoder(leveldb::DB* db) : p_(new VideoDecoderImpl(db)) {}
 
 VideoDecoder::~VideoDecoder() { delete p_; p_ = nullptr; }
 
@@ -243,8 +250,8 @@ void VideoDecoder::CloseFile() {
   return p_->CloseFile();
 }
 
-std::shared_ptr<VideoFrame> VideoDecoder::GetNextFrame() {
-  return p_->GetNextFrame();
+bool VideoDecoder::SaveNextFrame() {
+  return p_->SaveNextFrame();
 }
 
 }  // namespace vcsmc

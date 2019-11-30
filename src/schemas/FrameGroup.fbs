@@ -1,0 +1,10 @@
+namespace vcsmc.Data;
+
+table FrameGroup {
+    firstFrame:int;
+    lastFrame:int;
+    imageHashes:[ulong];
+}
+
+root_type FrameGroup;
+

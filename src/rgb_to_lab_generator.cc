@@ -63,3 +63,4 @@ class RgbToLab : public Halide::Generator<RgbToLab> {
 };
 
 HALIDE_REGISTER_GENERATOR(RgbToLab, rgb_to_lab)
+

@@ -2,6 +2,7 @@
 #define SRC_LOGGER_H_
 
 #include <cstdint>
+#include <string>
 
 namespace leveldb {
     class DB;
@@ -21,6 +22,7 @@ public:
 
     static void Initialize(leveldb::DB* database, int32_t echoLogLevel);
     static void Log(Level level, const char* format, ...);
+    static std::string Timestamp();
     static void Teardown();
 };
 

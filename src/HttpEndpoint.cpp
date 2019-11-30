@@ -1,22 +1,35 @@
 #include "HttpEndpoint.h"
 
+#include "constants.h"
+#include "image_file.h"
 #include "Logger.h"
+
+#include "FrameGroup_generated.h"
+#include "SourceFrame_generated.h"
 
 #include "leveldb/db.h"
 #include "pistache/endpoint.h"
 #include "pistache/router.h"
 
+#include <png.h>
+
+#include <filesystem>
+#include <inttypes.h>
 #include <string>
+
+namespace fs = std::filesystem;
 
 namespace vcsmc {
 
 class HttpEndpoint::HttpHandler {
 public:
-    HttpHandler(int listenPort, int numThreads, leveldb::DB* database, const std::string& htmlPath) :
+    HttpHandler(int listenPort, int numThreads, leveldb::DB* database, const std::string& htmlPath,
+            const std::string& cachePath) :
         m_listenPort(listenPort),
         m_numThreads(numThreads),
         m_db(database),
-        m_htmlPath(htmlPath) { }
+        m_htmlPath(htmlPath),
+        m_cachePath(cachePath) { }
 
     void setupRoutes() {
         Pistache::Address address(Pistache::Ipv4::any(), Pistache::Port(m_listenPort));
@@ -28,15 +41,34 @@ public:
         m_server->init(opts);
 
         // Static file serving.
-        Pistache::Rest::Routes::Get(m_router,"/", Pistache::Rest::Routes::bind(
+        Pistache::Rest::Routes::Get(m_router, "/", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::serveFile, this));
         Pistache::Rest::Routes::Get(m_router, "/index.html", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::serveFile, this));
+
+        // Returns some JSON with the frame group data. Number should be an 8 character hex string.
+        Pistache::Rest::Routes::Get(m_router, "/group/:number", Pistache::Rest::Routes::bind(
+            &HttpEndpoint::HttpHandler::getGroup, this));
+
+        // Image serving.
+        // Number should be an 8 character hex string. Hash should be a 16 character hex string and should match the
+        // hash supplied in the metadata. This is to avoid caching issues in browsers when fitting different videos.
+        Pistache::Rest::Routes::Get(m_router, "/img/source/:hash", Pistache::Rest::Routes::bind(
+            &HttpEndpoint::HttpHandler::getImageSource, this));
+        Pistache::Rest::Routes::Get(m_router, "/img/quantized/:hash", Pistache::Rest::Routes::bind(
+            &HttpEndpoint::HttpHandler::getImageTarget, this));
 
         // The "from" should be a string with the number of microseconds from unix epoch in hex, or zero.
         // Will return the first key with value >= from.
         Pistache::Rest::Routes::Get(m_router, "/log/:from", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::getLog, this));
+
+        // Returns a 64-bit hash of the quantized image associated with the provided source image hash.
+        Pistache::Rest::Routes::Get(m_router, "/quantizeMap/:hash", Pistache::Rest::Routes::bind(
+            &HttpEndpoint::HttpHandler::getQuantizeMap, this));
+        // Returns some JSON with the source frame metadata contained. Number should be an 8 character hex string.
+        Pistache::Rest::Routes::Get(m_router, "/source/:number", Pistache::Rest::Routes::bind(
+            &HttpEndpoint::HttpHandler::getSource, this));
     }
 
     void startServerThread() {
@@ -57,8 +89,85 @@ private:
 
     void serveFile(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
         std::string resource = m_htmlPath + (request.resource() == "/" ? "/index.html" : request.resource());
-        LOG_DEBUG("serving file %s", resource.c_str());
         Pistache::Http::serveFile(response, resource);
+    }
+
+    void getGroup(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+        auto number = request.param(":number").as<std::string>();
+        std::string groupKey = "frameGroup:" + number;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        it->Seek(groupKey);
+        if ( it->Valid() && it->key().ToString() == groupKey) {
+            const Data::FrameGroup* frameGroup = Data::GetFrameGroup(it->value().data());
+            std::array<char, 32> buf;
+            std::string json = "{ \"firstFrame\":";
+            snprintf(buf.data(), sizeof(buf), "%d", frameGroup->firstFrame());
+            json += buf.data() + std::string(", \"lastFrame\":");
+            snprintf(buf.data(), sizeof(buf), "%d", frameGroup->lastFrame());
+            json += buf.data() + std::string(", \"imageHashes\":[");
+            auto& hashes = *frameGroup->imageHashes();
+            bool appending = false;
+            for (auto hash : hashes) {
+                if (appending) {
+                    json += ", ";
+                }
+                snprintf(buf.data(), sizeof(buf), "\"%016" PRIx64 "\"", hash);
+                json += buf.data();
+                appending = true;
+            }
+            json += "] }";
+            response.send(Pistache::Http::Code::Ok, json, MIME(Application, Json));
+        } else {
+            LOG_WARN("frame group number %s not found.", number.c_str());
+            response.send(Pistache::Http::Code::Not_Found);
+        }
+    }
+
+    void getImageSource(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+        auto hash = request.param(":hash").as<std::string>();
+        std::string frameKey = "sourceImage:" + hash;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        it->Seek(frameKey);
+        if (it->Valid() && it->key().ToString() == frameKey) {
+            fs::path imageFilePath = m_cachePath + "sourceImage-" + hash + ".png";
+            bool imageOK = fs::exists(imageFilePath);
+            if (!imageOK) {
+                imageOK = SaveImage(reinterpret_cast<const uint8_t*>(it->value().data()), kTargetFrameWidthPixels,
+                    kFrameHeightPixels, imageFilePath);
+            }
+            if (imageOK) {
+                Pistache::Http::serveFile(response, imageFilePath);
+            } else {
+                LOG_WARN("error saving image file to %s", imageFilePath.c_str());
+                response.send(Pistache::Http::Code::Internal_Server_Error);
+            }
+        } else {
+            LOG_WARN("source image hash %s not found.", hash.c_str());
+            response.send(Pistache::Http::Code::Not_Found);
+        }
+    }
+
+    void getImageTarget(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+        auto hash = request.param(":hash").as<std::string>();
+        std::string quantKey = "quantImage:" + hash;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        it->Seek(quantKey);
+        if (it->Valid() && it->key().ToString() == quantKey) {
+            fs::path imageFilePath = m_cachePath + "quantImage-" + hash + ".png";
+            bool imageOK = fs::exists(imageFilePath);
+            if (!imageOK) {
+                imageOK = SaveAtariPaletteImage(reinterpret_cast<const uint8_t*>(it->value().data()), imageFilePath);
+            }
+            if (imageOK) {
+                Pistache::Http::serveFile(response, imageFilePath);
+            } else {
+                LOG_WARN("error saving palette image file to %s", imageFilePath.c_str());
+                response.send(Pistache::Http::Code::Internal_Server_Error);
+            }
+        } else {
+            LOG_WARN("quantized imaged hash %s not found.", quantKey.c_str());
+            response.send(Pistache::Http::Code::Not_Found);
+        }
     }
 
     void getLog(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
@@ -90,16 +199,57 @@ private:
         }
     }
 
+    void getQuantizeMap(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+        auto sourceHash = request.param(":hash").as<std::string>();
+        std::string mapKey = "quantizeMap:" + sourceHash;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        it->Seek(mapKey);
+        if (it->Valid() && it->key().ToString() == mapKey) {
+            response.send(Pistache::Http::Code::Ok, it->value().ToString(), MIME(Text, Plain));
+        } else {
+            response.send(Pistache::Http::Code::Not_Found);
+        }
+    }
+
+    void getSource(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+        auto frameNumber = request.param(":number").as<std::string>();
+        std::string frameKey = "sourceFrame:" + frameNumber;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        it->Seek(frameKey);
+        if (it->Valid() && it->key().ToString() == frameKey) {
+            const Data::SourceFrame* sourceFrame = Data::GetSourceFrame(it->value().data());
+            std::array<char, 32> buf;
+            std::string frameJSON = "{ \"frameNumber\":";
+            snprintf(buf.data(), sizeof(buf), "%d", sourceFrame->frameNumber());
+            frameJSON += buf.data() + std::string(", \"isKeyFrame\":");
+            if (sourceFrame->isKeyFrame()) {
+                frameJSON += "true";
+            } else {
+                frameJSON += "false";
+            }
+            frameJSON += ", \"frameTime\":";
+            snprintf(buf.data(), sizeof(buf), "%" PRId64, sourceFrame->frameTime());
+            frameJSON += buf.data() + std::string(", \"sourceHash\":\"");
+            snprintf(buf.data(), sizeof(buf), "%016" PRIx64, sourceFrame->sourceHash());
+            frameJSON += buf.data() + std::string("\" }");
+            response.send(Pistache::Http::Code::Ok, frameJSON, MIME(Application, Json));
+        } else {
+            response.send(Pistache::Http::Code::Not_Found);
+        }
+    }
+
     int m_listenPort;
     int m_numThreads;
     leveldb::DB* m_db;
     std::string m_htmlPath;
+    std::string m_cachePath;
     std::shared_ptr<Pistache::Http::Endpoint> m_server;
     Pistache::Rest::Router m_router;
 };
 
-HttpEndpoint::HttpEndpoint(int listenPort, int numThreads, leveldb::DB* database, const std::string& htmlPath) :
-    m_handler(new HttpHandler(listenPort, numThreads, database, htmlPath)) {
+HttpEndpoint::HttpEndpoint(int listenPort, int numThreads, leveldb::DB* database, const std::string& htmlPath,
+    const std::string& cachePath) :
+    m_handler(new HttpHandler(listenPort, numThreads, database, htmlPath, cachePath)) {
 }
 
 HttpEndpoint::~HttpEndpoint() {

@@ -1,0 +1,11 @@
+namespace vcsmc.Data;
+
+table SourceFrame {
+    frameNumber:int;
+    isKeyFrame:bool;
+    frameTime:ulong;
+    sourceHash:ulong;
+}
+
+root_type SourceFrame;
+
