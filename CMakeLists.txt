@@ -34,7 +34,14 @@ set(CMAKE_RANLIB "${LLVM_BIN_PATH}/llvm-ranlib" CACHE FILEPATH "ranlib" FORCE)
 # Need to override compiler settings before calling project() or CMAKE will
 # use autodetected host compiler settings.
 project(vcsmc
-        VERSION 0.0.1)
+        VERSION 0.0.1
+        LANGUAGES C CXX)
+
+find_package(OpenMP)
+if(NOT OpenMP_CXX_FOUND)
+    message(FATAL_ERROR "OpenMP support not detected.")
+endif()
+
 
 add_subdirectory(third_party)
 add_subdirectory(src)

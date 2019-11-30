@@ -181,6 +181,7 @@ add_executable(epfg
 target_link_libraries(epfg
     flatbuffers
     gflags::gflags
+    OpenMP::OpenMP_CXX
     vcsmc_lib
 )
 
