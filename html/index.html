@@ -5,14 +5,15 @@
         <script>
 "use strict";
 
+// ===== Logging
 var lastLogEntryTime = 0;
 var logLineCount = 0;
 
 function updateLog() {
-    let moreData = true;
     let xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
+            let moreData = true;
             let logResponse = this.responseText.split("\n");
             logResponse.forEach(logLine => {
                 if (logLine.length > 0) {
@@ -21,21 +22,27 @@ function updateLog() {
                     let logInt = parseInt(statusSplit[1], 16);
                     lastLogEntryTime = logInt + 1;
                     let logDate = new Date(logInt / 1000);
-                    let node = document.createElement("div");
+                    let logNode = document.createElement("div");
                     if (logLineCount % 2 == 0) {
-                        node.classList.add("logEven");
+                        logNode.classList.add("logEven");
                     } else {
-                        node.classList.add("logOdd");
+                        logNode.classList.add("logOdd");
                     }
                     logLineCount++;
-                    node.appendChild(document.createTextNode(
+                    logNode.appendChild(document.createTextNode(
                         logDate.toLocaleDateString() + " " + logDate.toLocaleTimeString() + ": " + logSplit[1]));
-                    document.getElementById("logStream").appendChild(node);
+                    document.getElementById("right").appendChild(logNode);
+                } else {
+                    moreData = false;
                 }
             });
+            if (moreData) {
+                updateLog();
+            }
         }
     }
     let timeStamp = lastLogEntryTime.toString(16);
+    // Left-pad zeros to 16 characters.
     while (timeStamp.length < 16) {
         timeStamp = "0" + timeStamp;
     }
@@ -43,28 +50,127 @@ function updateLog() {
     xhttp.send();
 }
 
+// ===== Frame Groups List
+var frameGroups = [];
+
+function updateFrameGroupsList(groupNumber) {
+    let xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            let group = JSON.parse(this.responseText);
+            frameGroups.push(group);
+            let li = document.createElement("li");
+            let a = document.createElement("a");
+            a.appendChild(document.createTextNode("Group " + groupNumber));
+            a.href = "javascript:drawGroup(" + groupNumber + ");";
+            li.appendChild(a);
+            document.getElementById("frameGroupsList").appendChild(li);
+            updateFrameGroupsList(groupNumber + 1);
+        }
+    }
+    let groupArg = groupNumber.toString(16);
+    while (groupArg.length < 8) {
+        groupArg = "0" + groupArg;
+    }
+    xhttp.open("GET", window.location.origin + "/group/" + groupArg);
+    xhttp.send();
+}
+
+function drawGroup(groupNumber) {
+    // Wipe out old contents.
+    let middleDiv = document.getElementById("middle");
+    while (middleDiv.firstChild) {
+        middleDiv.removeChild(middleDiv.firstChild);
+    }
+    // Render out each frame in its own div.
+    let group = frameGroups[groupNumber - 1];
+    let title = "Group " + groupNumber;
+    title = title + ", " + (group.lastFrame - group.firstFrame + 1) + " frames";
+    title = title + ", " + group.imageHashes.length + " unique quantized images";
+    let titleNode = document.createElement("h3");
+    titleNode.appendChild(document.createTextNode(title));
+    middleDiv.appendChild(titleNode);
+    let frameNumber = group.firstFrame;
+    while (frameNumber <= group.lastFrame) {
+        let frameDiv = document.createElement("div");
+        frameDiv.id = "frame-" + frameNumber;
+        middleDiv.appendChild(frameDiv);
+        let xhttpFrame = new XMLHttpRequest();
+        xhttpFrame.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                let frame = JSON.parse(this.responseText);
+                let p = document.createElement("p");
+                let frameText = "Frame " + frame.frameNumber + ", " + frame.frameTime + "us";
+                if (frame.isKeyFrame) {
+                    frameText = "[K] " + frameText;
+                }
+                p.appendChild(document.createTextNode(frameText));
+                frameDiv.appendChild(p);
+                let sourceImg = document.createElement("img");
+                sourceImg.src = window.location.origin + "/img/source/" + frame.sourceHash;
+                frameDiv.appendChild(sourceImg);
+                let xhttpMap = new XMLHttpRequest();
+                xhttpMap.onreadystatechange = function() {
+                    if (this.readyState == 4 && this.status == 200) {
+                        let quantHash = this.responseText;
+                        let quantImg = document.createElement("img");
+                        quantImg.src = window.location.origin + "/img/quantized/" + quantHash;
+                        frameDiv.appendChild(quantImg);
+                    }
+                }
+                xhttpMap.open("GET", window.location.origin + "/quantizeMap/" + frame.sourceHash);
+                xhttpMap.send();
+            }
+        }
+        let frameArg = frameNumber.toString(16);
+        while (frameArg.length < 8) {
+            frameArg = "0" + frameArg;
+        }
+        xhttpFrame.open("GET", window.location.origin + "/source/" + frameArg);
+        xhttpFrame.send();
+        frameNumber = frameNumber + 1;
+    }
+}
+
 window.onload = function() {
     setInterval(updateLog, 1000);
+    updateFrameGroupsList(1);
 };
         </script>
         <style>
-// Overall style
 body {
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: Arial;
+    height: 100vh;
+    overflow: hidden;
+    margin: 0;
 }
-.column {
+#content {
+    height: 100vh;
+}
+#left {
     float: left;
+    width: 10%;
+    height: 100vh;
+    overflow: auto;
+    box-sizing: border-box;
+    padding: 0.4em;
 }
-
-.left, .right {
-    width: 25%;
-}
-
-.middle {
+#middle {
+    float: left;
     width: 50%;
+    height: 100vh;
+    overflow: auto;
+    box-sizing: border-box;
+    padding: 0.4em;
 }
-
-// Logging
+#right {
+    float: left;
+    width: 40%;
+    height: 100vh;
+    overflow: auto;
+    box-sizing: border-box;
+    padding: 0.4em;
+}
 .logEven {
     background-color: #ccc;
 }
@@ -74,14 +180,19 @@ body {
         </style>
     </head>
     <body>
-        <div class="row">
-            <div class="column" id="leftNav">
-                <p>Status</p>
-                <p>Frame Group</p>
+        <div id="content">
+            <div id="left">
+                <ul>
+                    <li>Status</li>
+                    <li>Frame Groups
+                        <ul id="frameGroupsList">
+                        </ul>
+                    </li>
+                </ul>
             </div>
-            <div class="column" id="content">
+            <div id="middle">
             </div>
-            <div class="column" id="logStream">
+            <div id="right">
             </div>
         </div>
     </body>

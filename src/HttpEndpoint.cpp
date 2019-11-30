@@ -89,7 +89,6 @@ private:
 
     void serveFile(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
         std::string resource = m_htmlPath + (request.resource() == "/" ? "/index.html" : request.resource());
-        LOG_INFO("serving file %s", resource.c_str());
         Pistache::Http::serveFile(response, resource);
     }
 
@@ -107,13 +106,19 @@ private:
             snprintf(buf.data(), sizeof(buf), "%d", frameGroup->lastFrame());
             json += buf.data() + std::string(", \"imageHashes\":[");
             auto& hashes = *frameGroup->imageHashes();
+            bool appending = false;
             for (auto hash : hashes) {
+                if (appending) {
+                    json += ", ";
+                }
                 snprintf(buf.data(), sizeof(buf), "\"%016" PRIx64 "\"", hash);
-                json += buf.data() + std::string(", ");
+                json += buf.data();
+                appending = true;
             }
             json += "] }";
             response.send(Pistache::Http::Code::Ok, json, MIME(Application, Json));
         } else {
+            LOG_WARN("frame group number %s not found.", number.c_str());
             response.send(Pistache::Http::Code::Not_Found);
         }
     }
@@ -224,9 +229,9 @@ private:
             }
             frameJSON += ", \"frameTime\":";
             snprintf(buf.data(), sizeof(buf), "%" PRId64, sourceFrame->frameTime());
-            frameJSON += buf.data() + std::string(", \"sourceHash\":");
-            snprintf(buf.data(), sizeof(buf), "%" PRIx64, sourceFrame->sourceHash());
-            frameJSON += buf.data() + std::string(" }");
+            frameJSON += buf.data() + std::string(", \"sourceHash\":\"");
+            snprintf(buf.data(), sizeof(buf), "%016" PRIx64, sourceFrame->sourceHash());
+            frameJSON += buf.data() + std::string("\" }");
             response.send(Pistache::Http::Code::Ok, frameJSON, MIME(Application, Json));
         } else {
             response.send(Pistache::Http::Code::Not_Found);

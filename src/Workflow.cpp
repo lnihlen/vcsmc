@@ -123,7 +123,7 @@ void Workflow::run() {
                     LOG_INFO("end of source images for quantization.");
                     it->Seek("sourceFrame:00000000");
                     groupImages.clear();
-                    groupStartFrame = 0;
+                    groupStartFrame = 1;
                     groupNumber = 0;
                     state = kGroupFrames;
                 } else {
