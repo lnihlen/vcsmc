@@ -2,6 +2,7 @@
 
 #include "Logger.h"
 #include "Task.h"
+#include "Timer.h"
 
 namespace vcsmc {
 
@@ -35,13 +36,21 @@ void Workflow::run() {
             break;
         }
 
-        Task::Type nextType;
-        while ((nextType = task->load()) == type) {
+        Task::Type nextType = type;
+        while (nextType == type) {
+            Timer timer(m_db, type);
+
+            nextType = task->load();
+            if (nextType != type) {
+                break;
+            }
+
             if (!task->execute()) {
                 LOG_FATAL("error on execution of task %s", task->name());
                 m_quit = true;
                 break;
             }
+
             if (!task->store()) {
                 LOG_FATAL("error on storage of task %s", task->name());
                 m_quit = true;

@@ -77,6 +77,7 @@ set(CMAKE_CXX_STANDARD 17)
 ####
 # flatbuffer schema files
 set(vcsmc_schema_files
+    schemas/Duration.fbs
     schemas/FrameGroup.fbs
     schemas/SourceFrame.fbs
 )
@@ -120,6 +121,8 @@ set(vcsmc_core_files
     spec.h
     state.cc
     state.h
+    Timer.cpp
+    Timer.h
     tls_prng.cc
     tls_prng.h
     types.h

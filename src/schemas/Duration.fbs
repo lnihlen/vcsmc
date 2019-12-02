@@ -1,0 +1,10 @@
+namespace vcsmc.Data;
+
+table Duration {
+    type:int;
+    startTime:ulong;
+    stopTime:ulong;
+}
+
+root_type Duration;
+
