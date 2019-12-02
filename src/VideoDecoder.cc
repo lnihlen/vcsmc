@@ -13,7 +13,7 @@ extern "C" {
 #include "xxhash.h"
 #include "leveldb/db.h"
 
-#include <deque>
+#include <queue>
 
 namespace vcsmc {
 
@@ -102,11 +102,11 @@ class VideoDecoder::VideoDecoderImpl {
     video_frame_time_base_us_ = (format_context_->streams[video_stream_index_]->time_base.num * 1000 * 1000) /
         format_context_->streams[video_stream_index_]->time_base.den;
 
-    return SaveNextFrame();
+    return DecodeNextFrame();
   }
 
-  // Decode a frame, save in the database.
-  bool SaveNextFrame() {
+  // Decode a frame, save in the queue of decoded frames.
+  bool DecodeNextFrame() {
     AVPacket packet;
     av_init_packet(&packet);
     AVFrame* frame = av_frame_alloc();
@@ -162,19 +162,7 @@ class VideoDecoder::VideoDecoderImpl {
 
         frame_read = true;
         uint64_t frameHash = XXH64(planes.get(), kFrameSizeBytes * 3, 0);
-        leveldb::Status status;
-        std::array<char, 32> buf;
-        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
-        snprintf(buf.data(), sizeof(buf), "sourceImage:%016" PRIx64, frameHash);
-        if (!it->Valid() || it->key().ToString() != buf.data()) {
-            status = m_db->Put(leveldb::WriteOptions(), buf.data(), leveldb::Slice(reinterpret_cast<char*>(
-                planes.get()), kFrameSizeBytes * 3));
-            if (!status.ok()) {
-                LOG_FATAL("error writing frame bytes into database");
-                av_frame_free(&frame);
-                return false;
-            }
-        }
+        m_colorBytes.push(std::move(planes));
 
         flatbuffers::FlatBufferBuilder builder(1024);
         Data::SourceFrameBuilder frameBuilder(builder);
@@ -184,16 +172,8 @@ class VideoDecoder::VideoDecoderImpl {
         frameBuilder.add_sourceHash(frameHash);
         auto frameData = frameBuilder.Finish();
         builder.Finish(frameData);
-        snprintf(buf.data(), sizeof(buf), "sourceFrame:%08x", video_codec_context_->frame_number);
-        status = m_db->Put(leveldb::WriteOptions(), buf.data(),
-            leveldb::Slice(reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetSize()));
+        m_sourceFrames.push(builder.Release());
         av_frame_free(&frame);
-
-        if (!status.ok()) {
-            LOG_FATAL("error saving source frame %d into database.", video_codec_context_->frame_number);
-            return false;
-        }
-
       }
 
       av_packet_unref(&packet);
@@ -202,11 +182,45 @@ class VideoDecoder::VideoDecoderImpl {
     if (response == AVERROR_EOF) {
       at_end_of_file_ = true;
       av_packet_unref(&packet);
-      return false;
     }
 
     return true;
   }
+
+    bool SaveNextFrame() {
+        if (m_colorBytes.size() == 0) {
+            return true;
+        }
+
+        std::unique_ptr<uint8_t[]> planes = std::move(m_colorBytes.front());
+        m_colorBytes.pop();
+        flatbuffers::DetachedBuffer flatSource = std::move(m_sourceFrames.front());
+        m_sourceFrames.pop();
+        const Data::SourceFrame* sourceFrame = Data::GetSourceFrame(flatSource.data());
+        leveldb::Status status;
+
+        std::array<char, 32> buf;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        snprintf(buf.data(), sizeof(buf), "sourceImage:%016" PRIx64, sourceFrame->sourceHash());
+        if (!it->Valid() || it->key().ToString() != buf.data()) {
+            status = m_db->Put(leveldb::WriteOptions(), buf.data(), leveldb::Slice(reinterpret_cast<char*>(
+                planes.get()), kFrameSizeBytes * 3));
+            if (!status.ok()) {
+                LOG_FATAL("error writing frame bytes into database");
+                return false;
+            }
+        }
+
+        snprintf(buf.data(), sizeof(buf), "sourceFrame:%08x", sourceFrame->frameNumber());
+        status = m_db->Put(leveldb::WriteOptions(), buf.data(),
+            leveldb::Slice(reinterpret_cast<const char*>(flatSource.data()), flatSource.size()));
+        if (!status.ok()) {
+            LOG_FATAL("error saving source frame %d into database.", sourceFrame->frameNumber());
+            return false;
+        }
+
+        return true;
+    }
 
   bool AtEndOfFile() const {
     return at_end_of_file_;
@@ -223,15 +237,16 @@ class VideoDecoder::VideoDecoderImpl {
   }
 
  private:
-  AVFormatContext* format_context_;
-
-  AVCodec* video_codec_;
-  int video_stream_index_;
-  AVCodecContext* video_codec_context_;
-  SwsContext* resize_context_;
-  int64 video_frame_time_base_us_;
-  bool at_end_of_file_;
+    AVFormatContext* format_context_;
+    AVCodec* video_codec_;
+    int video_stream_index_;
+    AVCodecContext* video_codec_context_;
+    SwsContext* resize_context_;
+    int64 video_frame_time_base_us_;
+    bool at_end_of_file_;
     leveldb::DB* m_db;
+    std::queue<flatbuffers::DetachedBuffer> m_sourceFrames;
+    std::queue<std::unique_ptr<uint8_t[]>> m_colorBytes;
 };
 
 VideoDecoder::VideoDecoder(leveldb::DB* db) : p_(new VideoDecoderImpl(db)) {}
@@ -239,19 +254,23 @@ VideoDecoder::VideoDecoder(leveldb::DB* db) : p_(new VideoDecoderImpl(db)) {}
 VideoDecoder::~VideoDecoder() { delete p_; p_ = nullptr; }
 
 bool VideoDecoder::OpenFile(const std::string& file_name) {
-  return p_->OpenFile(file_name);
+    return p_->OpenFile(file_name);
 }
 
 bool VideoDecoder::AtEndOfFile() const {
-  return p_->AtEndOfFile();
+    return p_->AtEndOfFile();
 }
 
 void VideoDecoder::CloseFile() {
-  return p_->CloseFile();
+    return p_->CloseFile();
+}
+
+bool VideoDecoder::DecodeNextFrame() {
+    return p_->DecodeNextFrame();
 }
 
 bool VideoDecoder::SaveNextFrame() {
-  return p_->SaveNextFrame();
+    return p_->SaveNextFrame();
 }
 
 }  // namespace vcsmc

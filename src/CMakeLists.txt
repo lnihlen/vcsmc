@@ -162,6 +162,8 @@ target_include_directories(vcsmc_core PUBLIC
 # vcmsc_lib
 add_library(vcsmc_lib STATIC
     "${CMAKE_CURRENT_BINARY_DIR}/atari_ntsc_lab_color_table.cc"
+    Task.h
+    Task.cpp
 )
 
 target_link_libraries(vcsmc_lib PUBLIC
@@ -204,6 +206,15 @@ add_executable(run_unittests
 
 target_link_libraries(run_unittests
     gtest
+    vcsmc_lib
+)
+
+add_executable(run_benchmarks
+    run_benchmarks.cc
+)
+
+target_link_libraries(run_benchmarks
+    benchmark
     vcsmc_lib
 )
 
