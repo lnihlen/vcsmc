@@ -47,6 +47,8 @@ public:
             &HttpEndpoint::HttpHandler::serveFile, this));
         Pistache::Rest::Routes::Get(m_router, "/index.html", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::serveFile, this));
+        Pistache::Rest::Routes::Get(m_router, "/third_party/dygraph.min.js", Pistache::Rest::Routes::bind(
+            &HttpEndpoint::HttpHandler::serveFile, this));
 
         // Returns a JSON array of up to kMaxResponseSize characters with individual Duration elements packed within,
         // each with timestamp >= from. From is a 16-character hex string, microseconds from unix epoch.
