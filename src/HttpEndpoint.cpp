@@ -127,9 +127,11 @@ private:
                 snprintf(buf.data(), sizeof(buf), "%d", duration->type());
                 object += buf.data() + std::string(", \"startTime\":");
                 snprintf(buf.data(), sizeof(buf), "%" PRId64, duration->startTime());
-                object += buf.data() + std::string(", \"stopTime\":");
-                snprintf(buf.data(), sizeof(buf), "%" PRId64, duration->stopTime());
+                object += buf.data() + std::string(", \"duration\":");
+                snprintf(buf.data(), sizeof(buf), "%" PRId64, duration->duration());
                 object += buf.data() + std::string(" }");
+                it->Next();
+                if (!isDurationKey(it)) break;
             }
             json += " ]";
             response.send(Pistache::Http::Code::Ok, json, MIME(Application, Json));

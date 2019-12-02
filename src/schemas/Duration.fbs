@@ -3,7 +3,7 @@ namespace vcsmc.Data;
 table Duration {
     type:int;
     startTime:ulong;
-    stopTime:ulong;
+    duration:ulong;
 }
 
 root_type Duration;

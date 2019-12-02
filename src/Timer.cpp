@@ -23,7 +23,7 @@ Timer::~Timer() {
     Data::DurationBuilder durationBuilder(builder);
     durationBuilder.add_type(m_type);
     durationBuilder.add_startTime(m_startTime);
-    durationBuilder.add_stopTime(stopTime);
+    durationBuilder.add_duration(stopTime - m_startTime);
     auto duration = durationBuilder.Finish();
     builder.Finish(duration);
     std::array<char, 32> buf;

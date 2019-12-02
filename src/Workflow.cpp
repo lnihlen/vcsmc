@@ -37,7 +37,7 @@ void Workflow::run() {
         }
 
         Task::Type nextType = type;
-        while (nextType == type) {
+        while (!m_quit && nextType == type) {
             Timer timer(m_db, type);
 
             nextType = task->load();
