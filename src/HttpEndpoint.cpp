@@ -4,6 +4,7 @@
 #include "image_file.h"
 #include "Logger.h"
 
+#include "Duration_generated.h"
 #include "FrameGroup_generated.h"
 #include "SourceFrame_generated.h"
 
@@ -15,6 +16,7 @@
 
 #include <filesystem>
 #include <inttypes.h>
+#include <stdio.h>
 #include <string>
 
 namespace fs = std::filesystem;
@@ -45,6 +47,11 @@ public:
             &HttpEndpoint::HttpHandler::serveFile, this));
         Pistache::Rest::Routes::Get(m_router, "/index.html", Pistache::Rest::Routes::bind(
             &HttpEndpoint::HttpHandler::serveFile, this));
+
+        // Returns a JSON array of up to kMaxResponseSize characters with individual Duration elements packed within,
+        // each with timestamp >= from. From is a 16-character hex string, microseconds from unix epoch.
+        Pistache::Rest::Routes::Get(m_router, "/duration/:from", Pistache::Rest::Routes::bind(
+            &HttpEndpoint::HttpHandler::getDuration, this));
 
         // Returns some JSON with the frame group data. Number should be an 8 character hex string.
         Pistache::Rest::Routes::Get(m_router, "/group/:number", Pistache::Rest::Routes::bind(
@@ -92,6 +99,47 @@ private:
         Pistache::Http::serveFile(response, resource);
     }
 
+    void getDuration(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+        auto timeString = request.param(":from").as<std::string>();
+        std::string durationKey = "duration:";
+        if (timeString.size() == 16) {
+            durationKey += timeString;
+        }
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+        auto isDurationKey = [](auto& it) {
+            return it->Valid() && it->key().ToString().substr(0, 9) == "duration:";
+        };
+        it->Seek(durationKey);
+        if (isDurationKey(it)) {
+            std::string json = "[ ";
+            std::string object;
+            while (json.size() + object.size() < kMaxResponseContentSize - 2) {
+                if (json.size() > 2) json += ", ";
+                json += object;
+                const Data::Duration* duration = Data::GetDuration(it->value().data());
+                if (!duration) {
+                    LOG_WARN("error deserializing duration at key %s", it->key().data());
+                    response.send(Pistache::Http::Code::Internal_Server_Error);
+                    return;
+                }
+                object = "{ \"type\":";
+                std::array<char, 32> buf;
+                snprintf(buf.data(), sizeof(buf), "%d", duration->type());
+                object += buf.data() + std::string(", \"startTime\":");
+                snprintf(buf.data(), sizeof(buf), "%" PRId64, duration->startTime());
+                object += buf.data() + std::string(", \"stopTime\":");
+                snprintf(buf.data(), sizeof(buf), "%" PRId64, duration->stopTime());
+                object += buf.data() + std::string(" }");
+            }
+            json += " ]";
+            response.send(Pistache::Http::Code::Ok, json, MIME(Application, Json));
+        } else {
+            // Send back empty array to indicate done state.
+            response.send(Pistache::Http::Code::Ok, "[ ]", MIME(Application, Json));
+        }
+    }
+
+    // TODO: convert to sending JSON array, like duration.
     void getGroup(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
         auto number = request.param(":number").as<std::string>();
         std::string groupKey = "frameGroup:" + number;
@@ -170,6 +218,7 @@ private:
         }
     }
 
+    // TODO: convert to sending JSON array, just like duration.
     void getLog(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
         auto timeString = request.param(":from").as<std::string>();
         std::string logKey = "log:";
