@@ -222,3 +222,9 @@ target_link_libraries(run_benchmarks
     vcsmc_lib
 )
 
+add_custom_target(collect_benchmarks
+    COMMAND tools/collect_benchmarks.sh
+    DEPENDS run_benchmarks
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
