@@ -168,6 +168,8 @@ BENCHMARK(BM_Mean);
 BENCHMARK(BM_RgbToLab);
 BENCHMARK(BM_Ssim);
 BENCHMARK(BM_Variance);
-BENCHMARK(BM_QuantizeFrames);
+// Multi-threaded algorithms should use real time measurements.
+BENCHMARK(BM_QuantizeFrames)->UseRealTime();
+
 BENCHMARK_MAIN();
 
