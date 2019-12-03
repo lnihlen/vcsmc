@@ -26,6 +26,7 @@ namespace Data {
 // structured logging, and inclusion in benchmarks and time tracking.
 class Task {
 public:
+    // Manually kept in sync with the chart javascript in html/index.html.
     enum Type : int32_t {
         kInitial = 0,
         kDecodeFrames = 1,

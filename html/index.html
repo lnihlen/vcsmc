@@ -133,9 +133,97 @@ function drawGroup(groupNumber) {
     }
 }
 
+// ===== Durations
+var durationSums = [];
+const numberOfDurationTypes = 6;
+var lastDurationTime = 0;
+var currentDurationSums = null;
+var currentDurationStartTime = 0;
+var durationsGraph = null;
+
+function resetCurrentDurationSums(startTime, currentSums) {
+    currentDurationStartTime = startTime;
+    currentDurationSums = [ new Date(startTime / 1000.0) ];
+    if (currentSums != null) {
+        for (let i = 0; i < numberOfDurationTypes; i++) {
+            currentDurationSums.push(currentSums[i + 1]);
+        }
+    } else {
+        for (let i = 0; i < numberOfDurationTypes; i++) {
+            currentDurationSums.push(0);
+        }
+    }
+}
+
+function updateDurations() {
+    let xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            let durations = JSON.parse(this.responseText);
+            if (durations.length > 0) {
+                if (currentDurationSums == null) {
+                    resetCurrentDurationSums(durations[0].startTime, null);
+                }
+                durations.forEach(function(dur, index) {
+                    if (dur.startTime - currentDurationStartTime >= (5 * 1000 * 1000)) {
+                        durationSums.push(currentDurationSums);
+                        durationsGraph.updateOptions({ 'file': durationSums });
+                        resetCurrentDurationSums(dur.startTime, durationSums[durationSums.length - 1]);
+                    }
+                    currentDurationSums[dur.type + 1] += dur.duration;
+                    lastDurationTime = dur.startTime + 1;
+                });
+                // Got back non-zero length array, so request more data.
+                updateDurations();
+            }
+        }
+    }
+
+    let timeStamp = lastDurationTime.toString(16);
+    while (timeStamp.length < 16) {
+        timeStamp = "0" + timeStamp;
+    }
+    xhttp.open("GET", window.location.origin + "/duration/" + timeStamp);
+    xhttp.send();
+}
+
+function drawPerf() {
+    let middleDiv = document.getElementById("middle");
+    while (middleDiv.firstChild) {
+        middleDiv.removeChild(middleDiv.firstChild);
+    }
+    let titleNode = document.createElement("h3");
+    titleNode.appendChild(document.createTextNode("Task Categories Wall Clock Time in seconds"));
+    middleDiv.appendChild(titleNode);
+    // Create duration graph div.
+    let graphDiv = document.createElement("div");
+    middleDiv.appendChild(graphDiv);
+    durationsGraph = new Dygraph(graphDiv, durationSums, {
+        stackedGraph: true,
+        // Note these are currently hard-coded, copied from src/Task.h
+        labels: [
+            "Date",
+            "Initial",
+            "Decode Frames",
+            "Quantize Frames",
+            "Group Frames",
+            "Finished",
+            "Fatal"
+        ],
+        width: 800,
+        height: 600
+    });
+}
+
 window.onload = function() {
+    updateLog();
+    updateDurations();
     setInterval(updateLog, 1000);
+    setInterval(updateDurations, 5000);
     updateFrameGroupsList(1);
+
+    // Go to the perf page first.
+    drawPerf();
 };
         </script>
         <style>
@@ -184,7 +272,7 @@ body {
         <div id="content">
             <div id="left">
                 <ul>
-                    <li>Status</li>
+                    <li><a href="javascript:drawPerf();">Perf</a></li>
                     <li>Frame Groups
                         <ul id="frameGroupsList">
                         </ul>
