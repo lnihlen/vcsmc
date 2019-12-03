@@ -16,6 +16,7 @@
 
 #include <array>
 #include <inttypes.h>
+#include <random>
 
 namespace vcsmc {
 
@@ -201,6 +202,17 @@ bool QuantizeFrames::store() {
 
 bool QuantizeFrames::teardown() {
     return true;
+}
+
+void QuantizeFrames::setupBenchmark() {
+    Halide::Runtime::Buffer<uint8_t, 3> frameRGB(vcsmc::kTargetFrameWidthPixels, vcsmc::kFrameHeightPixels, 3);
+    std::random_device randomDevice;
+    std::default_random_engine randomEngine(randomDevice());
+    std::uniform_int_distribution<uint8_t> distribution(0, 255);
+
+    for (auto i = 0; i < vcsmc::kFrameSizeBytes * 3; ++i) {
+        frameRGB.begin()[i] = distribution(randomEngine);
+    }
 }
 
 // ===== kGroupFrames

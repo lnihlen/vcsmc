@@ -171,6 +171,7 @@ add_library(vcsmc_lib STATIC
 
 target_link_libraries(vcsmc_lib PUBLIC
     Halide
+    stdc++fs
     vcsmc_core
     vcsmc_image_processing
 )

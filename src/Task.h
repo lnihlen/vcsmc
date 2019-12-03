@@ -96,6 +96,9 @@ public:
     bool store() override;
     bool teardown() override;
 
+    // Set up member variables with test data so we can benchmark the execute() step.
+    void setupBenchmark();
+
 protected:
     std::unique_ptr<leveldb::Iterator> m_it;
     std::string m_sourceHash;

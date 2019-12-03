@@ -1,18 +1,13 @@
-#include "mean.h"
 #include "covariance.h"
+#include "gaussian_kernel.h"
+#include "mean.h"
 #include "ssim.h"
 #include "variance.h"
+
+#include "Halide.h"
 #include <gtest/gtest.h>
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-#pragma clang diagnostic ignored "-Wmissing-field-initializers"
-#include "Halide.h"
-#pragma clang diagnostic pop
-
 #include <cstring>
-
-#include "gaussian_kernel.h"
 
 namespace {
 
