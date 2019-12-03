@@ -2,7 +2,6 @@
 #define SRC_WORKFLOW_H_
 
 #include <future>
-#include <unordered_set>
 
 namespace leveldb {
 class DB;
@@ -22,9 +21,6 @@ public:
 
 private:
     void run();
-
-    bool saveFrameGroup(const std::unordered_set<uint64_t>& groupImages, int groupStartFrame, int lastFrameNumber,
-        int groupNumber);
 
     leveldb::DB* m_db;
     bool m_quit;

@@ -17,6 +17,7 @@ class VideoDecoder {
   ~VideoDecoder();
 
   bool OpenFile(const std::string& file_name);
+  bool DecodeNextFrame();
   bool SaveNextFrame();
   bool AtEndOfFile() const;
   void CloseFile();

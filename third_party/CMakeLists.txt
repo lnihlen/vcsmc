@@ -1,4 +1,11 @@
 ###
+# benchmark
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "disable benchmark testing")
+set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "disable install")
+set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "don't depend on googletest")
+add_subdirectory(benchmark)
+
+###
 # flatbuffers
 add_subdirectory(flatbuffers)
 
