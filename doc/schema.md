@@ -12,3 +12,7 @@ key: "quantizeMap:%016x", the parameter is the hex hash of the source image, the
 key: "quantImage:%016x", the parameter is the hex hash of the quant image, the value kFrameSizeBytes of color indices.
 
 key: "frameGroup:%08x", the parameter is the hex frame group number. Values are a FrameGroup flatbuffer.
+
+key: "groupStats:%08x", the parameter is the hex frame group number. Values are a GroupStats flatbuffer.
+
+key: "movieStats", no parameter. Holds a MovieStats flatbuffer.

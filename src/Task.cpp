@@ -8,6 +8,8 @@
 #include "VideoDecoder.h"
 
 #include "FrameGroup_generated.h"
+#include "GroupStats_generated.h"
+#include "MovieStats_generated.h"
 #include "SourceFrame_generated.h"
 
 #include "Halide.h"
@@ -47,6 +49,10 @@ std::unique_ptr<Task> Task::taskForType(Task::Type type, leveldb::DB* db) {
             task.reset(new GroupFrames(db));
             break;
 
+        case kGeneratePopulation:
+            task.reset(new GeneratePopulation(db));
+            break;
+
         case kFinished:
         case kFatal:
             break;
@@ -67,26 +73,58 @@ const char* DecodeFrames::name() {
     return "DecodeFrames";
 }
 
-bool DecodeFrames::setup() {
-    std::string moviePath;
-    leveldb::Status status = m_db->Get(leveldb::ReadOptions(), "FLAGS_movie_path", &moviePath);
+Task::Type DecodeFrames::setup() {
+    leveldb::Status status = m_db->Get(leveldb::ReadOptions(), "FLAGS_movie_path", &m_moviePath);
     if (!status.ok()) {
         LOG_FATAL("unable to read movie path from database");
-        return false;
+        return Type::kFatal;
+    }
+
+    // Check for an existing MovieStats object, which indicates the movie has already been decoded.
+    std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(leveldb::ReadOptions()));
+    it->Seek("movieStats");
+    if (it->Valid() && it->key().ToString() == "movieStats") {
+        // Pull record to compare path.
+        const Data::MovieStats* movieStats = Data::GetMovieStats(it->value().data());
+        if (!movieStats) {
+            LOG_FATAL("error deserializing MovieSstats flatbuffer");
+            return Type::kFatal;
+        }
+        if (flatbuffers::GetString(movieStats->moviePath()) != m_moviePath) {
+            LOG_WARN("already  decoded movie path %s differs from stored command-line argument path %s.",
+                flatbuffers::GetCstring(movieStats->moviePath()), m_moviePath.c_str());
+        }
+        LOG_INFO("MovieStats structure found, skipping decode step.");
+        return Type::kQuantizeFrames;
     }
 
     m_decoder.reset(new VideoDecoder(m_db));
-    LOG_INFO("opening movie file at %s for decoding.", moviePath.data());
-    if (!m_decoder->OpenFile(moviePath)) {
-        LOG_FATAL("error opening movie at %s", moviePath.data());
-        return false;
+    LOG_INFO("opening movie file at %s for decoding.", m_moviePath.data());
+    if (!m_decoder->OpenFile(m_moviePath)) {
+        LOG_FATAL("error opening movie at %s", m_moviePath.data());
+        return Type::kFatal;
     }
 
-    return true;
+    return Type::kDecodeFrames;
 }
 
 Task::Type DecodeFrames::load() {
     if (m_decoder->AtEndOfFile()) {
+        // Save MovieStats structure to database, so we'll skip the decode step in the future.
+        flatbuffers::FlatBufferBuilder builder(1024);
+        auto moviePath = builder.CreateString(m_moviePath);
+        Data::MovieStatsBuilder statsBuilder(builder);
+        statsBuilder.add_moviePath(moviePath);
+        statsBuilder.add_totalFrames(0);
+        statsBuilder.add_reportedDuration(0);
+        auto stats = statsBuilder.Finish();
+        builder.Finish(stats);
+        leveldb::Status status = m_db->Put(leveldb::WriteOptions(), "movieStats",
+            leveldb::Slice(reinterpret_cast<const char*>(builder.GetBufferPointer(), builder.GetSize())));
+        if (!status.ok()) {
+            LOG_FATAL("error saving movieStats key to database.");
+            return Type::kFatal;
+        }
         return Type::kQuantizeFrames;
     }
     return Type::kDecodeFrames;
@@ -121,10 +159,13 @@ const char* QuantizeFrames::name() {
     return "QuantizeFrames";
 }
 
-bool QuantizeFrames::setup() {
+Task::Type QuantizeFrames::setup() {
     m_it.reset(m_db->NewIterator(leveldb::ReadOptions()));
     m_it->Seek("sourceImage:0000000000000000");
-    return (m_it->Valid() && m_it->key().ToString().substr(0, 12) == "sourceImage:");
+    if (!m_it->Valid() || m_it->key().ToString().substr(0, 12) != "sourceImage:") {
+        return Type::kFatal;
+    }
+    return Type::kQuantizeFrames;
 }
 
 Task::Type QuantizeFrames::load() {
@@ -227,13 +268,16 @@ const char* GroupFrames::name() {
     return "GroupFrames";
 }
 
-bool GroupFrames::setup() {
+Task::Type GroupFrames::setup() {
     m_groupStartFrame = 1;
     m_groupNumber = 0;
     m_lastFrameNumber = 0;
     m_it.reset(m_db->NewIterator(leveldb::ReadOptions()));
     m_it->Seek("sourceFrame:00000000");
-    return (m_it->Valid() && m_it->key().ToString().substr(0, 12) == "sourceFrame:");
+    if (!m_it->Valid() || m_it->key().ToString().substr(0, 12) != "sourceFrame:") {
+        return Type::kFatal;
+    }
+    return Type::kGroupFrames;
 }
 
 Task::Type GroupFrames::load() {
@@ -242,7 +286,7 @@ Task::Type GroupFrames::load() {
         if (!lastSaved) {
             return Type::kFatal;
         }
-        return Type::kFinished;
+        return Type::kFinished; // FIXME
     }
 
     m_sourceFrame = Data::GetSourceFrame(m_it->value().data());
@@ -315,6 +359,117 @@ bool GroupFrames::saveFrameGroup() {
     return status.ok();
 }
 
+
+// ===== kGeneratePopulation
+GeneratePopulation::GeneratePopulation(leveldb::DB* db) :
+    Task(db),
+    m_groupNumber(0),
+    m_frameGroup(nullptr),
+    m_allGroupsFinished(false) {
+}
+
+GeneratePopulation::~GeneratePopulation() {
+}
+
+const char* GeneratePopulation::name() {
+    return "GeneratePopulation";
+}
+
+// (++) Identify new frame group to fit against.
+// Pick parameters for kernel generation. They are a fixed number of kernels per image (say 10k), but a max cap of 1M
+// kernels, so divide down in that case.
+// Generate an initial population of kernels for all frames.
+// Now the main evaluation loop:
+// (**) For any unscored kernels in the generation:
+//      sequence (per-frame, could consider per frame group)
+//      simulate
+//      score (per-frame).
+//  Now everyone should have a score.
+//  Conduct frame-only tournament. Sort frames by victories.
+//  Check if all frames have met score criteria or if we've hit generation cap, if so go to (++)
+//  Generating next generation:
+//      Sort per-frame for winners and select survivors for next generation.
+//  Some kind of cross-frame breeding of winners
+//  Fill balance of generation with new codons which are offspring of the winners.
+//  Go back to (**)
+
+// Each major step should have a way of determining if it should be skipped. So DecodeFrames (should rename to DecodeVideo)
+// should be able to check that the video has already been decoded, and if so advance to the next state. (and not be
+// counted in the time durations). Maybe a function Task::Type checkForPreviousCompletion() or something? Instead - 
+// setup() can also return a state change.
+//
+// Then for individual iterations we can also check. There should be a way to ignore these Durations too, probably with
+// an additional function to Timer that says discard.
+
+Task::Type GeneratePopulation::setup() {
+    // TODO: move much of this to load(), I think
+    //
+    // Iterate through FrameGroups keys to find first unfinished or absent GroupStats key.
+    m_groups.reset(m_db->NewIterator(leveldb::ReadOptions()));
+    m_groups->Seek("frameGroup:00000000");
+    auto isFrameGroup = [](auto& it) {
+        return it->Valid() && it->key().ToString().substr(0, 11) == "frameGroup:";
+    };
+    if (!isFrameGroup(m_groups)) {
+        LOG_FATAL("GeneratePopulation unable to find frameGroup keys.");
+        return Type::kFatal;
+    }
+
+    std::unique_ptr<leveldb::Iterator> stats(m_db->NewIterator(leveldb::ReadOptions()));
+
+    while (isFrameGroup(m_groups)) {
+        std::string statsKey = "stats:" + m_groups->key().ToString().substr(11);
+        stats->Seek(statsKey);
+        if (stats->Valid() && stats->key().ToString() == statsKey) {
+            const Data::GroupStats* groupStats = Data::GetGroupStats(stats->value().data());
+            if (!groupStats) {
+                LOG_FATAL("error deserializing GroupStas record for key %s", statsKey.data());
+                return Type::kFatal;
+            }
+            if (!groupStats->isFinished()) {
+                // This means we should transition to one of the intermediate states? Like GeneratePopulation is only
+                // for completely new situations?
+                break;
+            }
+        } else {
+            break;
+        }
+        m_groups->Next();
+    }
+
+    if (isFrameGroup(m_groups)) {
+        m_groupNumber = strtol(m_groups->key().data() + 11, nullptr, 16);
+        m_frameGroup = Data::GetFrameGroup(m_groups->value().data());
+    } else {
+        LOG_INFO("marking all groups as finished.");
+        m_allGroupsFinished = true;
+    }
+
+    return Type::kGeneratePopulation;
+}
+
+
+Task::Type GeneratePopulation::load() {
+    if (m_allGroupsFinished) {
+        return Type::kFinished;
+    }
+
+    // We know what frame group we're working with. It is assumed we are generating the first generation only, and
+    // creating the table structures to do fitting for a new framegroup. 
+    return Type::kGeneratePopulation;
+}
+
+bool GeneratePopulation::execute() {
+    return false;
+}
+
+bool GeneratePopulation::store() {
+    return false;
+}
+
+bool GeneratePopulation::teardown() {
+    return false;
+}
 
 }  // namespace vcsmc
 

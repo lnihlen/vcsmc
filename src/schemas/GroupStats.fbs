@@ -1,0 +1,13 @@
+namespace vcsmc.Data;
+
+table GroupStats {
+    generationSize:int;
+    scoreMean:float;
+    scoreVariance:float;
+
+    numberOfGenerations:int;
+    isFinished:bool;
+}
+
+root_type GroupStats;
+

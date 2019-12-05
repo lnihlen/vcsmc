@@ -4,6 +4,14 @@ Building is currently only supported on Linux.
 CMake is the build system.
 You will need to build llvm and clang from source.
 
+We need the following ubuntu packages:
+ * m4
+ * libpng-dev
+ * libz-dev
+ * libavcodec-dev
+ * libavformat-dev
+ * libswscale-dev
+
 ### Halide and LLVM
 
 This program uses [Halide](https://github.com/halide/Halide) as a toolchain for Ahead-of-Time compilation of vectorized
