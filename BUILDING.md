@@ -11,6 +11,9 @@ We need the following ubuntu packages:
  * libavcodec-dev
  * libavformat-dev
  * libswscale-dev
+ * libomp-dev
+ * libelf-dev (for getting clang to build OpenMP support)
+ * libffi-dev (same as above)
 
 ### Halide and LLVM
 

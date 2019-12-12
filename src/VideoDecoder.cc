@@ -277,5 +277,9 @@ bool VideoDecoder::SaveNextFrame() {
     return p_->SaveNextFrame();
 }
 
+int64_t VideoDecoder::reportedDuration() {
+    return p_->reportedDuration();
+}
+
 }  // namespace vcsmc
 

@@ -116,7 +116,7 @@ Task::Type DecodeFrames::load() {
         Data::MovieStatsBuilder statsBuilder(builder);
         statsBuilder.add_moviePath(moviePath);
         statsBuilder.add_totalFrames(0);
-        statsBuilder.add_reportedDuration(0);
+        statsBuilder.add_reportedDuration(m_decoder->reportedDuration());
         auto stats = statsBuilder.Finish();
         builder.Finish(stats);
         leveldb::Status status = m_db->Put(leveldb::WriteOptions(), "movieStats",
