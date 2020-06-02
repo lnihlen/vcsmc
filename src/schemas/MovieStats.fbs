@@ -1,0 +1,10 @@
+namespace vcsmc.Data;
+
+table MovieStats {
+    moviePath:string;
+    totalFrames:int;
+    reportedDuration:long;
+}
+
+root_type MovieStats;
+

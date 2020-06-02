@@ -79,6 +79,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(vcsmc_schema_files
     schemas/Duration.fbs
     schemas/FrameGroup.fbs
+    schemas/GroupStats.fbs
+    schemas/MovieStats.fbs
     schemas/SourceFrame.fbs
 )
 

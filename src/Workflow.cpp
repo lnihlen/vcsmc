@@ -30,38 +30,42 @@ void Workflow::run() {
     while (!m_quit) {
         LOG_INFO("starting on task %s", task->name());
 
-        if (!task->setup()) {
-            LOG_FATAL("error on setup of task %s", task->name());
-            m_quit = true;
-            break;
+        bool skipTeardown = false;
+        Task::Type nextType = task->setup();
+        if (nextType != type) {
+            skipTeardown = true;
         }
 
-        Task::Type nextType = type;
         while (!m_quit && nextType == type) {
             Timer timer(m_db, type);
 
             nextType = task->load();
             if (nextType != type) {
+                timer.setDiscard(true);
                 break;
             }
 
             if (!task->execute()) {
                 LOG_FATAL("error on execution of task %s", task->name());
                 m_quit = true;
+                timer.setDiscard(true);
                 break;
             }
 
             if (!task->store()) {
                 LOG_FATAL("error on storage of task %s", task->name());
+                timer.setDiscard(true);
                 m_quit = true;
                 break;
             }
         }
 
-        if (!task->teardown()) {
-            LOG_FATAL("error tearing down task %s", task->name());
-            m_quit = true;
-            break;
+        if (!skipTeardown) {
+            if (!task->teardown()) {
+                LOG_FATAL("error tearing down task %s", task->name());
+                m_quit = true;
+                break;
+            }
         }
 
         type = nextType;

@@ -47,8 +47,7 @@ class VideoDecoder::VideoDecoderImpl {
     // Iterate through all streams in file to find the first video stream.
     for (size_t i = 0; i < format_context_->nb_streams; ++i) {
       // Find the appropriate decoder for this stream, if available.
-      AVCodecParameters* stream_parameters =
-          format_context_->streams[i]->codecpar;
+      AVCodecParameters* stream_parameters = format_context_->streams[i]->codecpar;
       AVCodec* codec = avcodec_find_decoder(stream_parameters->codec_id);
 
       // Skip streams with unsupported codecs for now.
@@ -236,6 +235,11 @@ class VideoDecoder::VideoDecoderImpl {
     video_codec_context_ = nullptr;
   }
 
+    // Duration in format_context_, in us.
+    int64_t reportedDuration() {
+      return format_context_->duration * video_frame_time_base_us_;
+    }
+
  private:
     AVFormatContext* format_context_;
     AVCodec* video_codec_;
@@ -271,6 +275,10 @@ bool VideoDecoder::DecodeNextFrame() {
 
 bool VideoDecoder::SaveNextFrame() {
     return p_->SaveNextFrame();
+}
+
+int64_t VideoDecoder::reportedDuration() {
+    return p_->reportedDuration();
 }
 
 }  // namespace vcsmc

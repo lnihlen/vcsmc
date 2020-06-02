@@ -19,6 +19,7 @@ namespace vcsmc {
 
 class VideoDecoder;
 namespace Data {
+    class FrameGroup;
     class SourceFrame;
 };
 
@@ -29,11 +30,23 @@ public:
     // Manually kept in sync with the chart javascript in html/index.html.
     enum Type : int32_t {
         kInitial = 0,
+
+        // Movie decode and input frame preparation.
         kDecodeFrames = 1,
         kQuantizeFrames = 2,
         kGroupFrames = 3,
-        kFinished = 4,
-        kFatal = 5
+
+        // Evolutionary Programming Iterations on Frame Groups
+        kGeneratePopulation = 4,
+/*
+        kSequencePopulation = 5,
+        kSimulatePopulation = 6,
+        kScorePopulation = 7,
+        kTournamentPopulation = 8,
+        kPropagatePopulation = 9,
+*/
+        kFinished = 10,
+        kFatal = 11
     };
 
     // Given an enumerated type, returns the associated Task pointer.
@@ -45,8 +58,10 @@ public:
     // Return a string with the name of the task.
     virtual const char* name() = 0;
 
-    // Called first, perform any one-time setup functions.
-    virtual bool setup() = 0;
+    // Called first, perform any one-time setup functions. Can detect that this step has already been performed, in
+    // which case will return a different Task::Type than its own kind. On error returns kFatal. If a different task
+    // type is returned, teardown() will not be called.
+    virtual Task::Type setup() = 0;
 
     // Called iteratively in order load(), execute(), store(), until a different Task::Type than the one currently
     // running is returned by load(). Sets up whatever internal buffers are needed for processing during the benchmarked
@@ -67,20 +82,20 @@ protected:
     leveldb::DB* m_db;
 };
 
-
 class DecodeFrames : public Task {
 public:
     DecodeFrames(leveldb::DB* db);
     virtual ~DecodeFrames();
 
     const char* name() override;
-    bool setup() override;
+    Task::Type setup() override;
     Task::Type load() override;
     bool execute() override;
     bool store() override;
     bool teardown() override;
 
 protected:
+    std::string m_moviePath;
     std::unique_ptr<VideoDecoder> m_decoder;
 };
 
@@ -90,7 +105,7 @@ public:
     virtual ~QuantizeFrames();
 
     const char* name() override;
-    bool setup() override;
+    Task::Type setup() override;
     Task::Type load() override;
     bool execute() override;
     bool store() override;
@@ -116,7 +131,7 @@ public:
     virtual ~GroupFrames();
 
     const char* name() override;
-    bool setup() override;
+    Task::Type setup() override;
     Task::Type load() override;
     bool execute() override;
     bool store() override;
@@ -131,6 +146,25 @@ protected:
     int m_groupNumber;
     int m_lastFrameNumber;
     const Data::SourceFrame* m_sourceFrame;
+};
+
+class GeneratePopulation : public Task {
+public:
+    GeneratePopulation(leveldb::DB* db);
+    virtual ~GeneratePopulation();
+
+    const char* name() override;
+    Task::Type setup() override;
+    Task::Type load() override;
+    bool execute() override;
+    bool store() override;
+    bool teardown() override;
+
+protected:
+    std::unique_ptr<leveldb::Iterator> m_groups;
+    int m_groupNumber;
+    const Data::FrameGroup* m_frameGroup;
+    bool m_allGroupsFinished;
 };
 
 }  // namespace vcsmc
